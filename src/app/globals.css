@@ -1,6 +1,6 @@
 :root {
-  background: #fbfbfc;
-  color: #16181d;
+  background: #0d0911;
+  color: #f4eee7;
   font-family:
     ui-sans-serif,
     -apple-system,
@@ -21,6 +21,7 @@ body {
 
 body {
   overflow: hidden;
+  background: #0d0911;
 }
 
 button,
@@ -33,4 +34,3 @@ textarea {
 .tabular-nums {
   font-variant-numeric: tabular-nums;
 }
-

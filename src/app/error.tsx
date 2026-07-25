@@ -13,8 +13,8 @@ export default function Error({
   return (
     <main className={styles.routeError} role="alert">
       <AlertTriangle size={30} />
-      <h1>VIP Floor fixtureを表示できません</h1>
-      <p>fixtureの初期化に失敗しました。外部通信は行われていません。</p>
+      <h1>VIP Floorを表示できません</h1>
+      <p>画面の初期化に失敗しました。再試行しても直らない場合は管理者へ連絡してください。</p>
       <button type="button" onClick={reset}>
         <RefreshCw size={16} />
         再試行
@@ -22,4 +22,3 @@ export default function Error({
     </main>
   );
 }
-

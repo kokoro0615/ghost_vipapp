@@ -1,44 +1,7 @@
-import type {
-  AssignmentCommand,
-  CancellationCommand,
-  CustomerProfileCommand,
-  ReservationNoteCommand,
-  ScheduleCommand,
-  SeatExtensionCommand,
-  ServiceStatusCommand,
-  VipBlockCreateCommand,
-  VipFloorBoardV2,
-  VipFloorErrorCode,
-  WalkInCommand,
-} from "@/lib/vipFloorV2Contract";
+import type { VipFloorBoardV2, VipServiceStatus } from "@/lib/vipFloorV2Contract";
 
 export const WORKSPACE_VIEWS = ["floor", "timeline", "list"] as const;
 export type WorkspaceView = (typeof WORKSPACE_VIEWS)[number];
-
-export const SCENARIO_KEYS = [
-  "healthy",
-  "opening_empty",
-  "loading",
-  "stale",
-  "reconnecting",
-  "read_error",
-  "read_only",
-  "masked_customer",
-  "late_no_contact",
-  "partial_arrival",
-  "service_progression",
-  "unassigned",
-  "connected_tables",
-  "table_locked",
-  "reservation_block",
-  "capacity_warning",
-  "version_conflict",
-  "table_time_conflict",
-  "refund_review",
-  "long_labels",
-  "dense_stress",
-] as const;
-export type ScenarioKey = (typeof SCENARIO_KEYS)[number];
 
 export type GlobalUiState =
   | "healthy"
@@ -52,62 +15,30 @@ export type GlobalUiState =
 export const COMMAND_KINDS = [
   "service_status",
   "check_in",
+  "arrival_time",
   "assignment",
-  "schedule",
   "seat_extension",
-  "block",
   "note",
-  "walk_in",
-  "cancel_refund",
-  "customer",
 ] as const;
 export type CommandKind = (typeof COMMAND_KINDS)[number];
 
-export type FixtureResultMode =
-  | "success"
-  | "validation"
-  | "permission"
-  | "version_conflict"
-  | "time_conflict"
-  | "block_conflict"
-  | "capacity_override";
-
-export type FixtureCommandDraft =
-  | { kind: "service_status"; reservationId: string; payload: ServiceStatusCommand }
-  | { kind: "check_in"; reservationId: string; payload: ServiceStatusCommand }
-  | { kind: "assignment"; reservationId: string; payload: AssignmentCommand }
-  | { kind: "schedule"; reservationId: string; payload: ScheduleCommand }
-  | { kind: "seat_extension"; reservationId: string; payload: SeatExtensionCommand }
-  | { kind: "block"; operation: "create" | "edit" | "remove"; reservationId: string | null; blockId: string | null; payload: VipBlockCreateCommand }
-  | { kind: "note"; operation: "create" | "edit" | "pin"; reservationId: string; payload: ReservationNoteCommand }
-  | { kind: "walk_in"; reservationId: null; payload: WalkInCommand }
-  | { kind: "cancel_refund"; reservationId: string; payload: CancellationCommand }
-  | { kind: "customer"; reservationId: string; payload: CustomerProfileCommand };
-
-export type FixtureCommandOutcome =
-  | {
-      ok: true;
-      board: VipFloorBoardV2;
-      message: string;
-      auditLabel: string;
-    }
-  | {
-      ok: false;
-      code: VipFloorErrorCode;
-      message: string;
-      recovery: string;
-    };
-
-export type ScenarioDefinition = {
-  key: ScenarioKey;
-  label: string;
-  state: GlobalUiState;
-  description: string;
-  defaultView?: WorkspaceView;
-  defaultSelection?: string | null;
-  readOnly?: boolean;
-  board: VipFloorBoardV2;
+export type LiveCommandDraft = {
+  kind: CommandKind;
+  reservationId: string;
+  expectedUpdatedAt: string;
+  payload: {
+    reason: string;
+    occurredAt?: string;
+    serviceStatus?: VipServiceStatus;
+    tableIds?: string[];
+    extendMinutes?: number;
+    note?: string;
+  };
 };
+
+export type CommandOutcome =
+  | { ok: true; message: string }
+  | { ok: false; code: string; message: string; recovery: string };
 
 export type QueueGroup = {
   key: string;
@@ -143,4 +74,26 @@ export type HistoryEntry = {
   actor: string;
   label: string;
   detail: string;
+};
+
+export type WorkspaceState = {
+  board: VipFloorBoardV2;
+  globalState: GlobalUiState;
+  stateDescription: string;
+  view: WorkspaceView;
+  selectedReservationId: string | null;
+  selectedTableId: string | null;
+  sectionId: string;
+  query: string;
+  statusFilter: string;
+  density: "compact" | "comfortable";
+  timelineZoom: 15 | 30 | 60;
+  queueCollapsed: boolean;
+  inspectorCollapsed: boolean;
+  mobileInspectorOpen: boolean;
+  command: { open: boolean; kind: CommandKind; step: 1 | 2 };
+  pending: boolean;
+  message: string;
+  conflict: CommandOutcome | null;
+  history: HistoryEntry[];
 };

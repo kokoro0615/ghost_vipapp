@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CalendarClock, ChevronLeft, ChevronRight, CircleDollarSign, ClipboardList, LockKeyhole, MapPin, NotebookPen, ShieldCheck, UserRound, UsersRound } from "lucide-react";
+import { CalendarClock, ChevronLeft, ChevronRight, CircleDollarSign, ClipboardList, MapPin, NotebookPen, ShieldCheck, UserRound, UsersRound } from "lucide-react";
 
 import type { VipFloorBoardV2 } from "@/lib/vipFloorV2Contract";
 
@@ -14,13 +14,11 @@ type Tab = (typeof tabs)[number];
 
 const commandButtons: Array<{ kind: CommandKind; label: string }> = [
   { kind: "check_in", label: "Check in" },
+  { kind: "arrival_time", label: "到着時刻" },
   { kind: "service_status", label: "接客状態" },
   { kind: "assignment", label: "席割当" },
-  { kind: "schedule", label: "時間変更" },
-  { kind: "seat_extension", label: "延長" },
+  { kind: "seat_extension", label: "30分延長" },
   { kind: "note", label: "メモ" },
-  { kind: "customer", label: "顧客編集" },
-  { kind: "cancel_refund", label: "取消 / 返金" },
 ];
 
 type Props = {
@@ -38,7 +36,6 @@ type Props = {
 export function Inspector({ board, reservation, selectedTableId, history, collapsed = false, instance, readOnly, onCollapse, onCommand }: Props) {
   const [tab, setTab] = useState<Tab>("overview");
   const table = board.tables.find((item) => item.id === selectedTableId) ?? null;
-  const source = reservation ? board.reservations.find((item) => item.id === reservation.id) ?? null : null;
   const meta = getStatusMeta(reservation?.serviceStatus);
   const StatusIcon = meta.icon;
   const notes = reservation ? board.notes.filter((note) => note.reservationId === reservation.id) : [];
@@ -74,19 +71,25 @@ export function Inspector({ board, reservation, selectedTableId, history, collap
               <div><dt><ShieldCheck size={14} /> 版</dt><dd>v{reservation.version}</dd></div>
               <div><dt><ClipboardList size={14} /> 例外</dt><dd>{reservation.exceptionLabel ?? "なし"}</dd></div>
             </dl> : null}
-            {tab === "guest" ? <div className={styles.detailStack}><p className={styles.maskedName}><UserRound size={17} />{reservation.guestLabel}</p><p>連絡先はfixtureでは保存・表示しません。顧客情報は常にマスクされています。</p><small>表示言語: {String(source?.customer?.languageCode ?? "ja")}</small></div> : null}
+            {tab === "guest" ? <div className={styles.detailStack}><p className={styles.maskedName}><UserRound size={17} />{reservation.guestLabel}</p><p>この端末では業務に必要なマスク済み表示名のみ扱います。</p><small>電話・メール・個人情報exportは対象外です。</small></div> : null}
             {tab === "service" ? <div className={styles.detailStack}><p><StatusIcon size={16} /> {meta.label}</p><p>source: {reservation.sourceLabel}</p><p>table lock: {table?.operationalLocked ? table.lockReason : "なし"}</p><p>flags: {reservation.flags.join(", ") || "なし"}</p></div> : null}
-            {tab === "payment" ? <div className={styles.detailStack}><p><CircleDollarSign size={16} /> {String(source?.payment?.status ?? "未確認")}</p><p className="tabular-nums">金額: ¥{Number(source?.payment?.amountYen ?? 0).toLocaleString("ja-JP")}</p><p>provider情報はfixture UIへ保持しません。</p></div> : null}
+            {tab === "payment" ? <div className={styles.detailStack}><p><CircleDollarSign size={16} /> 対象外</p><p>決済・返金操作はこのVIP Floorアプリでは行いません。</p><small>必要な場合はGHOST本体の承認済み手順を使用してください。</small></div> : null}
             {tab === "notes" ? <div className={styles.noteList}>{notes.length ? notes.map((note) => <article key={note.id}><strong><NotebookPen size={14} />{note.pinned ? "固定メモ" : "メモ"}</strong><p>{note.body}</p><small>v{note.version} / {note.kind}</small></article>) : <p>メモはありません。</p>}</div> : null}
             {tab === "history" ? <ol className={styles.historyList}>{history.map((item) => <li key={item.id}><span>{new Intl.DateTimeFormat("ja-JP", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Tokyo" }).format(new Date(item.at))}</span><div><strong>{item.label}</strong><p>{item.detail}</p><small>{item.actor}</small></div></li>)}</ol> : null}
           </div>
 
           <div className={styles.commandGrid} aria-label="予約操作">
-            {commandButtons.map((command) => <button key={command.kind} type="button" onClick={() => onCommand(command.kind)} disabled={readOnly} data-danger={command.kind === "cancel_refund" || undefined}>{command.kind === "cancel_refund" ? <LockKeyhole size={14} /> : null}{command.label}</button>)}
+            {commandButtons.map((command) => {
+              const unavailableForState =
+                (command.kind === "check_in" && reservation.lifecycleStatus === "checked_in")
+                || (command.kind === "seat_extension" && reservation.lifecycleStatus !== "checked_in")
+                || (command.kind === "assignment" && reservation.lifecycleStatus === "checked_in");
+              return <button key={command.kind} type="button" onClick={() => onCommand(command.kind)} disabled={readOnly || unavailableForState}>{command.label}</button>;
+            })}
           </div>
         </>
       ) : table ? (
-        <div className={styles.noSelection}><MapPin size={24} /><h2>{table.displayCode}</h2><p>{table.name} / {table.capacityMin}-{table.capacityMax}名</p><p>{table.operationalLocked ? table.lockReason : "空席。店頭VIPまたは予約ブロックを作成できます。"}</p><button type="button" className={styles.primaryButton} onClick={() => onCommand("walk_in")} disabled={readOnly}>店頭VIPを作成</button><button type="button" className={styles.secondaryButton} onClick={() => onCommand("block")} disabled={readOnly}>Blockを作成</button></div>
+        <div className={styles.noSelection}><MapPin size={24} /><h2>{table.displayCode}</h2><p>{table.name} / {table.capacityMin}-{table.capacityMax}名</p><p>{table.operationalLocked ? table.lockReason : "空席。予約を選択すると、この卓へ割り当てできます。"}</p></div>
       ) : (
         <div className={styles.noSelection}><MapPin size={24} /><h2>席または予約を選択</h2><p>floor node、timeline bar、list row、queue itemのいずれからでも同じinspectorを開けます。</p></div>
       )}

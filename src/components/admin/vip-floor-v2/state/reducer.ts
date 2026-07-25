@@ -1,30 +1,17 @@
 import type { VipFloorBoardV2 } from "@/lib/vipFloorV2Contract";
 
-import type { CommandKind, FixtureCommandOutcome, FixtureResultMode, HistoryEntry, ScenarioDefinition, WorkspaceView } from "../contract/uiTypes";
-
-export type WorkspaceState = {
-  scenario: ScenarioDefinition;
-  board: VipFloorBoardV2;
-  view: WorkspaceView;
-  selectedReservationId: string | null;
-  selectedTableId: string | null;
-  sectionId: string;
-  query: string;
-  statusFilter: string;
-  density: "compact" | "comfortable";
-  timelineZoom: 15 | 30 | 60;
-  queueCollapsed: boolean;
-  inspectorCollapsed: boolean;
-  mobileInspectorOpen: boolean;
-  command: { open: boolean; kind: CommandKind; step: 1 | 2; resultMode: FixtureResultMode };
-  pending: boolean;
-  message: string;
-  conflict: FixtureCommandOutcome | null;
-  history: HistoryEntry[];
-};
+import type {
+  CommandKind,
+  CommandOutcome,
+  GlobalUiState,
+  HistoryEntry,
+  WorkspaceState,
+  WorkspaceView,
+} from "../contract/uiTypes";
 
 export type WorkspaceAction =
-  | { type: "scenario"; scenario: ScenarioDefinition }
+  | { type: "hydrate"; board: VipFloorBoardV2; message: string; actor?: string }
+  | { type: "globalState"; state: GlobalUiState; description: string; message?: string }
   | { type: "view"; view: WorkspaceView }
   | { type: "selectReservation"; reservationId: string | null }
   | { type: "selectTable"; tableId: string | null; reservationId?: string | null }
@@ -39,21 +26,18 @@ export type WorkspaceAction =
   | { type: "openCommand"; kind: CommandKind }
   | { type: "closeCommand" }
   | { type: "commandStep"; step: 1 | 2 }
-  | { type: "resultMode"; mode: FixtureResultMode }
   | { type: "pending"; pending: boolean }
-  | { type: "commandOutcome"; outcome: FixtureCommandOutcome }
-  | { type: "retryRead" };
+  | { type: "commandOutcome"; outcome: CommandOutcome }
+  | { type: "history"; entry: HistoryEntry };
 
-export function createInitialState(scenario: ScenarioDefinition): WorkspaceState {
-  const selection = scenario.defaultSelection
-    ? scenario.board.reservations.find((item) => item.publicCode === scenario.defaultSelection)?.id ?? null
-    : scenario.board.reservations[0]?.id ?? null;
+export function createInitialState(board: VipFloorBoardV2): WorkspaceState {
   return {
-    scenario,
-    board: structuredClone(scenario.board),
-    view: scenario.defaultView ?? "list",
-    selectedReservationId: selection,
-    selectedTableId: scenario.board.reservations.find((item) => item.id === selection)?.tableIds[0] ?? null,
+    board,
+    globalState: "loading",
+    stateDescription: "GHOST予約台帳へ安全に接続しています。",
+    view: "list",
+    selectedReservationId: null,
+    selectedTableId: null,
     sectionId: "all",
     query: "",
     statusFilter: "all",
@@ -62,22 +46,40 @@ export function createInitialState(scenario: ScenarioDefinition): WorkspaceState
     queueCollapsed: false,
     inspectorCollapsed: false,
     mobileInspectorOpen: false,
-    command: { open: false, kind: "service_status", step: 1, resultMode: "success" },
+    command: { open: false, kind: "service_status", step: 1 },
     pending: false,
-    message: "Fixture only / 外部通信なし",
+    message: "認証を確認しています",
     conflict: null,
-    history: [
-      { id: "initial", at: scenario.board.generatedAt, actor: "Fixture Operator", label: "営業ボードを準備", detail: scenario.label },
-    ],
+    history: [],
   };
 }
 
 export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction): WorkspaceState {
   switch (action.type) {
-    case "scenario": {
-      const next = createInitialState(action.scenario);
-      return { ...next, view: action.scenario.defaultView ?? state.view };
+    case "hydrate": {
+      const selectionStillExists = state.board.reservations.some((item) => item.id === state.selectedReservationId)
+        && action.board.reservations.some((item) => item.id === state.selectedReservationId);
+      const selectedReservationId = selectionStillExists
+        ? state.selectedReservationId
+        : action.board.reservations[0]?.id ?? null;
+      const selectedReservation = action.board.reservations.find((item) => item.id === selectedReservationId);
+      const globalState = action.board.reservations.length === 0 ? "empty" : action.board.operations.adminMutationEnabled ? "healthy" : "read_only";
+      return {
+        ...state,
+        board: action.board,
+        globalState,
+        stateDescription: globalState === "read_only"
+          ? "GHOST側の更新スイッチが停止中です。予約は閲覧できます。"
+          : "GHOST予約台帳と同期済みです。",
+        selectedReservationId,
+        selectedTableId: selectedReservation?.tableIds[0] ?? null,
+        message: action.message,
+        pending: false,
+        conflict: null,
+      };
     }
+    case "globalState":
+      return { ...state, globalState: action.state, stateDescription: action.description, message: action.message ?? state.message, pending: false };
     case "view":
       return { ...state, view: action.view };
     case "selectReservation": {
@@ -94,26 +96,15 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
     case "queueCollapsed": return { ...state, queueCollapsed: action.collapsed };
     case "inspectorCollapsed": return { ...state, inspectorCollapsed: action.collapsed };
     case "mobileInspector": return { ...state, mobileInspectorOpen: action.open };
-    case "openCommand": return { ...state, command: { ...state.command, open: true, kind: action.kind, step: 1 }, conflict: null, mobileInspectorOpen: false };
+    case "openCommand": return { ...state, command: { open: true, kind: action.kind, step: 1 }, conflict: null, mobileInspectorOpen: false };
     case "closeCommand": return { ...state, command: { ...state.command, open: false, step: 1 }, pending: false };
     case "commandStep": return { ...state, command: { ...state.command, step: action.step } };
-    case "resultMode": return { ...state, command: { ...state.command, resultMode: action.mode } };
     case "pending": return { ...state, pending: action.pending };
-    case "commandOutcome": {
-      if (!action.outcome.ok) return { ...state, pending: false, conflict: action.outcome, message: action.outcome.message };
-      return {
-        ...state,
-        board: action.outcome.board,
-        pending: false,
-        conflict: null,
-        message: action.outcome.message,
-        command: { ...state.command, open: false, step: 1 },
-        history: [
-          { id: `history-${action.outcome.board.boardRevision}`, at: action.outcome.board.generatedAt, actor: "Fixture Operator", label: action.outcome.auditLabel, detail: action.outcome.message },
-          ...state.history,
-        ],
-      };
-    }
-    case "retryRead": return { ...state, scenario: { ...state.scenario, state: "healthy" }, message: "保存済みfixture stateを復元しました。" };
+    case "commandOutcome":
+      return action.outcome.ok
+        ? { ...state, pending: false, conflict: null, message: action.outcome.message, command: { ...state.command, open: false, step: 1 } }
+        : { ...state, pending: false, conflict: action.outcome, message: action.outcome.message };
+    case "history":
+      return { ...state, history: [action.entry, ...state.history].slice(0, 20) };
   }
 }

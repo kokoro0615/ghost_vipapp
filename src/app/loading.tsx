@@ -6,8 +6,7 @@ export default function Loading() {
       <div />
       <div />
       <div />
-      <p>VIP Floor fixtureを準備しています。</p>
+      <p>GHOST予約台帳へ接続しています。</p>
     </main>
   );
 }
-
