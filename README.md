@@ -21,6 +21,12 @@ npm run dev
 
 `http://localhost:3000` を開きます。旧URL互換として `/admin/vip-floor` と `/admin/vip-floor/ui-first` はルートへredirectします。
 
+ローカル起動時も認証情報が必要です。
+
+```bash
+VIPAPP_BASIC_USER=ghost-ops VIPAPP_BASIC_PASSWORD='set-a-strong-password' npm run dev
+```
+
 ## Validation
 
 ```bash
@@ -31,5 +37,4 @@ npm run build
 
 ## Deployment safety
 
-このアプリは管理画面です。Vercel Productionへ公開する前にDeployment Protectionを有効化してください。Hobby planではProduction domainを保護できないため、Vercel AuthenticationでProductionを保護できるプランか、アプリ内認証を実装する必要があります。
-
+このアプリは管理画面です。Vercel Authenticationに加え、`VIPAPP_BASIC_USER` と `VIPAPP_BASIC_PASSWORD` によるアプリ内Basic Authenticationを必須とします。環境変数が欠けている場合はfail-closedで全画面を401にします。
