@@ -1,0 +1,105 @@
+"use client";
+
+import type { CSSProperties } from "react";
+import { Clock3, Minus, Plus, TriangleAlert } from "lucide-react";
+
+import type { VipFloorBoardV2 } from "@/lib/vipFloorV2Contract";
+
+import { getStatusMeta } from "../contract/statusModel";
+import type { UiReservation } from "../contract/uiTypes";
+import styles from "../VipFloorWorkspace.module.css";
+
+type TimelineProps = {
+  board: VipFloorBoardV2;
+  reservations: UiReservation[];
+  selectedReservationId: string | null;
+  sectionId: string;
+  zoom: 15 | 30 | 60;
+  onZoom: (zoom: 15 | 30 | 60) => void;
+  onSelect: (id: string) => void;
+};
+
+const startMs = new Date("2026-07-23T21:00:00+09:00").getTime();
+const totalMinutes = 8 * 60;
+
+function positionStyle(startAt: string, endAt: string) {
+  const offset = Math.max(0, (new Date(startAt).getTime() - startMs) / 60_000);
+  const duration = Math.max(15, (new Date(endAt).getTime() - new Date(startAt).getTime()) / 60_000);
+  return {
+    "--bar-start": `${(offset / totalMinutes) * 100}%`,
+    "--bar-width": `${Math.min(100 - (offset / totalMinutes) * 100, (duration / totalMinutes) * 100)}%`,
+  } as CSSProperties;
+}
+
+export default function TimelineView({ board, reservations, selectedReservationId, sectionId, zoom, onZoom, onSelect }: TimelineProps) {
+  const visibleTables = board.tables.filter((table) => sectionId === "all" || table.sectionId === sectionId);
+  const ticks = Array.from({ length: 17 }, (_, index) => `${String(21 + Math.floor(index / 2) > 23 ? 21 + Math.floor(index / 2) - 24 : 21 + Math.floor(index / 2)).padStart(2, "0")}:${index % 2 ? "30" : "00"}`);
+  const unassigned = reservations.filter((item) => item.tableIds.length === 0);
+
+  return (
+    <section className={styles.timelineView} aria-labelledby="timeline-view-title">
+      <div className={styles.viewHeading}>
+        <div>
+          <h2 id="timeline-view-title">TABLE × TIME</h2>
+          <p>15分単位の滞在、turnover、block、競合を空間で確認します。</p>
+        </div>
+        <div className={styles.zoomControl} role="group" aria-label="時間軸ズーム">
+          <button type="button" onClick={() => onZoom(zoom === 60 ? 30 : 15)} aria-label="時間軸を拡大"><Plus size={15} /></button>
+          <span className="tabular-nums">{zoom}m</span>
+          <button type="button" onClick={() => onZoom(zoom === 15 ? 30 : 60)} aria-label="時間軸を縮小"><Minus size={15} /></button>
+        </div>
+      </div>
+
+      <div className={styles.timelineScroller} tabIndex={0} aria-label="VIP席の時間軸。左右にスクロールできます。" data-zoom={zoom}>
+        <div className={styles.timelineGrid}>
+          <div className={styles.timelineCorner}><Clock3 size={14} aria-hidden /> 席 / 時刻</div>
+          <div className={styles.timelineTicks}>{ticks.map((tick) => <span key={tick}>{tick}</span>)}</div>
+          {visibleTables.map((table) => {
+            const items = reservations.filter((reservation) => reservation.tableIds.includes(table.id));
+            return (
+              <div className={styles.timelineRow} key={table.id}>
+                <div className={styles.timelineTableLabel}>
+                  <strong>{table.displayCode}</strong>
+                  <span>{table.capacityMax}名</span>
+                  {table.operationalLocked ? <small>LOCK</small> : null}
+                </div>
+                <div className={styles.timelineTrack}>
+                  {items.map((reservation) => {
+                    const meta = getStatusMeta(reservation.serviceStatus);
+                    const Icon = meta.icon;
+                    return (
+                      <button
+                        key={reservation.id}
+                        type="button"
+                        className={styles.timelineBar}
+                        style={positionStyle(reservation.startAt, reservation.endAt)}
+                        data-tone={meta.tone}
+                        data-cue={meta.cue}
+                        data-selected={reservation.id === selectedReservationId || undefined}
+                        onClick={() => onSelect(reservation.id)}
+                        aria-label={`${reservation.publicCode}、${reservation.guestLabel}、${reservation.startLabel}から${reservation.endLabel}、${meta.label}`}
+                      >
+                        <Icon size={12} aria-hidden />
+                        <span>{reservation.publicCode}</span>
+                        <small>{reservation.startLabel}</small>
+                      </button>
+                    );
+                  })}
+                  {board.blocks.filter((block) => block.targets.tableIds.includes(table.id)).map((block) => (
+                    <span key={block.id} className={styles.timelineBlock} style={positionStyle(block.startAt, block.endAt)}>BLOCK</span>
+                  ))}
+                  <span className={styles.nowLine} aria-label="現在時刻 22:14" />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className={styles.unassignedTray}>
+        <span><TriangleAlert size={15} aria-hidden /> 未割当 {unassigned.length}</span>
+        <div>{unassigned.map((item) => <button type="button" key={item.id} onClick={() => onSelect(item.id)}>{item.startLabel} {item.publicCode}</button>)}</div>
+      </div>
+    </section>
+  );
+}
