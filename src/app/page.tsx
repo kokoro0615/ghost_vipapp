@@ -1,6 +1,5 @@
-import VipFloorWorkspace from "@/components/admin/vip-floor-v2/VipFloorWorkspace";
+import RealVipFloorApp from "@/components/RealVipFloorApp";
 
 export default function HomePage() {
-  return <VipFloorWorkspace />;
+  return <RealVipFloorApp />;
 }
-
