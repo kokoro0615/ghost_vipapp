@@ -1,4 +1,4 @@
-# GHOST VIP Manager 顧客Trial一気通貫デプロイプロンプト
+# GHOST VIP Manager 本番完成コード＋Staging DB 顧客Trial一気通貫プロンプト
 
 > 承認日: 2026-07-26 JST  
 > 顧客URL: `https://ghost-vipapp.vercel.app/`  
@@ -6,33 +6,40 @@
 > Production DB: `cpfsrwctjymhmwvsbwdi`（read-only確認以外の変更禁止）
 
 あなたはGHOST VIP Manager顧客Trial rolloutの統括Solです。以下を唯一の実行指示として、
-trial safety実装、隔離staging構築、仮データ投入、staged production検証、
-`ghost-vipapp.vercel.app`へのpromote、顧客handoff、rollback準備まで一気通貫で完了してください。
+本番完成コードの仕上げ、隔離staging data plane、仮データ投入、production-target build検証、
+`ghost-vipapp.vercel.app`へのpromote、顧客handoff、rollback／正式本番切替準備まで
+一気通貫で完了してください。
 途中報告やpreview READYだけで終了してはいけません。
 
 ## 0. 承認された構成
 
-ユーザーは「専用trial URL＋custom environment」を承認し、顧客URLとして
-`https://ghost-vipapp.vercel.app/`を指定した。
+ユーザーは次の構成を正式採用した。
 
-このURLは既存`ghost-vipapp` projectのproduction aliasであり、同じprojectのcustom
-environment domainとして同時利用するものではない。したがって次の安全な適応構成を採用する。
+> UI・機能・コード・Vercel buildは本番完成版とし、顧客trial期間だけデータ保存先を
+> stagingにする。VIP App用の新規custom environmentやtrial専用アプリは作らない。
 
 ```text
 Customer browser
   -> https://ghost-vipapp.vercel.app/
-     VIP App production deployment（trial shell / Basic auth / TRIAL表示）
+     VIP App production-target deployment
+     本番完成コード / Production envでbuild / Basic auth / runtime TRIAL表示
   -> GHOST website staging custom environment
-     admin v2 API / Owner PIN / trial-only mutations
+     本番と同一contractのadmin v2 API / Owner PIN / trial期間だけmutation ON
   -> Supabase staging rsvrtaavofflkvtfzsfh
      synthetic trial data only
 ```
 
-- VIP App production aliasは顧客入口としてだけ使う。
+- VIP Appの機能をtrial用に削らない。trial専用fork、mock API、別UIを作らない。
+- 本番とtrialの差は、環境変数で選ぶbackend/data plane、外部delivery停止、TRIAL注意表示だけに限定する。
+- VIP Appは`vercel --prod --skip-domain`でproduction-target buildを作り、
+  実host E2E後に既存production aliasへpromoteする。
+- VIP App用custom environmentの作成、`--target=trial`、Shareable Linkは使用しない。
 - Website production alias `ghost-ruby-one.vercel.app`は変更しない。
 - Production Supabaseへmigration、seed、trial mutationを行わない。
 - 顧客が入力した仮データはすべてstagingへ保存する。
 - Stripe、LINE、Email delivery、webhook、public bookingはtrial中すべて停止する。
+- Vercel Production環境変数の変更は既存deploymentを書き換えない。trial開始時も正式本番切替時も、
+  対象値を設定した後に新しいproduction-target deploymentをbuildして検証する。
 
 ## 1. 正本と既知のrollback anchor
 
@@ -52,7 +59,7 @@ Customer browser
 - Website/API candidate: `665fcf4d1eefca6bc790d5967f221a4d9fb48a06`
 - VIP App branch: `codex/vip-manager-g0-5-20260726`
 - VIP App code candidate: `fc5c24f20867d80a45564249afcc1a8f13e1ac7b`
-- このprompt追加前のVIP App docs baseline: `4757e6a877154575d42a4f821a0b3dfdd18d6574`
+- このprompt改訂前のVIP App docs baseline: `ced639935f56527230bdb0a013bdec7ebc6d7a47`
 - 実行開始時のVIP App docs tipは、remote branch上でこのpromptを含む最新commitを解決して
   manifestへ記録する。code candidateのtreeを意図なく変更しない。
 
@@ -71,7 +78,8 @@ Customer browser
 - Website `staging` custom environmentの環境変数設定とdeployment
 - Supabase stagingへのforward-only migration、synthetic seed、trial mutation
 - Trial専用Basic資格情報、Owner PIN、暗号/search key、bypass secretの生成・設定
-- VIP Appのstaged production deployment
+- VIP App Production環境変数のtrial data plane向け設定
+- VIP Appのproduction-target staged deployment
 - 全Gate合格後の`ghost-vipapp.vercel.app`へのpromote
 - 認証済みsynthetic E2E、監視、rollback準備
 
@@ -82,6 +90,7 @@ Customer browser
 - 実顧客PIIの取込
 - 実メール、LINE、Stripe、webhook送信
 - production project/databaseの削除・reset
+- VIP App用custom environment、trial専用UI fork、trial専用mock backendの新設
 - secret、PIN、cookie、Authorizationのchat/Git/log出力
 
 ## 3. 停止しない実行規則
@@ -96,6 +105,7 @@ Customer browser
 8. 1タスクが詰まったらmock、local、staging、read-only検証へ切り替え、他Waveを進める。
 9. 外部permissionまたはsecret設定が本当に必要な場合だけ、promote直前で一つの具体的操作として報告する。
 10. 「コード完成」「preview READY」「手順提示」だけを完了としない。
+11. trial短縮のために本番機能を省略しない。未完成機能をtrial専用mockで隠さない。
 
 ## 4. Agent編成とtoken節約
 
@@ -105,8 +115,8 @@ cross-repo contract、Gate判定、promote/rollback判断だけを担当する�
 
 | Lane | Model | 所有範囲 |
 |---|---|---|
-| Data/API | Terra | `website` trial guard、migration、seed/cleanup、auth、external side-effect停止 |
-| Manager UI | Terra | `ghost_vipapp/src` trial banner、proxy bypass、入力安全、trial UX |
+| Data/API | Terra | `website`本番contract完成、trial guard、migration、seed/cleanup、auth、external side-effect停止 |
+| Manager UI | Terra | `ghost_vipapp/src`本番完成UI、runtime trial banner、proxy bypass、入力安全 |
 | QA/Release | Terra | tests、live staging E2E、Vercel、observability、manifest、rollback |
 | Inventory/Audit | Luna | `rg`、env名、route/migration inventory、反復validation、artifact照合 |
 
@@ -128,6 +138,12 @@ cross-repo contract、Gate判定、promote/rollback判断だけを担当する�
 5. Production DBのboard revision、reservation/customer/outbox件数は集計値だけsnapshotし、
    trial後に不変を照合できるようPII-free evidenceへ保存する。
 6. `docs/evidence/GHOST_VIP_MANAGER_TRIAL_RELEASE_<DATE>.md`を作成し、全ID/SHA/Gateを集約する。
+7. VIP App Production envをstaging向けへ設定している期間は、別agent、人、Git integrationが
+   production deploymentを開始しないrelease lockを宣言する。意図しないproduction deploymentを
+   検知したらaliasを変更せず停止し、そのdeploymentをevidenceへ記録する。
+8. rollback anchorへ既知の安全な認証経路で到達できることを確認する。既存Basic値を取得できず
+   rollback後の操作性を証明できない場合は、promote前に旧sourceから管理可能な新資格情報を使った
+   rollback deploymentを`--prod --skip-domain`で用意し、そのIDを新anchorとする。
 
 Gate TR-0：
 
@@ -135,16 +151,20 @@ Gate TR-0：
 - staging/production refを機械的に識別可能
 - dirty差分を巻き込まない手段が確定
 - production DB mutationが0
+- production release lockと、認証可能なrollback deploymentが確定
 
-## Wave TR-1: Trial safety実装
+## Wave TR-1: 本番コード完成＋Trial data-plane safety
 
 開始時点ではtrial mode、protection bypass header、seed/cleanup harnessは未実装である。
 既存4幅/axe suiteはAPIをsynthetic mockするUI regressionであり、live staging統合証拠ではない。
 これらを「既にある」と仮定せず、このWaveで実装して別々のGateとして検証する。
+ただしtrial専用の機能縮小版を作ってはならない。正本仕様の本番機能を完成させ、
+trial差分はserver-side runtime flagによる安全制御と注意表示だけに閉じ込める。
 
 ### 1. Trial mode
 
 両surfaceにserver-side `GHOST_VIP_TRIAL_MODE=true`を導入する。
+同じsourceを正式本番では`false`にしてbuildできることをcontract testで保証する。
 
 VIP App：
 
@@ -339,13 +359,13 @@ Gate TR-3：
 - production DB snapshot不変
 - backend deployment READY
 
-## Wave TR-4A: VIP App custom environment統合
+## Wave TR-4: VIP App production-target staged deployment
 
-ユーザーが承認したcustom environment方式をpre-productionの正式Gateとして使用する。
-Vercel DashboardまたはAPIでVIP App projectへ`trial` custom environmentを1つ作成する。
-現CLIはcustom target一覧とdeployには対応するが、target作成subcommandはない前提で進める。
+VIP App用のcustom environmentは作らない。本番完成sourceをVercel Production環境変数で
+buildし、最初はdomainを割り当てずに実host統合試験を行う。
 
-`trial` targetへ次だけを設定する。
+変更前にVIP App Production環境変数の名前、適用範囲、更新時刻を値非表示でsnapshotし、
+rollback／正式本番切替manifestへ保存する。trial期間のProduction envを次で整備する。
 
 ```text
 GHOST_VIP_TRIAL_MODE=true
@@ -355,54 +375,36 @@ VIPAPP_BASIC_USER=<trial-only value>
 VIPAPP_BASIC_PASSWORD=<trial-only strong value>
 ```
 
-1. Production envをimportしない。必要値をtrial専用として個別に設定する。
-2. exact VIP App SHAを`vercel deploy --target=trial`でdeployする。
-3. commit-specific deploymentへrevocable Shareable Linkを発行する。
-4. 顧客経路はShareable Link＋app Basic、VIP server→backendはautomation bypass headerを使う。
-5. `staging-mutation-e2e.mjs`を実hostへ実行し、fixture create→command→audit→
-   cleanup orphan 0→logoutまで確認する。
-6. mutation harnessは`GHOST_VIPAPP_ALLOW_STAGING_MUTATION=E2E削除可`と
+1. production envを丸ごと再作成せず、必要なkeyだけを監査付きで更新する。
+2. Basic user/passwordとOwner PINを別々の安全な経路で生成する。
+3. 値はVercel envとmode 600のrepo外handoff fileにだけ保存する。
+4. exact canonical source archiveのSHA/tree hashを記録する。
+5. `vercel --prod --skip-domain`でproduction-target deploymentを作る。
+6. deployment ID、URL、READY state、source SHA、Production env適用を記録する。
+7. deployment protection automation bypassはserver-to-server/E2Eだけで使用し、
+   secretをquery、browser storage、client bundle、logへ渡さない。
+8. alias未付与の実deploymentへ`staging-mutation-e2e.mjs`を実行し、
+   fixture create→command→audit→cleanup orphan 0→logoutまで確認する。
+9. mutation harnessは`GHOST_VIPAPP_ALLOW_STAGING_MUTATION=E2E削除可`と
    staging fingerprint/host allowlistがなければnetwork前に停止する。
-7. `prod-e2e.mjs`をmutation用途へ流用しない。
-
-Gate TR-4A：
-
-- VIP `trial` custom deployment READY
-- Shareable LinkでVercel accountなしの指定確認者が到達可能
-- Basic/PIN/session/logout PASS
-- live staging mutation/audit/cleanup PASS
-- 全mutationがSupabase stagingだけに到達
-- production DB/両production alias不変
-
-## Wave TR-4B: VIP App production用staged deployment
-
-VIP App production envを値非表示で整備する。
-
-```text
-GHOST_VIP_TRIAL_MODE=true
-GHOST_ADMIN_API_ORIGIN=<website staging origin>
-GHOST_BACKEND_PROTECTION_BYPASS=<server-only secret>
-VIPAPP_BASIC_USER=<trial-only value>
-VIPAPP_BASIC_PASSWORD=<trial-only strong value>
-```
-
-1. Basic user/passwordとOwner PINを別々の安全な経路で生成する。
-2. 値はVercel envとmode 600のrepo外handoff fileにだけ保存する。
-3. production environmentでbuildするが、最初はdomainを割り当てない。
-4. exact candidate sourceから`vercel deploy --prod --skip-domain`を実行する。
-5. staged production deployment ID/URL/READY stateを記録する。
-6. production envを使ったbuildであることを確認する。
-7. deployment protection bypassを使い、domain未割当deploymentへ統合E2Eを実行する。
+10. `prod-e2e.mjs`をmutation用途へ流用しない。
+11. deploymentの全read/mutation requestがWebsite staging originだけへ到達し、
+    Website production originやproduction Supabaseへのrequestが0であることを証明する。
+12. deployment一覧を再取得し、release lock中に意図しないproduction build／alias assignmentが
+    発生していないことを確認する。
 
 この段階では`ghost-vipapp.vercel.app`は旧deploymentのままでなければならない。
 
-Gate TR-4B：
+Gate TR-4：
 
-- staged production READY
+- 本番完成sourceのproduction-target staged deploymentがREADY
 - current production alias不変
 - Basic/PIN/session/logout PASS
+- live staging mutation/audit/cleanup PASS
 - 全mutationがSupabase stagingにだけ到達
 - production DB snapshot不変
+- VIP App custom environment作成0
+- trial専用UI/API fork 0
 
 ## Wave TR-5: 顧客操作品質Gate
 
@@ -452,16 +454,18 @@ Gate TR-5：
 全Gate合格後だけ実施する。
 
 1. current aliasがrollback anchorを指すことを再確認する。
-2. backend staging mutationがON、外部side effectがOFFであることを再確認する。
-3. `vercel promote <staged-production-deployment>`でVIP Appをpromoteする。
-4. `ghost-vipapp.vercel.app`が新deployment IDを指すことを確認する。
-5. 未認証`/`とadmin APIが401であることを確認する。
-6. Basic＋Owner PINでloginする。
-7. synthetic reservationを1件create/editし、stagingへだけ保存されたことを確認する。
-8. production DB snapshot/revision/countが不変であることを確認する。
-9. Vercel error log、SLO、outbox、realtime gapを確認する。
-10. handoff fileのpath、trial期限、rollback IDをOwnerへ報告する。secret値は表示しない。
-11. 意図的に作ったSLO alertをclearし、dead outbox、realtime gap、5xxが0であることを確認する。
+2. rollback deploymentへ認証付きで到達でき、必要なrollback資格情報のhandoffがあることを確認する。
+3. release lockが有効で、意図しないproduction deploymentが0であることを確認する。
+4. backend staging mutationがON、外部side effectがOFFであることを再確認する。
+5. `vercel promote <staged-production-deployment>`でVIP Appをpromoteする。
+6. `ghost-vipapp.vercel.app`が新deployment IDを指すことを確認する。
+7. 未認証`/`とadmin APIが401であることを確認する。
+8. Basic＋Owner PINでloginする。
+9. synthetic reservationを1件create/editし、stagingへだけ保存されたことを確認する。
+10. production DB snapshot/revision/countが不変であることを確認する。
+11. Vercel error log、SLO、outbox、realtime gapを確認する。
+12. handoff fileのpath、trial期限、rollback IDをOwnerへ報告する。secret値は表示しない。
+13. 意図的に作ったSLO alertをclearし、dead outbox、realtime gap、5xxが0であることを確認する。
 
 Promotion直後smokeに失敗した場合：
 
@@ -492,6 +496,7 @@ Gate TR-6：
 - support/rollback判断者
 - exact deployment/source/schema manifest
 - cleanup runbook
+- 正式本番切替runbook
 
 Trial credential handoff：
 
@@ -500,19 +505,54 @@ Trial credential handoff：
 - Git、docs、screenshot、consoleへ値を残さない
 - trial終了時に全値をrotation/revoke
 
-Trial終了時は次の順序で実行する。
+Trial終了時は「停止」または「正式本番切替」のどちらかをOwnerが選ぶ。
+選択がない状態でproduction DBへ接続してはならない。
+
+### A. Trialを停止し、旧productionへ戻す
+
+次の順序で実行する。
 
 1. backend staging mutation OFF
 2. 顧客access停止
 3. VIP Appをrollback anchorへrollback
-4. Shareable Linkをrevoke
-5. Basic、PIN、bypass secretをrotation/revoke
-6. VIP production environmentからtrial origin/bypass/trial-modeを除去または通常値へ復元
+4. Basic、PIN、bypass secretをrotation/revoke
+5. VIP Production環境変数からstaging origin、bypass、trial mode値を除去または通常値へ復元
+6. 必要なら旧sourceを復元後のProduction envで新規buildし、旧alias挙動を確認
 7. cleanup dry-run
 8. staging rows cleanup
 9. orphan/outbox/audit検証
 10. production DB不変確認
 11. evidence/status/log更新
+
+### B. 同じ本番完成コードを正式production data planeへ切り替える
+
+これは本promptのtrial rollout承認だけでは実行しない。Ownerの正式本番切替承認を得た後、
+次の独立Gateをすべて満たして実行する。
+
+1. production DB backup/PITR状態、migration history、forward-only dry-runを確認する。
+2. production Supabaseへ承認済みmigrationだけを適用し、seed/trial rowsは投入しない。
+3. Website Production envへ本番secretを安全に設定し、全mutation flag OFFでbackendを先行deployする。
+4. production backendのread-only smoke、schema、auth、provider flag OFFを確認する。
+5. VIP Production envを次へ切り替える。
+
+```text
+GHOST_VIP_TRIAL_MODE=false
+GHOST_ADMIN_API_ORIGIN=<website production origin>
+GHOST_BACKEND_PROTECTION_BYPASS=<unset>
+VIPAPP_BASIC_USER=<production value>
+VIPAPP_BASIC_PASSWORD=<production strong value>
+```
+
+6. trialで検証したものと同一source SHA/treeから、別の
+   `vercel --prod --skip-domain` production-target deploymentを新規buildする。
+7. alias未付与deploymentでproduction read-only smokeを行う。synthetic mutationは実行しない。
+8. Owner最終承認後にそのdeploymentをpromoteする。
+9. mutation flagはread→限定mutationの順で段階的にONにし、監視とrollbackを継続する。
+10. staging mutation OFF、trial credential/bypass revoke、staging cleanupを実行する。
+
+環境変数の変更だけで既存trial deploymentを正式本番へ転用しない。
+deploymentはbuild時に対象環境の値を受け取るため、正式production data plane向けの
+新しいproduction-target buildとpre-promotion Gateを必須とする。
 
 `vercel rollback`はdeployment artifactを戻すが、projectに現在登録されている環境変数を
 自動では戻さない。rollback後もtrial backend originやbypass secretを残さず、
@@ -525,8 +565,8 @@ Trial終了時は次の順序で実行する。
 - Trial safety code/testがcanonical remote commit
 - Website staging backendがREADY
 - Supabase stagingにsynthetic seed
-- VIP App `trial` custom environmentでlive integration E2EがPASS
-- Staged production E2Eが全PASS
+- 本番完成コードのproduction-target staged deploymentでlive integration E2EがPASS
+- VIP App custom environment作成0、trial専用fork 0
 - `ghost-vipapp.vercel.app`が新trial deploymentを参照
 - Basic＋Owner PINで顧客が操作可能
 - 仮データがstagingへ永続化
@@ -536,6 +576,7 @@ Trial終了時は次の順序で実行する。
 - 4幅/axe/keyboard/PII/security Gate合格
 - exact rollback deploymentがREADY
 - trial credential handoff、scenario、cleanup手順が用意済み
+- 正式本番切替時に同一sourceから再buildするrunbookが用意済み
 - `AI_CURRENT_STATUS.md`と`AI_WORK_LOG.md`更新済み
 
 最終報告には、secret/PIIを含めず次だけを記載する。
@@ -553,16 +594,20 @@ Trial終了時は次の順序で実行する。
 
 ## 公式設計根拠
 
-- Vercel Custom Environments:
+- Website stagingで使用するVercel Custom Environments:
   `https://vercel.com/docs/deployments/environments`
 - Vercel staged production / alias:
   `https://vercel.com/docs/cli/alias`
+- Vercel CLI production deployment:
+  `https://vercel.com/docs/cli/deploying-from-cli`
+- Vercel promote:
+  `https://vercel.com/docs/cli/promote`
+- Vercel environment variables:
+  `https://vercel.com/docs/environment-variables`
 - Vercel Deployment Protection:
   `https://vercel.com/docs/deployment-protection`
-- Vercel Shareable Links:
-  `https://vercel.com/docs/deployment-protection/methods-to-bypass-deployment-protection/sharable-links`
 - Protection Bypass for Automation:
-  `https://vercel.com/docs/deployment-protection/methods-to-bypass-deployment-protection`
+  `https://vercel.com/docs/deployment-protection/methods-to-bypass-deployment-protection/protection-bypass-automation`
 - Vercel deploy / `--skip-domain`:
   `https://vercel.com/docs/cli/deploy`
 - Vercel rollback:
