@@ -275,6 +275,17 @@ async function main() {
   } catch (error) {
     primaryError = error;
   } finally {
+    if (loggedIn) {
+      try {
+        const logout = await client.requestJson("/api/admin/session", { method: "DELETE" });
+        assert(logout.response.ok, `logout_failed:${logout.response.status}`);
+        assert(client.jar.size === 0, "logout_cookie_not_cleared");
+        const afterLogout = await client.requestJson("/api/admin/session");
+        assert(afterLogout.response.status === 401, "session_survived_logout");
+      } catch (logoutError) {
+        if (!primaryError) primaryError = logoutError;
+      }
+    }
     if (config) {
       try {
         const cleanup = await runLifecycleScript(
@@ -298,17 +309,6 @@ async function main() {
         primaryError = primaryError
           ? new Error(`${safeErrorCode(primaryError)}:cleanup:${safeErrorCode(cleanupError)}`)
           : cleanupError;
-      }
-    }
-    if (loggedIn) {
-      try {
-        const logout = await client.requestJson("/api/admin/session", { method: "DELETE" });
-        assert(logout.response.ok, `logout_failed:${logout.response.status}`);
-        assert(client.jar.size === 0, "logout_cookie_not_cleared");
-        const afterLogout = await client.requestJson("/api/admin/session");
-        assert(afterLogout.response.status === 401, "session_survived_logout");
-      } catch (logoutError) {
-        if (!primaryError) primaryError = logoutError;
       }
     }
   }
