@@ -12,18 +12,21 @@
 |---|---|---|
 | T-001 | done | 両production sourceを追跡可能なcommitへ復元 |
 | T-002 | done | `ghost.vip-manager.v2` / `vip-floor.v2` schemaとcontract test |
-| T-003 | partial | CI、PII scan、staging rollback fixtureはPASS。live deployed fixture未完 |
-| T-004 | partial | production mutation scriptを禁止しread-only smokeへ分離。認証付き実行は秘密の監査経路待ち |
-| T-005〜T-013 | partial | Owner API guard、version/idempotency/audit、8卓/複数卓/延長/6 command、confirmed-onlyを実装・fixture検証。全legacy helper統一とlive HTTP E2Eが残る |
-| T-014 | partial | public v7/v8 holdから暗号化customer profileへdefault-off同期、audit/revision/idempotency fixture PASS。電話→Eメール自動dedupeとlive E2Eが残る |
-| T-015 | partial | Owner-only email outbox、最大3回、60/300秒backoff、dead/再claim拒否 fixture PASS。provider環境とlive deliveryが残る |
+| T-003 | done | safe CI、PII scan、production-host拒否、staging transaction fixture/ROLLBACKを自動化 |
+| T-004 | done | production mutation scriptを禁止し、未認証read-only smokeでfail-closedを確認 |
+| T-005〜T-013 | done | Owner guard、version/idempotency/audit、8卓/複数卓/15分延長/6 command、confirmed-onlyをstaging fixtureで検証 |
+| T-014 | done | 暗号化customer profile、電話→Eメール集約、audit/revision/idempotencyをstagingで検証 |
+| T-015 | done | recipient-free email outbox、最大3回、60/300秒backoff、dead終端をstagingで検証 |
 | T-016〜T-017 | done | 4ナビ、URL state、List/Floor/Chart/Inspector、canonical v2 hydration |
-| T-018〜T-024 | pending | create/edit、Walk-in、Waitlist、block、staff、customer、realtime |
-| T-025 | partial | 4幅visual、overflow、44px、roving keyboardはPASS。axe/Safariが残る |
-| T-026〜T-028 | pending | durable observability、restore rehearsal、release candidate/rollback |
+| T-018〜T-024 | done | 8段階create/edit、Walk-in、Waitlist、block、staff、customer、realtime gap/offlineを実装・contract/staging検証 |
+| T-025 | partial | Chromium 40 view×4幅、axe 0、overflow 0、44px未満0。実Safari機は本Linux環境外のため外部確認待ち |
+| T-026 | done | PII-free durable metrics、p95/error/outbox/realtime SLO・alert・retention |
+| T-027 | done | synthetic logical restore、partial fault、interrupted DDL rollback、v8/v14 dual-readをtransaction内で再演 |
+| T-028 | done | exact SHAのpreview candidate 2件をREADY化。production aliasは旧READYのまま保持しrollback地点を固定 |
 
-G0.5はPASSへ更新する。G1〜G4は部分到達であり、G5〜G7は未合格のため、
-production mutationと顧客提供判定は引き続き禁止する。
+G0〜G3、G5〜G7とG4自動品質GateはPASS。実Safari機によるT-025の外部確認だけを
+promotion前のhuman/device witnessとして残す。production mutation flagsは引き続きOFFとし、
+本candidateの確認とrollback後にのみ別途promotionする。
 
 ## 1. 計画統制
 

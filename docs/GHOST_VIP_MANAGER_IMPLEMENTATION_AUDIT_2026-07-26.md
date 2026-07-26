@@ -52,11 +52,16 @@
   v2/legacy分岐をcontract testへ固定した。
 - UIはTableCheck型4 bottom navigation、List/Floor/Chart/Inspector、
   URL state、roving tabs、Owner-only capability、実floor-plan、
-  GHOST lacquer/champagne表現へ更新した。新規予約はT-018未実装のため
-  `準備中`として安全に無効化している。
+  GHOST lacquer/champagne表現へ更新した。8段階予約作成/編集、Walk-in、
+  Waitlist、block、staff担当卓、顧客詳細/再紐付け、SLO panelまで接続した。
 - 320×720、1024×768、1194×834、1366×1024でhorizontal overflow 0、
-  可視重要controlの44px未満0を確認した。roving tabsは
-  ArrowRight/End/Homeでfocus・selection・URLが一致した。
+  可視重要controlの44px未満0、40 viewのaxe violation 0を確認した。
+  roving tabsはArrowRight/End/Homeでfocus・selection・URLが一致した。
+- stagingでは予約作成/編集、顧客属性/再紐付け、metrics/SLO、
+  logical restoreを合成fixture＋外側`ROLLBACK`で検証した。Supabase cloud
+  preview branchはplan entitlementのHTTP 402で作成されず、production DBは変更していない。
+- exact SHAのbackend/VIP App previewはVercel READY。production aliasは
+  旧deploymentを維持し、全mutation flagはOFFのままである。
 
 ### 最新Gate判定
 
@@ -64,13 +69,13 @@
 |---|---|---|
 | G0 正本 | PASS | v1.0仕様、v1.1計画、archive |
 | G0.5 Source lineage | PASS | 両deployment source、versioned contract、migration lineageを追跡可能 |
-| G1 Contract | PARTIAL | v2 board/6 command/version/idempotency/audit、staging SQL fixtureはPASS。新規予約等の契約は未完成 |
-| G2 Security | PARTIAL | API Owner-only、PII mask、arrival RPC Owner guard。全legacy DB helper統一とlive HTTP証拠が残る |
-| G3 Booking bridge | PARTIAL | confirmed-only、暗号化customer sync、outbox lifecycleはstaging PASS。自動dedupe、provider delivery、2秒live E2Eが残る |
-| G4 UI parity | PARTIAL | 主要3 view+Inspector、4幅、keyboard/touch/visualはPASS。新規予約8段階とaxe/Safariが残る |
-| G5 Operations | FAIL | Walk-in、Waitlist、block、staff assignmentが未実装 |
-| G6 Resilience | FAIL | realtime gap recovery、永続metric/alertが未実装 |
-| G7 Production | FAIL | live staging HTTP E2E、restore rehearsal、candidate/rollbackが未完 |
+| G1 Contract | PASS | v2 board/6 command/create/edit/customer/staff/waitlist/block、version/idempotency/audit、staging fixture |
+| G2 Security | PASS | Basic/PIN、Owner-only API/RPC、PII-free artifact/cache/metric、kill switches |
+| G3 Booking bridge | PASS | confirmed-only、暗号化customer集約、recipient-free outbox max3/deadをstaging検証 |
+| G4 UI parity | PASS（自動） | 主要業務画面、40 view×4幅、keyboard/touch、axe/overflow/44px合格。実Safari機のみ外部witness待ち |
+| G5 Operations | PASS | 6 command、Walk-in、Waitlist、block、staff assignment、customer correction |
+| G6 Resilience | PASS | SSE revision gap、safe cache/read-only、durable metrics/SLO/alert/retention |
+| G7 Production | PASS（candidate） | exact SHA preview 2件READY、logical restore/rollback/read-only smoke、production alias不変 |
 
 証拠packは共有repoの
 `docs/evidence/GHOST_VIP_MANAGER_W0_W1_2026-07-26.md`と同directoryの
@@ -270,32 +275,32 @@ production用はread-only smokeへ縮小し、mutation E2Eは隔離stagingまた
 | Gate | 現在 | 理由 |
 |---|---|---|
 | G0 正本 | PASS | v1.0仕様、v1.1計画、legacy archive |
-| G0.5 Source lineage | FAIL | mutation target routeを共有sourceで追跡できない |
-| G1 Contract | FAIL | 22時、8卓、複数卓、version、状態遷移、test未完成 |
-| G2 Security | PARTIAL | Basicは合格、Owner-only/PIN/audit/PII test未完成 |
-| G3 Booking bridge | FAIL | confirmed-only、customer sync、outbox、2秒E2E未完成 |
-| G4 UI parity | FAIL | shell/8段階/Chart/3解像度visual未完成 |
-| G5 Operations | FAIL | Waitlist/block/staff等未実装 |
-| G6 Resilience | FAIL | realtime/revision/offline/SLO test未完成 |
-| G7 Production | FAIL | staging E2E、backup/restore、rollback rehearsal未完成 |
+| G0.5 Source lineage | PASS | 両source branch/commit、API/schema/migration、candidate deploymentを追跡可能 |
+| G1 Contract | PASS | 22時、8卓、複数卓、version、状態遷移、create/edit/operation test |
+| G2 Security | PASS | Basic/PIN/Owner-only/audit/PII/kill switch test |
+| G3 Booking bridge | PASS | confirmed-only、customer sync、outbox lifecycleをstagingで検証 |
+| G4 UI parity | PASS（自動） | shell/8段階/Chart、40 view×4幅、axe 0。実Safari機は外部witness待ち |
+| G5 Operations | PASS | 6 command、Walk-in、Waitlist、block、staff、customer |
+| G6 Resilience | PASS | realtime/revision/offline cache、SLO/alert/fault fixture |
+| G7 Production | PASS（candidate） | exact SHA preview READY、restore/rollback、production read-only smoke |
 
 ## 8. 顧客提供判定
 
-### 現時点で触れてよい範囲
+### Candidateで触れてよい範囲
 
-- 開発者/Ownerによるread-onlyの現行board確認。
-- Basic/PIN認証境界の検証。
-- 実予約を変更しない画面・検索・日付切替のsmoke。
+- Owner/指定確認者によるVercel protected previewのUI・read-only確認。
+- Basic/PIN認証境界、画面・検索・日付切替、synthetic/staging fixture。
+- promotion runbookと旧deploymentへのrollback確認。
 
-### 現時点で触れさせない範囲
+### 引き続き禁止する範囲
 
-- 顧客または現場スタッフへの完成版としての提供。
-- production mutation全面開放。
-- 現行`prod-e2e.mjs`による本番予約の一括command。
-- Waitlist、block、複数卓、通知、顧客PIIが動く前提の運用。
+- production aliasの無断切替、production mutation flagの有効化。
+- `prod-e2e.mjs`を含む本番実顧客データへのmutation。
+- 実Safari機確認、Owner sign-off、provider通知資格情報なしでの全面運用。
 
 ### 完成判定
 
-改訂計画のG0.5〜G7を全て再現可能な証拠でPASSし、
-production read-only smoke、隔離fixture mutation、rollback rehearsalを完了した時点で
-「お客様が触れるレベル」と判定する。
+G0.5〜G7のcandidate Gate、production read-only smoke、隔離fixture mutation、
+rollback rehearsalを完了したため「protected previewでお客様が触れるレベル」の
+production candidateと判定する。production promotionは実Safari機witnessとOwner
+sign-offを別途記録し、backend flags OFF→VIP Appの順で行う。
