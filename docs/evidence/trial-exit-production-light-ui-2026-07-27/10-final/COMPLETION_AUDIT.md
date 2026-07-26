@@ -1,6 +1,6 @@
 # Production completion audit
 
-Observed: 2026-07-27 04:43:05 JST  
+Observed: 2026-07-27 04:43:05 JST
 Outcome: `HOLD_GATE_A_PARTIAL_CLEANUP_RESIDUAL_APPROVAL`
 
 This matrix audits the execution prompt against current source, runtime and
