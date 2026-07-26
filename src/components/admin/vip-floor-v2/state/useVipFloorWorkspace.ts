@@ -12,6 +12,11 @@ import {
   VIP_FLOOR_SCHEMA_VERSION,
   type VipFloorBoardV2,
 } from "@/lib/vipFloorV2Contract";
+import {
+  classifyBoardRevision,
+  readSafeBoardCache,
+  writeSafeBoardCache,
+} from "@/lib/vipFloorRealtime";
 
 import type {
   LiveCommandDraft,
@@ -57,10 +62,15 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
   const [auth, setAuth] = useState<AuthState>({ status: "checking", session: null });
   const [businessDate, setBusinessDateState] = useState(initialDate);
   const [offline, setOffline] = useState(false);
+  const mutationBlocked = offline
+    || ["loading", "stale", "reconnecting", "error", "read_only"].includes(state.globalState)
+    || !state.board.operations.adminMutationEnabled;
 
   const loadBoard = useCallback(async (date: string, mode: "initial" | "refresh" = "refresh") => {
     if (typeof navigator !== "undefined" && !navigator.onLine) {
       setOffline(true);
+      const cachedBoard = readSafeBoardCache(date);
+      if (cachedBoard) dispatch({ type: "hydrate", board: cachedBoard, message: "安全な最終台帳を表示中" });
       dispatch({
         type: "globalState",
         state: "stale",
@@ -109,14 +119,21 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
         ? payload
         : adaptLegacyVipBoard(payload as unknown as LegacyVipBoard, date);
       dispatch({ type: "hydrate", board, message: "GHOST予約台帳と同期済み" });
+      if (isVipFloorBoardV2(payload)) writeSafeBoardCache(board);
       setOffline(false);
       return true;
     } catch {
+      const cachedBoard = readSafeBoardCache(date);
+      if (cachedBoard) dispatch({ type: "hydrate", board: cachedBoard, message: "安全な最終台帳を表示中" });
       dispatch({
         type: "globalState",
-        state: "error",
-        description: "通信が切断されました。保存済みの予約は変更していません。",
-        message: "接続を確認して再読込してください",
+        state: cachedBoard ? "stale" : "error",
+        description: cachedBoard
+          ? "通信が切断されたため、個人情報を除いた最終台帳を閲覧専用で表示しています。"
+          : "通信が切断されました。保存済みの予約は変更していません。",
+        message: cachedBoard
+          ? "安全な最終台帳 — 更新操作は停止中"
+          : "接続を確認して再読込してください",
       });
       return false;
     }
@@ -185,6 +202,73 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
     };
   }, [auth.status, businessDate, loadBoard]);
 
+  useEffect(() => {
+    if (
+      auth.status !== "authenticated"
+      || typeof EventSource === "undefined"
+      || state.board.businessDay.businessDate !== businessDate
+    ) {
+      return;
+    }
+
+    const revisionAtConnect = state.board.boardRevision;
+    const events = new EventSource(
+      `/api/admin/vip-floor/events?date=${encodeURIComponent(businessDate)}&since=${revisionAtConnect}`,
+    );
+
+    const markStreamUnavailable = () => {
+      dispatch({
+        type: "globalState",
+        state: "stale",
+        description: "更新通知が中断しました。最後に確認した台帳を閲覧専用で表示しています。",
+        message: "再接続中 — 更新操作は停止中",
+      });
+    };
+
+    events.addEventListener("revision", (event) => {
+      try {
+        const payload = JSON.parse((event as MessageEvent<string>).data) as {
+          businessDate?: unknown;
+          revision?: unknown;
+        };
+        if (
+          typeof payload.businessDate !== "string"
+          || typeof payload.revision !== "number"
+        ) {
+          return;
+        }
+        const decision = classifyBoardRevision({
+          currentBusinessDate: businessDate,
+          currentRevision: revisionAtConnect,
+          incomingBusinessDate: payload.businessDate,
+          incomingRevision: payload.revision,
+        });
+        if (decision === "ignore") return;
+        if (decision === "gap_refresh") {
+          dispatch({
+            type: "globalState",
+            state: "reconnecting",
+            description: "台帳revisionの欠番を検知したため、全件を再取得しています。",
+            message: `REV ${revisionAtConnect} → ${payload.revision} / 欠番回復中`,
+          });
+        }
+        void loadBoard(businessDate);
+      } catch {
+        markStreamUnavailable();
+      }
+    });
+    events.addEventListener("unavailable", markStreamUnavailable);
+    events.addEventListener("error", markStreamUnavailable);
+
+    return () => events.close();
+  }, [
+    auth.status,
+    businessDate,
+    loadBoard,
+    state.board.boardRevision,
+    state.board.businessDay.businessDate,
+  ]);
+
   const login = useCallback(async (pin: string) => {
     dispatch({ type: "pending", pending: true });
     try {
@@ -245,13 +329,15 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
   }, [auth.status, loadBoard]);
 
   const runCommand = useCallback(async (draft: LiveCommandDraft) => {
-    if (offline) {
+    if (mutationBlocked) {
       dispatch({
         type: "commandOutcome",
         outcome: {
           ok: false,
-          code: "OFFLINE",
-          message: "オフライン中は更新できません。",
+          code: offline ? "OFFLINE" : "STALE_READ_ONLY",
+          message: offline
+            ? "オフライン中は更新できません。"
+            : "台帳の連続性を確認できないため更新を停止しています。",
           recovery: "接続復帰後に予約を再読込してください。",
         },
       });
@@ -334,10 +420,10 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
         },
       });
     }
-  }, [auth.session, businessDate, loadBoard, offline]);
+  }, [auth.session, businessDate, loadBoard, mutationBlocked, offline]);
 
   const loadOperationOptions = useCallback(async () => {
-    if (offline || auth.session?.role !== "owner") return null;
+    if (mutationBlocked || auth.session?.role !== "owner") return null;
 
     try {
       const response = await fetch(
@@ -372,18 +458,24 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
       });
       return null;
     }
-  }, [auth.session?.role, businessDate, offline]);
+  }, [auth.session?.role, businessDate, mutationBlocked]);
 
   const runOperation = useCallback(async (draft: OperationDraft) => {
-    if (offline || auth.session?.role !== "owner") {
+    if (mutationBlocked || auth.session?.role !== "owner") {
       dispatch({
         type: "commandOutcome",
         outcome: {
           ok: false,
-          code: offline ? "OFFLINE" : "INSUFFICIENT_ROLE",
+          code: offline
+            ? "OFFLINE"
+            : mutationBlocked
+              ? "STALE_READ_ONLY"
+              : "INSUFFICIENT_ROLE",
           message: offline
             ? "オフライン中は作成できません。"
-            : "この操作はOwner専用です。",
+            : mutationBlocked
+              ? "台帳の連続性を確認できないため作成を停止しています。"
+              : "この操作はOwner専用です。",
           recovery: offline
             ? "接続復帰後に台帳を再読込してください。"
             : "Owner専用PINでログインしてください。",
@@ -443,7 +535,7 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
       });
       return false;
     }
-  }, [auth.session?.role, businessDate, loadBoard, offline]);
+  }, [auth.session?.role, businessDate, loadBoard, mutationBlocked, offline]);
 
   return {
     state,

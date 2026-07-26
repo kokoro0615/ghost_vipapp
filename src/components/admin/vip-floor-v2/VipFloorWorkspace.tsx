@@ -99,7 +99,7 @@ export default function VipFloorWorkspace() {
     && canExecuteVipCommand(auth.session.role, kind);
 
   const readOnly = offline
-    || state.globalState === "read_only"
+    || ["loading", "stale", "reconnecting", "error", "read_only"].includes(state.globalState)
     || !state.board.operations.adminMutationEnabled
     || !canMutate;
 
