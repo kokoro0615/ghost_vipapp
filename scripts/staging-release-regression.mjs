@@ -819,12 +819,26 @@ async function runUiRegression(config, reservationId, uiReservationPlan) {
       await openQueue.click();
       await queue.getByRole("button", { name: "例外queueを閉じる" }).waitFor();
     }
+    await statusFilter.selectOption("expected");
+    await page.waitForTimeout(250);
+    await assertEventually(
+      async () => (
+        await statusFilter.inputValue() === "expected"
+        && new URL(page.url()).searchParams.get("filter") === "expected"
+      ),
+      "ui_queue_expected_filter_failed",
+    );
+    await page.getByRole("button", {
+      name: `${uiReservationPublicCode}の詳細を開く`,
+      exact: true,
+    }).waitFor();
     const queueItem = queue
       .getByRole("button")
       .filter({ hasText: uiReservationPublicCode });
     await queueItem.waitFor();
     await queueItem.click();
     await page.locator('aside[aria-label="予約インスペクター"]:visible').waitFor();
+    await statusFilter.selectOption("all");
     await search.fill("");
 
     await page.getByRole("button", { name: "Floor", exact: true }).click();
