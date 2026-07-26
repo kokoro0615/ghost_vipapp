@@ -87,12 +87,20 @@ cleanup was executed.
 
 ## Latest pre-promotion re-freeze
 
-At 2026-07-27 03:13:02 JST, all run-scoped counts were unchanged except
-`vip_manager_metrics`, which had increased from 1646 to 3100 while the Trial
-remained live. The 28-table total was therefore 3227; control rows remained
-run 1, baseline 1 and run events 0. Baseline SHA-256 remained unchanged,
-active seats remained 16 with Trial seats 8, and sent provider jobs remained
-0.
+At 2026-07-27 03:43:23 JST, all run-scoped counts were unchanged except
+`vip_manager_metrics`, which had increased from the initial 1646 to 3898 while
+the Trial remained live. The 28-table total was therefore 4025; control rows
+remained run 1, baseline 1 and run events 0. Baseline SHA-256 remained
+unchanged, active seats remained 16 with official seats 8 and Trial seats 8,
+and sent provider jobs remained 0.
+
+The seeded `trial_attention_fixture` metric was no longer present anywhere in
+the metrics table, so the full seeded-state verifier now stops at
+`trial_attention_metric_missing`. The remaining run metrics were 3598
+successful board reads and 300 observed realtime-unavailable events. No
+repair/reseed was attempted. This drift reinforces that PR-5 must use a new
+release-candidate run only after Gate A restores the official-eight-table
+baseline; it does not change the exact-run cleanup target.
 
 Two active sessions remained. Their non-secret expiry times were 2026-07-27
 13:19:44 JST and 13:29:22 JST. The cleanup manifest must be re-frozen again

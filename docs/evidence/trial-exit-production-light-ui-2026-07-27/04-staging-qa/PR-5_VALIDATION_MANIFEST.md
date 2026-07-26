@@ -12,6 +12,12 @@ contains Trial `T1` through `T8`, so no new staging mutation run was started.
 Running the release-candidate fixture before exact-run cleanup would test the
 wrong 16-table state and would invalidate this manifest.
 
+The 03:43 JST read-only re-freeze also found that the old Trial run's seeded
+`trial_attention_fixture` metric was absent while live board/realtime telemetry
+continued to accumulate. No repair was made to the ending Trial. PR-5 must
+create and later clean a fresh release-candidate lineage after Gate A, including
+new SLO/alert evidence, rather than reusing this drifted Trial state.
+
 Required authenticated flow:
 
 1. login, session expiry and logout;
