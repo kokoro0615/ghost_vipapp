@@ -6,6 +6,24 @@
 > 対応仕様: `GHOST_VIP_MANAGER_SPEC.md` v1.0  
 > 現況証拠: `GHOST_VIP_MANAGER_IMPLEMENTATION_AUDIT_2026-07-26.md`
 
+## 0. 実行進捗（2026-07-26 JST）
+
+| Task | 状態 | 証拠 / 残り |
+|---|---|---|
+| T-001 | done | 両production sourceを追跡可能なcommitへ復元 |
+| T-002 | done | `ghost.vip-manager.v2` / `vip-floor.v2` schemaとcontract test |
+| T-003 | partial | CI、PII scan、staging rollback fixtureはPASS。live deployed fixture未完 |
+| T-004 | partial | production mutation scriptを禁止しread-only smokeへ分離。認証付き実行は秘密の監査経路待ち |
+| T-005〜T-013 | partial | Owner API guard、version/idempotency/audit、8卓/複数卓/延長/6 command、confirmed-onlyを実装・fixture検証。全legacy helper統一とlive HTTP E2Eが残る |
+| T-014〜T-015 | pending | customer confirmation sync、email outbox |
+| T-016〜T-017 | done | 4ナビ、URL state、List/Floor/Chart/Inspector、canonical v2 hydration |
+| T-018〜T-024 | pending | create/edit、Walk-in、Waitlist、block、staff、customer、realtime |
+| T-025 | partial | 4幅visual、overflow、44px、roving keyboardはPASS。axe/Safariが残る |
+| T-026〜T-028 | pending | durable observability、restore rehearsal、release candidate/rollback |
+
+G0.5はPASSへ更新する。G1〜G4は部分到達であり、G5〜G7は未合格のため、
+production mutationと顧客提供判定は引き続き禁止する。
+
 ## 1. 計画統制
 
 本書をGHOST VIP Managerの唯一の現行実装計画とする。

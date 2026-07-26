@@ -143,7 +143,7 @@
 .venueIdentity strong { overflow: hidden; font-size: 14px; letter-spacing: 0.035em; text-overflow: ellipsis; white-space: nowrap; }
 .ribbonControl, .scenarioControl { display: flex; min-width: 0; align-items: center; gap: 7px; padding: 0 12px; border-right: 1px solid var(--line-soft); color: var(--muted); }
 .ribbonControl span, .scenarioControl span { font-size: 10px; letter-spacing: 0.07em; text-transform: uppercase; }
-.ribbonControl input, .ribbonControl select, .scenarioControl select { min-width: 0; height: 34px; border: 0; background: transparent; color: var(--ivory); font-size: 12px; font-variant-numeric: tabular-nums; }
+.ribbonControl input, .ribbonControl select, .scenarioControl select { min-width: 0; height: 44px; border: 0; background: transparent; color: var(--ivory); font-size: 12px; font-variant-numeric: tabular-nums; }
 .ribbonControl strong { color: var(--ivory); font-size: 11px; font-weight: 600; white-space: nowrap; }
 .scenarioControl { margin-left: auto; }
 .scenarioControl select { max-width: 158px; }
@@ -179,7 +179,7 @@
 .collapsedCount { display: flex; flex-direction: column; align-items: center; gap: 4px; padding-top: 16px; color: var(--warning); }
 .collapsedCount span { font-variant-numeric: tabular-nums; }
 .searchField, .toolbarSearch { display: flex; min-width: 0; align-items: center; gap: 7px; border: 1px solid var(--line-soft); border-radius: 3px; background: var(--lacquer-0); color: var(--muted); }
-.searchField { min-height: 40px; margin: 10px; padding: 0 9px; }
+.searchField { min-height: 44px; margin: 10px; padding: 0 9px; }
 .searchField input, .toolbarSearch input { min-width: 0; flex: 1; border: 0; outline: 0; background: transparent; color: var(--ivory); }
 .searchField input::placeholder, .toolbarSearch input::placeholder { color: var(--text-tertiary); }
 .queueScroll { flex: 1; overflow-y: auto; overscroll-behavior: contain; }
@@ -211,6 +211,7 @@
 .toolbarSelect { display: flex; min-height: 44px; align-items: center; gap: 5px; padding: 0 7px; border: 1px solid var(--line-soft); border-radius: 3px; color: var(--muted); }
 .toolbarSelect span { font-size: 9px; text-transform: uppercase; }
 .toolbarSelect select { max-width: 104px; border: 0; background: transparent; color: var(--ivory); }
+.searchField input, .toolbarSearch input, .toolbarSelect select { min-height: 44px; }
 .paneButton { width: 44px; height: 44px; }
 .stateBanner { display: flex; min-height: 38px; align-items: center; gap: 8px; padding: 6px 10px; border-bottom: 1px solid #f0d6a8; background: var(--warning-tint); color: var(--warning); }
 .stateBanner[data-tone="neutral"] { color: var(--ivory); }
@@ -271,7 +272,7 @@
 .timelineTableLabel span, .timelineTableLabel small { color: var(--muted); font-size: 9px; }
 .timelineTableLabel small { grid-column: 1 / -1; color: var(--danger); }
 .timelineTrack { position: relative; overflow: hidden; background-image: repeating-linear-gradient(90deg, transparent 0 calc(6.25% - 1px), var(--line-soft) calc(6.25% - 1px) 6.25%); }
-.timelineBar { position: absolute; z-index: 2; top: 8px; left: var(--bar-start); display: grid; width: var(--bar-width); min-width: 52px; height: 38px; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 3px; padding: 3px 6px; overflow: hidden; border: 1px solid var(--line); border-left-width: 3px; border-radius: 3px; background: var(--lacquer-3); text-align: left; }
+.timelineBar { position: absolute; z-index: 2; top: 7px; left: var(--bar-start); display: grid; width: var(--bar-width); min-width: 52px; min-height: 44px; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 3px; padding: 3px 6px; overflow: hidden; border: 1px solid var(--line); border-left-width: 3px; border-radius: 3px; background: var(--lacquer-3); text-align: left; }
 .timelineBar span { overflow: hidden; font-size: 10px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
 .timelineBar small { grid-column: 2; color: var(--muted); font-size: 8px; }
 .timelineBar[data-tone="danger"] { border-left-color: var(--danger); }
@@ -286,7 +287,7 @@
 .unassignedTray { display: grid; min-height: 54px; grid-template-columns: 130px minmax(0, 1fr); align-items: center; gap: 8px; padding: 6px 10px; border-top: 1px solid var(--line); background: var(--lacquer-1); }
 .unassignedTray > span { display: flex; align-items: center; gap: 5px; color: var(--warning); }
 .unassignedTray div { display: flex; gap: 6px; overflow-x: auto; }
-.unassignedTray button { min-height: 34px; padding: 0 9px; border: 1px solid var(--line); border-radius: 3px; background: var(--lacquer-2); white-space: nowrap; }
+.unassignedTray button { min-height: 44px; padding: 0 9px; border: 1px solid var(--line); border-radius: 3px; background: var(--lacquer-2); white-space: nowrap; }
 
 .listScroller { min-height: 0; flex: 1; overflow: auto; overscroll-behavior: contain; }
 .reservationTable { width: 100%; min-width: 780px; border-collapse: collapse; background: var(--lacquer-0); font-size: 11px; }
@@ -297,7 +298,7 @@
 .reservationTable tbody tr:hover { background: var(--surface-hover); }
 .reservationTable tr[data-selected] { background: var(--surface-selected); box-shadow: inset 2px 0 var(--accent); }
 .timeCell { display: flex; flex-direction: column; }
-.timeCell button { padding: 0; border: 0; background: none; color: var(--text-primary); font-family: var(--font-operator); font-size: 15px; font-weight: 700; text-align: left; }
+.timeCell button { min-width: 44px; min-height: 44px; padding: 0; border: 0; background: none; color: var(--text-primary); font-family: var(--font-operator); font-size: 15px; font-weight: 700; text-align: left; }
 .timeCell small { color: var(--muted); font-size: 8px; }
 .statusBadge { display: inline-flex; min-height: 24px; align-items: center; gap: 4px; padding: 2px 6px; border: 1px solid var(--line); border-left-width: 3px; border-radius: 8px; }
 .statusBadge[data-tone="danger"] { border-color: #f0bdca; border-left-color: var(--danger); background: var(--danger-tint); color: var(--danger); }
@@ -312,12 +313,12 @@
 .guestCell { display: block; max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
 .exceptionText { color: var(--warning); }
 .mutedText { color: var(--muted); }
-.rowAction { display: grid; width: 34px; height: 34px; place-items: center; border: 1px solid var(--line-soft); border-radius: 3px; background: var(--lacquer-2); }
+.rowAction { display: grid; width: 44px; height: 44px; place-items: center; border: 1px solid var(--line-soft); border-radius: 3px; background: var(--lacquer-2); }
 
 .desktopInspector { grid-column: 3; grid-row: 2; width: 360px; min-width: 0; min-height: 0; overflow: hidden; border-left: 1px solid var(--line); background: var(--lacquer-1); }
 .inspector { display: flex; height: 100%; min-width: 0; flex-direction: column; overflow: hidden; background: var(--lacquer-1); }
 .inspectorCollapsed { display: flex; width: 44px; height: 100%; flex-direction: column; align-items: center; gap: 12px; padding-top: 8px; }
-.inspectorCollapsed button { display: grid; width: 36px; height: 36px; place-items: center; border: 1px solid var(--line); border-radius: 3px; background: var(--lacquer-2); }
+.inspectorCollapsed button { display: grid; width: 44px; height: 44px; place-items: center; border: 1px solid var(--line); border-radius: 3px; background: var(--lacquer-2); }
 .inspectorCollapsed span { color: var(--muted); font-size: 9px; letter-spacing: 0.12em; writing-mode: vertical-rl; }
 .desktopInspector:has(.inspectorCollapsed) { width: 44px; }
 .inspectorHeader { display: flex; min-height: 52px; align-items: center; justify-content: space-between; padding: 7px 8px 7px 12px; border-bottom: 1px solid var(--line); }
@@ -366,7 +367,7 @@
 .commandHeader { display: flex; min-height: 60px; align-items: center; justify-content: space-between; padding: 9px 10px 9px 14px; border-bottom: 1px solid var(--line); background: var(--lacquer-2); }
 .commandHeader span { color: var(--metal); font-size: 9px; letter-spacing: 0.12em; }
 .commandHeader h2 { margin: 2px 0 0; font-family: var(--font-operator); font-size: 20px; }
-.commandHeader button { display: grid; width: 40px; height: 40px; place-items: center; border: 1px solid var(--line); border-radius: 3px; background: var(--lacquer-1); }
+.commandHeader button { display: grid; width: 44px; height: 44px; place-items: center; border: 1px solid var(--line); border-radius: 3px; background: var(--lacquer-1); }
 .stepRail { display: flex; min-height: 34px; align-items: center; justify-content: center; gap: 9px; border-bottom: 1px solid var(--line-soft); color: var(--muted); font-size: 10px; }
 .stepRail span[data-current] { color: var(--metal-strong); font-weight: 700; }
 .commandForm { min-height: 0; overflow-y: auto; padding: 12px; }

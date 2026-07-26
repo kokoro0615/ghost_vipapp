@@ -8,6 +8,10 @@ import {
   type LegacyVipBoard,
 } from "@/lib/vipFloorLegacy";
 import { canExecuteVipCommand, type VipAdminRole } from "@/lib/adminPermissions";
+import {
+  VIP_FLOOR_SCHEMA_VERSION,
+  type VipFloorBoardV2,
+} from "@/lib/vipFloorV2Contract";
 
 import type { LiveCommandDraft } from "../contract/uiTypes";
 import { createInitialState, workspaceReducer } from "./reducer";
@@ -96,7 +100,9 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
         });
         return false;
       }
-      const board = adaptLegacyVipBoard(payload as unknown as LegacyVipBoard, date);
+      const board = isVipFloorBoardV2(payload)
+        ? payload
+        : adaptLegacyVipBoard(payload as unknown as LegacyVipBoard, date);
       dispatch({ type: "hydrate", board, message: "GHOST予約台帳と同期済み" });
       setOffline(false);
       return true;
@@ -337,4 +343,24 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
     loadBoard: () => loadBoard(businessDate),
     setBusinessDate,
   };
+}
+
+function isVipFloorBoardV2(
+  payload: Record<string, unknown>,
+): payload is Record<string, unknown> & VipFloorBoardV2 {
+  return payload.schemaVersion === VIP_FLOOR_SCHEMA_VERSION
+    && typeof payload.generatedAt === "string"
+    && typeof payload.boardRevision === "number"
+    && Array.isArray(payload.tables)
+    && Array.isArray(payload.reservations)
+    && Array.isArray(payload.assignments)
+    && Array.isArray(payload.unassignedReservationIds)
+    && Array.isArray(payload.blocks)
+    && Array.isArray(payload.notes)
+    && typeof payload.businessDay === "object"
+    && payload.businessDay !== null
+    && typeof payload.capabilities === "object"
+    && payload.capabilities !== null
+    && typeof payload.operations === "object"
+    && payload.operations !== null;
 }

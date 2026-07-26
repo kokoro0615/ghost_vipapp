@@ -7,6 +7,68 @@
 > 対応計画: `GHOST_VIP_MANAGER_IMPLEMENTATION_PLAN.md` v1.1  
 > 最新疎通時の公開deployment: `dpl_9Vh3knq1cBgnR48UNMxx7gM7j2NX`
 
+## 0. 2026-07-26 実行追補
+
+本節は下記の着手前監査を上書きする最新実行状態である。元監査は差分の
+追跡用に残し、Release Gateは証拠のある範囲だけ更新する。
+
+### 解消したP0基盤
+
+- VIP App本番dirty deploymentを完全復元し、
+  `archive/production-dpl-9Vh3-20260725` /
+  `8dfecb401c235ca9fd97ca8d20b096de72518055`へ固定した。
+- VIP AppのW0 checkpointを
+  `codex/vip-manager-g0-5-20260726` /
+  `b7347e2e1295bf8cc364d3cad63c512b49612802`へ固定した。
+- GHOST本番sourceを
+  `96771cb6fe315ea3e5b72d148b5881776721781d`へ照合した。
+- versioned canonical branch
+  `codex/vip-manager-contract-v2-20260726` /
+  `b1b1a3185cdbffa7855d8b55315d1f9a37daa55b`を作成し、旧
+  `vipapp-command` routeを廃止した。
+- staging Supabaseとlocal migration setを33/33で一致させ、
+  `20260726150000_ghost_vip_manager_arrival_time_v9.sql`まで適用した。
+  production DB mutationは0、dual-writeは`false`のままである。
+- staging transaction fixtureはarrival 5、mutation 28、helper 41、
+  read 10 checkをすべてPASSし、全て`ROLLBACK`した。
+
+### 契約・権限・UIの更新
+
+- 6 commandをcanonical v2 routeへ接続し、数値`expectedVersion`、
+  `Idempotency-Key`、固定理由`管理画面操作`、audit、revisionを統一した。
+- public service-role routeはOwner以外のmutationを403にし、arrival v9
+  RPCもOwnerを再検証する。boardの非Owner表示は顧客名をmaskし、noteを
+  除外する。
+- API応答境界でconfirmed-only filteringを行い、hold/expired予約と
+  関連assignment、table参照、note、集計値を除外する。
+- canonical `vip-floor.v2`をlegacy `seats` adapterへ誤投入するcrashを修正し、
+  v2/legacy分岐をcontract testへ固定した。
+- UIはTableCheck型4 bottom navigation、List/Floor/Chart/Inspector、
+  URL state、roving tabs、Owner-only capability、実floor-plan、
+  GHOST lacquer/champagne表現へ更新した。新規予約はT-018未実装のため
+  `準備中`として安全に無効化している。
+- 320×720、1024×768、1194×834、1366×1024でhorizontal overflow 0、
+  可視重要controlの44px未満0を確認した。roving tabsは
+  ArrowRight/End/Homeでfocus・selection・URLが一致した。
+
+### 最新Gate判定
+
+| Gate | 最新 | 根拠 / 残り |
+|---|---|---|
+| G0 正本 | PASS | v1.0仕様、v1.1計画、archive |
+| G0.5 Source lineage | PASS | 両deployment source、versioned contract、migration lineageを追跡可能 |
+| G1 Contract | PARTIAL | v2 board/6 command/version/idempotency/audit、staging SQL fixtureはPASS。新規予約等の契約は未完成 |
+| G2 Security | PARTIAL | API Owner-only、PII mask、arrival RPC Owner guard。全legacy DB helper統一とlive HTTP証拠が残る |
+| G3 Booking bridge | PARTIAL | confirmed-only API境界はPASS。customer sync/outbox/2秒E2Eが残る |
+| G4 UI parity | PARTIAL | 主要3 view+Inspector、4幅、keyboard/touch/visualはPASS。新規予約8段階とaxe/Safariが残る |
+| G5 Operations | FAIL | Walk-in、Waitlist、block、staff assignmentが未実装 |
+| G6 Resilience | FAIL | realtime gap recovery、永続metric/alertが未実装 |
+| G7 Production | FAIL | live staging HTTP E2E、restore rehearsal、candidate/rollbackが未完 |
+
+証拠packは共有repoの
+`docs/evidence/GHOST_VIP_MANAGER_W0_W1_2026-07-26.md`と同directoryの
+PII-free screenshotに記録する。
+
 ## 1. 結論
 
 現行本番は「Basic/PINで保護された旧GHOST予約台帳の閲覧UI」と

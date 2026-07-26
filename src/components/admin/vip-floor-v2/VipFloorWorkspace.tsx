@@ -185,7 +185,7 @@ export default function VipFloorWorkspace() {
       <header className={styles.serviceRibbon}>
         <div className={styles.venueIdentity}>
           <span>GHOST OSAKA</span>
-          <strong>VIP FLOOR OPERATIONS</strong>
+            <strong>VIP MANAGER</strong>
         </div>
         <label className={styles.ribbonControl}>
           <CalendarDays size={15} />

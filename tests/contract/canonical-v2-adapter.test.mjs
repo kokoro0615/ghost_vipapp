@@ -10,6 +10,10 @@ const commandRoutePath = path.join(
 );
 const boardRoutePath = path.join(root, "src/app/api/admin/vip-floor/route.ts");
 const legacyAdapterPath = path.join(root, "src/lib/vipFloorLegacy.ts");
+const workspaceHookPath = path.join(
+  root,
+  "src/components/admin/vip-floor-v2/state/useVipFloorWorkspace.ts",
+);
 const siblingWebsiteRoot = path.resolve(root, "../ghost/website");
 const siblingContractPath = path.join(
   siblingWebsiteRoot,
@@ -87,6 +91,7 @@ test("command payload translation preserves the v2 concurrency and domain fields
 test("board adapter prefers vip-floor.v2 and makes legacy fallback read-only", () => {
   const boardSource = readFileSync(boardRoutePath, "utf8");
   const legacySource = readFileSync(legacyAdapterPath, "utf8");
+  const workspaceSource = readFileSync(workspaceHookPath, "utf8");
   const v2Index = boardSource.indexOf("/api/admin/v2/vip-floor");
   const legacyIndex = boardSource.indexOf("/api/admin/vip-status");
 
@@ -96,6 +101,9 @@ test("board adapter prefers vip-floor.v2 and makes legacy fallback read-only", (
   assert.match(boardSource, /"X-GHOST-Board-Contract": VIP_FLOOR_SCHEMA_VERSION/u);
   assert.match(boardSource, /"X-GHOST-Board-Contract": "legacy-read-only"/u);
   assert.match(legacySource, /adminMutationEnabled: false/u);
+  assert.match(workspaceSource, /isVipFloorBoardV2\(payload\)/u);
+  assert.match(workspaceSource, /\? payload\s*:\s*adaptLegacyVipBoard/u);
+  assert.match(workspaceSource, /payload\.schemaVersion === VIP_FLOOR_SCHEMA_VERSION/u);
 });
 
 test("checked-out GHOST website contract stays synchronized when available", () => {
