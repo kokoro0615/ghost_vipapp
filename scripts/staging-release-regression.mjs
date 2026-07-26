@@ -835,7 +835,15 @@ async function runUiRegression(config, reservationId, uiReservationPlan) {
     const queueItem = queue
       .getByRole("button")
       .filter({ hasText: uiReservationPublicCode });
-    await queueItem.waitFor();
+    const queueItemCount = await queueItem.count();
+    assert(
+      queueItemCount === 1,
+      `ui_queue_item_missing:${queueItemCount}:${await queue.locator("button").count()}:${
+        await queue.getAttribute("data-collapsed") === null ? "open" : "collapsed"
+      }`,
+    );
+    await queueItem.scrollIntoViewIfNeeded();
+    assert(await queueItem.isVisible(), "ui_queue_item_not_visible");
     await queueItem.click();
     await page.locator('aside[aria-label="予約インスペクター"]:visible').waitFor();
     await statusFilter.selectOption("all");
