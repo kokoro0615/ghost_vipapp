@@ -1,6 +1,6 @@
 # Gate A exact-run cleanup manifest
 
-Status: `READY_FOR_FRESH_OWNER_APPROVAL`
+Status: `PARTIAL_CLEANUP_HOLD_NEW_EXACT_APPROVAL`
 Observed: 2026-07-27 04:32:48 JST
 Cleanup target: Supabase staging `rsvrtaavofflkvtfzsfh` only
 Exact Trial run: `trial-20260726-adaa919e0001`
@@ -127,7 +127,34 @@ run-scoped `admin_session.retire` audit rows. Control rows remain run 1,
 baseline 1 and run events 0; sent provider jobs remain 0; official active seats
 remain 8 and Trial active seats remain 8.
 
-The cleanup dry-run repeated the exact dependency order and refused the
-Production Supabase ref. Cleanup remains unexecuted. If any count, baseline
-hash, target ref, run ID, session count or fixed deployment differs before
-execution, stop and obtain a newly frozen approval manifest.
+At this freeze, the cleanup dry-run repeated the exact dependency order and
+refused the Production Supabase ref; cleanup had not yet executed. If any
+count, baseline hash, target ref, run ID, session count or fixed deployment
+differed before execution, the contract required a newly frozen approval.
+
+## Approved execution and fail-closed partial stop
+
+At 2026-07-27 04:43:05 JST, the execution-time snapshot matched the approved
+28-table 5289 rows, control 2, baseline SHA-256, session 0, official/Trial seat
+shape, sent provider 0, exact ref/run and maintenance deployment. The approved
+cleanup then stopped at the final `admin_users` delete on
+`audit_logs_actor_admin_id_fkey`.
+
+Read-only diagnosis identified one pre-existing unscoped
+`admin_pin.set`/`admin_pin_credentials` audit row with
+`trial_run_id=NULL` that references the exact Trial admin. It was not included
+in the approved 5289 run-scoped rows. Per the Owner's no-drift condition, it
+was not deleted and no inferred authorization was used.
+
+Residual freeze:
+
+- 28-table exact-run lineage: `admin_users=1`; the other 27 tables are 0;
+- unscoped Trial PIN audit orphan: 1;
+- controls: run 1, baseline 1, run events 0;
+- baseline SHA-256 remains `08abb1...`;
+- official active `VIP-1`–`VIP-8` unchanged; T/TRIAL seats/sections 0;
+- sent provider 0.
+
+Gate A remains HOLD for new exact residual-cleanup approval covering the one
+orphan audit row, one run-scoped admin row and two controls. Only then may the
+baseline restore and independent clean verifier be completed.

@@ -1,7 +1,7 @@
 # Production completion audit
 
-Observed: 2026-07-27 04:32:48 JST  
-Outcome: `HOLD_GATE_A_FRESH_OWNER_APPROVAL`
+Observed: 2026-07-27 04:43:05 JST  
+Outcome: `HOLD_GATE_A_PARTIAL_CLEANUP_RESIDUAL_APPROVAL`
 
 This matrix audits the execution prompt against current source, runtime and
 data evidence. `PASS` means the requirement has direct evidence at its full
@@ -26,7 +26,7 @@ Website `0a063e0`. QA/tooling commits do not alter the runtime candidates.
 | PR-1 authority | PASS | VIP commit `729eea7`; SPEC 1.1, PLAN 1.2, README and narrow VIP-only AGENTS exception | None |
 | PR-2 inactive-history migration blocker | PARTIAL | Website runtime candidate; clean and inactive 2-seat PostgreSQL 16.14 migration/dump/restore; refs 2+2 retained; board 8/8/8/0 | Apply only after encrypted Production snapshot restore and Gate B |
 | PR-3 Trial shutdown preparation | PASS | read-only backend `dpl_FSf...`; maintenance fixed URL `dpl_6zR...`; exact session retirement 2/2 and active 0; fixed smoke/log PASS | Destructive Trial data cleanup is Gate A, not part of this PASS |
-| Gate A exact staging cleanup | HOLD | 04:32 freeze: ref `rsvr...`, run `trial-20260726-adaa919e0001`, 28-table 5289, control 2, baseline `08abb1...`, session 0, sent 0 | Obtain separate fresh approval; abort on any drift; run exact cleanup and clean verifier |
+| Gate A exact staging cleanup | HOLD partial | 04:43 execution snapshot matched approved 5289/control2 exactly; dependency cleanup reached final admin delete, then FK-stopped on one unscoped Trial PIN audit orphan. Residual: admin1 + orphan audit1 + controls2; baseline present; official8/T0/sent0 | Obtain new exact residual approval; delete only orphan audit1 → admin1 → verify baseline → controls2 → independent clean verifier |
 | PR-4 complete light UI | PASS automated | VIP runtime commits `333d02c`/`1f34fc1`; all named routes, views, dialogs and states in 36-state manifest | Physical iPad witness remains a separate QA HOLD |
 | PR-5 staging business regression | PARTIAL | full fail-closed runner `c000dd...`; contract 4/4; Website fresh-RC lifecycle pinned by SHA | Run live only after Gate A official-eight baseline, then verify DB and deployment-log provider 0 |
 | PR-6 Production backup / migration | HOLD | exact 24 checksum allowlist; clean/inactive synthetic restore rehearsals; PITR false / physical backups zero documented | Obtain Production DB credential; encrypted logical dump; isolated restore; Gate B approval; apply exact 24 |
@@ -54,8 +54,8 @@ Website `0a063e0`. QA/tooling commits do not alter the runtime candidates.
 |---:|---|---|
 | 1 | Fixed URL uses final Production backend/DB | HOLD — maintenance backend/staging DB |
 | 2 | `GHOST_VIP_TRIAL_MODE=false` | HOLD for final Production build |
-| 3 | Active/UI tables are official eight only | HOLD in staging until Gate A; Production read-only inventory is eight active |
-| 4 | Trial T tables and run fixture cleaned | HOLD Gate A |
+| 3 | Active/UI tables are official eight only | PASS current staging data shape: official active 8, T/TRIAL seats/sections 0; Gate A controls still open |
+| 4 | Trial T tables and run fixture cleaned | HOLD — residual admin1, unscoped audit orphan1 and controls2 |
 | 5 | Inactive historical rows safely preserved/hidden | PASS in code and isolated production-shape rehearsal; live application awaits Gate B |
 | 6 | Complete light UI, old purple chrome zero | PASS automated |
 | 7 | List/Floor/Chart directly reachable | PASS |
@@ -78,6 +78,7 @@ Approvals are not bundled:
 4. Gate D: exact VIP deployment promotion;
 5. Gate E: each mutation flag wave.
 
-The next authorized action is none until Gate A approval is received. Session
-retirement and maintenance promotion approval has been fully consumed and does
-not authorize cleanup.
+The next authorized action is none until the newly frozen Gate A residual
+approval is received. The original 5289/control2 approval was consumed by the
+partial execution and does not authorize deletion of the newly identified
+unscoped audit orphan.
