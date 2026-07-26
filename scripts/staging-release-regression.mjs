@@ -822,7 +822,24 @@ async function runUiRegression(config, reservationId, uiReservationPlan) {
     await search.fill(uiReservationPublicCode);
     const queue = page.getByLabel("例外と到着queue");
     if (await queue.getAttribute("data-collapsed") !== null) {
-      await page.getByRole("button", { name: "キューパネルを切替" }).click();
+      const queueToggle = page.getByRole("button", { name: "キューパネルを切替" });
+      assert(await queueToggle.count() === 1, "ui_queue_toggle_missing");
+      assert(await queueToggle.isVisible(), "ui_queue_toggle_not_visible");
+      assert(
+        await queueToggle.evaluate((element) => {
+          const rect = element.getBoundingClientRect();
+          const target = document.elementFromPoint(
+            rect.left + rect.width / 2,
+            rect.top + rect.height / 2,
+          );
+          return target === element || (target instanceof Node && element.contains(target));
+        }),
+        "ui_queue_toggle_covered",
+      );
+      await queueToggle.click({ timeout: 5_000 })
+        .catch(() => {
+          throw new Error("ui_queue_toggle_click_failed");
+        });
       await assertEventually(
         async () => await queue.getAttribute("data-collapsed") === null,
         "ui_queue_open_failed",
@@ -889,7 +906,10 @@ async function runUiRegression(config, reservationId, uiReservationPlan) {
       "ui_exposed_internal_reservation_id",
     );
 
-    await page.getByRole("button", { name: /ログアウト/u }).first().click();
+    await page.getByRole("button", { name: /ログアウト/u }).first().click({ timeout: 5_000 })
+      .catch(() => {
+        throw new Error("ui_logout_click_failed");
+      });
     await page.getByLabel("Owner専用PIN").waitFor();
 
     assert(failures.length === 0, `ui_runtime_failures:${[...new Set(failures)].join(",")}`);
