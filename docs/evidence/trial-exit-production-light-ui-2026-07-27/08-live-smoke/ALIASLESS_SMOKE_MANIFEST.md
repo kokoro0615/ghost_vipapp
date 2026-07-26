@@ -1,9 +1,10 @@
 # Aliasless production smoke manifest
 
-Status: `PASS_MAINTENANCE_ANCHOR_ONLY`
+Status: `PASS_MAINTENANCE_FIXED_URL_ONLY`
 
-The aliasless maintenance anchor `dpl_6zRMGjhUo7HLwAcuWAKRMVKxZg7C`
-passed:
+The maintenance anchor `dpl_6zRMGjhUo7HLwAcuWAKRMVKxZg7C` first passed
+aliasless smoke and then, after exact session retirement and fresh Owner
+approval, passed the same checks on the fixed URL:
 
 - Vercel protection bypassed only through the authenticated CLI;
 - outer Basic absent: 401;
@@ -12,11 +13,14 @@ passed:
 - PIN, workspace, reservation search and form controls: zero;
 - local session read without a PIN session: 401;
 - command POST without a PIN session: 401;
-- customer fixed URL remained on `dpl_3kwpgwP3H3wQ7CnEwoHU7ZbdYxBR`.
+- fixed URL resolved to `dpl_6zRMGjhUo7HLwAcuWAKRMVKxZg7C`;
+- exact Trial run non-expired active sessions: 0;
+- fixed URL session, board and command routes without a PIN session: `401`;
+- recent deployment `5xx` and error-level logs: 0.
 
 The candidate points to read-only staging backend
 `dpl_FSf7tGxgDmpnnfJzNwC8kQFZAWvE`. No business mutation, provider call,
-production alias promotion or production database change was performed.
+Gate A cleanup or production database change was performed.
 
 This is PR-3 maintenance evidence only. The final Website/VIP read-only
 production candidates, permanent credentials, authenticated production board,

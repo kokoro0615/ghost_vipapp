@@ -28,11 +28,17 @@ Until then, report the narrow achieved state and an explicit `HOLD_<REASON>`.
 - final maintenance=false rebuild: `PASS`
 - final false-mode hydrated PIN screen: `PASS`
 
-The final `npm run ci` passed lint, typecheck, unit 11/11, contract 29/29,
+The latest exact `npm run ci` passed lint, typecheck, unit 11/11, contract 33/33,
 PII-safe artifact scan, production build, maintenance true/false runtime and
 the 216-screenshot light UI matrix. Automated light UI acceptance is PASS.
 
 The overall release outcome remains `HOLD_REQUIRED_GATES`: staging release
-candidate regression/cleanup, production logical dump plus isolated restore,
-fresh Owner approvals, aliasless/live deployment proof, physical iPad Safari
-and post-promotion rollback/revocation evidence are not complete.
+candidate live regression/cleanup, production logical dump plus isolated
+restore, Gate A–E Owner approvals, final production candidate proof, physical
+iPad Safari and post-promotion rollback/revocation evidence are not complete.
+
+The customer fixed URL is now the authenticated read-only maintenance anchor
+`dpl_6zRMGjhUo7HLwAcuWAKRMVKxZg7C`, after separately approved retirement of
+the exact Trial run's two active sessions. Maintenance fixed-URL smoke passed
+and non-expired active Trial sessions are zero. This is Trial shutdown
+evidence, not final Production readiness or Gate A cleanup evidence.

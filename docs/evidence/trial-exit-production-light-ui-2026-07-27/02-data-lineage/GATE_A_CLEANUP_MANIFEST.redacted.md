@@ -1,7 +1,7 @@
 # Gate A exact-run cleanup manifest
 
-Status: `HOLD_FRESH_OWNER_APPROVAL`
-Observed: 2026-07-27 02:19:49 JST
+Status: `READY_FOR_FRESH_OWNER_APPROVAL`
+Observed: 2026-07-27 04:32:48 JST
 Cleanup target: Supabase staging `rsvrtaavofflkvtfzsfh` only
 Exact Trial run: `trial-20260726-adaa919e0001`
 
@@ -20,7 +20,7 @@ Website release branch. It contains counts only and no PII or credentials.
 - Baseline SHA-256:
   `08abb1dee60ee7d74f281f058b70fd253e374cfc40066a7eeaf359f840306e40`.
 - Provider deliveries with Trial lineage and `sent` state: 0.
-- Non-expired active Trial sessions at freeze: 2. Gate A requires 0.
+- Non-expired active Trial sessions at freeze: 0.
 
 ## Exact planned delete counts at freeze
 
@@ -48,7 +48,7 @@ immediately before a fresh Owner approval.
 | `customers` | 4 |
 | `customer_profiles` | 4 |
 | `customer_tags` | 4 |
-| `audit_logs` | 13 |
+| `audit_logs` | 15 |
 | `reservation_customer_link_events` | 4 |
 | `reservation_blocks` | 2 |
 | `reservation_block_targets` | 2 |
@@ -56,12 +56,12 @@ immediately before a fresh Owner approval.
 | `vip_staff_members` | 3 |
 | `vip_table_staff_assignments` | 3 |
 | `notification_jobs` | 1 |
-| `vip_manager_metrics` | 1646 |
-| **28-table total** | **1773** |
+| `vip_manager_metrics` | 5160 |
+| **28-table total** | **5289** |
 
 Control rows outside the 28 lineage tables:
 `vip_manager_trial_run_events=0`, `vip_manager_trial_baselines=1`,
-`vip_manager_trial_runs=1`. Expected total including control rows is 1775 at
+`vip_manager_trial_runs=1`. Expected total including control rows is 5291 at
 the observation time.
 
 ## Execution and recovery contract
@@ -81,9 +81,9 @@ the baseline row remains. Reseed requires a clean verification, the same
 v16/v17 staging schema, a fresh lifecycle credential and a separate fresh
 Owner approval. It is not automatic authorization to recreate the Trial.
 
-Gate A remains HOLD because active sessions were nonzero, the lifecycle
-credential was unavailable and fresh Owner approval was not obtained. No
-cleanup was executed.
+Gate A remains HOLD only for its separate fresh Owner approval. The exact
+session-retirement credential path was proven without persisting or emitting
+the key. No cleanup was executed.
 
 ## Latest pre-promotion re-freeze
 
@@ -106,3 +106,28 @@ Two active sessions remained. Their non-secret expiry times were 2026-07-27
 13:19:44 JST and 13:29:22 JST. The cleanup manifest must be re-frozen again
 after exact-run session retirement and maintenance alias promotion, then
 presented for a separate fresh Gate A approval.
+
+## Post-maintenance Gate A freeze
+
+Owner separately approved retirement of the two non-expired active sessions
+and promotion of maintenance deployment
+`dpl_6zRMGjhUo7HLwAcuWAKRMVKxZg7C`. The session retirement used only
+`retire_admin_session_v7` for the exact run and completed 2/2; an independent
+read-only check returned zero non-expired active sessions.
+
+The fixed URL now resolves to the exact maintenance deployment. Smoke evidence:
+outer Basic absent `401`, valid existing Basic `200`, maintenance copy present,
+PIN/workspace/form/input zero, and session/board/command without a PIN session
+all `401`. Recent deployment logs contained zero `5xx` and zero error-level
+entries.
+
+The 04:32:48 JST snapshot validated the exact baseline hash and produced the
+current table above. The only non-telemetry delta from the 03:43 freeze was two
+run-scoped `admin_session.retire` audit rows. Control rows remain run 1,
+baseline 1 and run events 0; sent provider jobs remain 0; official active seats
+remain 8 and Trial active seats remain 8.
+
+The cleanup dry-run repeated the exact dependency order and refused the
+Production Supabase ref. Cleanup remains unexecuted. If any count, baseline
+hash, target ref, run ID, session count or fixed deployment differs before
+execution, stop and obtain a newly frozen approval manifest.

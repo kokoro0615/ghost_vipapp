@@ -1,6 +1,6 @@
 # Deployment Gate manifest
 
-Status: `PARTIAL_MAINTENANCE_CANDIDATE_READY`
+Status: `PASS_MAINTENANCE_FIXED_URL`
 
 ## PR-3 maintenance candidates
 
@@ -14,19 +14,22 @@ Status: `PARTIAL_MAINTENANCE_CANDIDATE_READY`
   disabled; Trial safety remains enabled
 - VIP maintenance anchor:
   `dpl_6zRMGjhUo7HLwAcuWAKRMVKxZg7C` (`READY`, target `production`,
-  customer fixed alias not promoted)
+  promoted to the customer fixed URL after fresh Owner approval)
 - VIP source:
   `1f34fc1ec9f138fa60f2ba7b76316bf642f0e439`, tree
   `87bfdc82bf0b2d465fe088673744aac83a6f17c9`
 - VIP backend origin: the exact read-only staging deployment above
-- customer fixed URL remains on Trial deployment
-  `dpl_3kwpgwP3H3wQ7CnEwoHU7ZbdYxBR`
+- customer fixed URL resolves to maintenance deployment
+  `dpl_6zRMGjhUo7HLwAcuWAKRMVKxZg7C`; previous Trial deployment
+  `dpl_3kwpgwP3H3wQ7CnEwoHU7ZbdYxBR` remains only as frozen history
 - Website production remains on
   `dpl_5RaU3Mpz8KanMeEnfcZK5b9NGFSP`
 
-The maintenance anchor is not the final Gate C/D production candidate. Active
-Trial sessions were 2 at the latest read-only check, so session retirement and
-fresh Owner approval are required before promoting the maintenance anchor.
+The maintenance anchor is not the final Gate C/D production candidate. Owner
+approved retirement of the exact run's two non-expired active sessions and
+promotion of this deployment. Retirement completed 2/2, an independent check
+returned zero, and the fixed URL promotion/smoke passed. Gate A cleanup still
+requires a separate fresh approval.
 
 Prepare one mode-600 redacted JSON using schema
 `ghost-vip-production-deployment-release.v1`, then run:
