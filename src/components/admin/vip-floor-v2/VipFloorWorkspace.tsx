@@ -35,6 +35,7 @@ import { ObservabilityPanel } from "./observability/ObservabilityPanel";
 import { ExceptionRail } from "./shell/ExceptionRail";
 import { useVipFloorWorkspace } from "./state/useVipFloorWorkspace";
 import { StaffPanel } from "./staff/StaffPanel";
+import { TrialModeCue } from "./TrialMode";
 import { WaitlistPanel } from "./waitlist/WaitlistPanel";
 import styles from "./VipFloorWorkspace.module.css";
 import { canExecuteVipCommand } from "@/lib/adminPermissions";
@@ -229,6 +230,7 @@ export default function VipFloorWorkspace() {
           <div className={styles.loginMark}><span>G</span></div>
           <p className={styles.loginEyebrow}>GHOST OSAKA · OWNER ACCESS</p>
           <h1>現場オペレーション</h1>
+          <TrialModeCue className={styles.loginTrialCue} />
           <p className={styles.loginMessage} role="status">{state.message}</p>
           <label>
             Owner専用PIN
@@ -262,6 +264,7 @@ export default function VipFloorWorkspace() {
           <span>GHOST OSAKA</span>
             <strong>VIP MANAGER</strong>
         </div>
+        <TrialModeCue className={styles.headerTrialCue} />
         <label className={styles.ribbonControl}>
           <CalendarDays size={15} />
           <span>営業日</span>

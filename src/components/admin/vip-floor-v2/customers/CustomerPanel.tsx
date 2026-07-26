@@ -5,6 +5,7 @@ import { Link2, Save, Unlink, UserRound, X } from "lucide-react";
 
 import type { CustomerDetail, UiReservation } from "../contract/uiTypes";
 import styles from "../VipFloorWorkspace.module.css";
+import { TrialModeCue } from "../TrialMode";
 
 type Props = {
   open: boolean;
@@ -146,6 +147,7 @@ export function CustomerPanel({
           <div>
             <span>OWNER · ENCRYPTED CUSTOMER</span>
             <h2 id="customer-panel-title">顧客詳細と紐付け</h2>
+            <TrialModeCue className={styles.dialogTrialCue} compact />
           </div>
           <button type="button" onClick={onClose} aria-label="顧客詳細を閉じる">
             <X size={19} />

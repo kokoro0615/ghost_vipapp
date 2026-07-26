@@ -17,6 +17,7 @@ import type {
   WaitlistEntry,
 } from "../contract/uiTypes";
 import styles from "../VipFloorWorkspace.module.css";
+import { TrialModeCue, useTrialMode } from "../TrialMode";
 
 type Props = {
   open: boolean;
@@ -37,6 +38,7 @@ export function WaitlistPanel({
   onRefresh,
   onAction,
 }: Props) {
+  const trialMode = useTrialMode();
   const [mode, setMode] = useState<"queue" | "create">("queue");
   const [now, setNow] = useState(() => Date.now());
   const panelRef = useRef<HTMLDivElement>(null);
@@ -130,6 +132,7 @@ export function WaitlistPanel({
           <div>
             <span>GHOST ARRIVAL QUEUE</span>
             <h2 id="waitlist-title">Waitlist</h2>
+            <TrialModeCue className={styles.dialogTrialCue} compact />
           </div>
           <button type="button" onClick={onClose} aria-label="Waitlistを閉じる">
             <X size={19} />
@@ -174,7 +177,7 @@ export function WaitlistPanel({
               <div className={styles.formColumns}>
                 <label>
                   表示名（任意）
-                  <input name="guestLabel" maxLength={80} placeholder="入口で識別できる名前" />
+                  <input name="guestLabel" maxLength={80} placeholder={trialMode ? "例: TRIAL-待機01" : "入口で識別できる名前"} />
                 </label>
                 <label>
                   人数
@@ -183,7 +186,7 @@ export function WaitlistPanel({
               </div>
               <label>
                 Eメール（呼出通知・任意）
-                <input type="email" name="email" maxLength={254} autoComplete="off" />
+                <input type="email" name="email" maxLength={254} autoComplete="off" placeholder={trialMode ? "trial-01@example.com" : undefined} pattern={trialMode ? "^[^@\\s]+@example\\.com$" : undefined} />
               </label>
             </fieldset>
             <footer className={styles.commandFooter}>

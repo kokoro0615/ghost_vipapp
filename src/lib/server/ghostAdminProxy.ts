@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import "server-only";
 
 import { NextResponse } from "next/server";
 
@@ -6,6 +7,7 @@ import { normalizeVipAdminRole, type VipAdminRole } from "@/lib/adminPermissions
 
 const SESSION_COOKIE = "ghost_vipapp_admin_session";
 const BACKEND_ORIGIN = (process.env.GHOST_ADMIN_API_ORIGIN ?? "https://ghost-ruby-one.vercel.app").replace(/\/$/u, "");
+const PRODUCTION_WEBSITE_ORIGINS = new Set(["https://ghost-ruby-one.vercel.app"]);
 
 export type AdminSessionPayload = {
   ok?: boolean;
@@ -41,7 +43,18 @@ export async function ghostAdminFetch(path: string, init: RequestInit = {}, toke
   const headers = new Headers(init.headers);
   headers.set("x-request-id", headers.get("x-request-id") ?? randomUUID());
   if (token) headers.set("authorization", `Bearer ${token}`);
-  return fetch(`${BACKEND_ORIGIN}${path}`, { ...init, headers, cache: "no-store", redirect: "error" });
+
+  const backendUrl = new URL(path, BACKEND_ORIGIN);
+  const configuredOrigin = new URL(BACKEND_ORIGIN).origin;
+  if (backendUrl.origin !== configuredOrigin) {
+    throw new Error("ghost_admin_origin_mismatch");
+  }
+  const bypass = process.env.GHOST_BACKEND_PROTECTION_BYPASS;
+  if (bypass && backendUrl.origin === configuredOrigin && !PRODUCTION_WEBSITE_ORIGINS.has(backendUrl.origin)) {
+    headers.set("x-vercel-protection-bypass", bypass);
+  }
+
+  return fetch(backendUrl, { ...init, headers, cache: "no-store", redirect: "error" });
 }
 
 export function copyJson(response: Response) {

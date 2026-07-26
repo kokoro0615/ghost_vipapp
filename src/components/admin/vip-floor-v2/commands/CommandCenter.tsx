@@ -7,6 +7,7 @@ import type { VipFloorBoardV2, VipServiceStatus } from "@/lib/vipFloorV2Contract
 
 import type { CommandKind, LiveCommandDraft, UiReservation } from "../contract/uiTypes";
 import styles from "../VipFloorWorkspace.module.css";
+import { TrialModeCue } from "../TrialMode";
 
 const commandLabels: Record<CommandKind, string> = {
   service_status: "接客状態を変更",
@@ -198,7 +199,7 @@ export function CommandCenter({
         onKeyDown={trapFocus}
       >
         <header className={styles.commandHeader}>
-          <div><span>GHOST 実行コマンド</span><h2 id="command-title">{commandLabels[kind]}</h2></div>
+          <div><span>GHOST 実行コマンド</span><h2 id="command-title">{commandLabels[kind]}</h2><TrialModeCue className={styles.dialogTrialCue} compact /></div>
           <button type="button" onClick={onClose} aria-label="操作画面を閉じる"><X size={19} /></button>
         </header>
         <div className={styles.stepRail} aria-label="操作ステップ">

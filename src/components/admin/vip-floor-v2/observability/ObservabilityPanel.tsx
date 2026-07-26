@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Activity, RefreshCw, TriangleAlert, X } from "lucide-react";
 
 import styles from "../VipFloorWorkspace.module.css";
+import { TrialModeCue } from "../TrialMode";
 
 type SloPayload = {
   generatedAt: string;
@@ -74,6 +75,7 @@ export function ObservabilityPanel({ open, onClose }: Props) {
           <div>
             <span>GHOST MANAGER · LAST 60 MIN</span>
             <h2 id="slo-panel-title">運用SLO / Alert</h2>
+            <TrialModeCue className={styles.dialogTrialCue} compact />
           </div>
           <button type="button" onClick={onClose} aria-label="SLOを閉じる"><X size={19} /></button>
         </header>

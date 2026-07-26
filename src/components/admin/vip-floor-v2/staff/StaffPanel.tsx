@@ -10,6 +10,7 @@ import type {
   StaffWorkspaceData,
 } from "../contract/uiTypes";
 import styles from "../VipFloorWorkspace.module.css";
+import { TrialModeCue, useTrialMode } from "../TrialMode";
 
 type Props = {
   open: boolean;
@@ -22,6 +23,7 @@ type Props = {
 };
 
 export function StaffPanel({ open, pending, board, data, onClose, onRefresh, onAction }: Props) {
+  const trialMode = useTrialMode();
   const panelRef = useRef<HTMLDivElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
   const [mode, setMode] = useState<"assignments" | "master">("assignments");
@@ -101,7 +103,7 @@ export function StaffPanel({ open, pending, board, data, onClose, onRefresh, onA
         onKeyDown={trapFocus}
       >
         <header className={styles.commandHeader}>
-          <div><span>GHOST FLOOR CREW</span><h2 id="staff-title">スタッフ担当卓</h2></div>
+          <div><span>GHOST FLOOR CREW</span><h2 id="staff-title">スタッフ担当卓</h2><TrialModeCue className={styles.dialogTrialCue} compact /></div>
           <button type="button" onClick={onClose} aria-label="スタッフ担当卓を閉じる"><X size={19} /></button>
         </header>
         <div className={styles.operationTabs} role="tablist" aria-label="スタッフ管理">
@@ -121,7 +123,7 @@ export function StaffPanel({ open, pending, board, data, onClose, onRefresh, onA
             <form className={styles.staffCreate} onSubmit={create}>
               <label>
                 表示名
-                <input name="displayName" maxLength={80} required placeholder="Ownerが初期スタッフを登録" />
+                <input name="displayName" maxLength={80} required placeholder={trialMode ? "例: TRIAL-スタッフ01" : "Ownerが初期スタッフを登録"} />
               </label>
               <button type="submit" className={styles.primaryButton} disabled={pending}>
                 <Check size={16} />登録

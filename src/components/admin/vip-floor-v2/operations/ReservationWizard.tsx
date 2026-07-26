@@ -12,6 +12,7 @@ import type {
   UiReservation,
 } from "../contract/uiTypes";
 import styles from "../VipFloorWorkspace.module.css";
+import { useTrialMode } from "../TrialMode";
 
 const STEPS = ["日付", "時刻", "人数", "卓", "顧客", "追加", "担当", "確認"] as const;
 
@@ -54,6 +55,7 @@ export function ReservationWizard({
   onRun,
   onDone,
 }: Props) {
+  const trialMode = useTrialMode();
   const defaults = useMemo(
     () => reservation
       ? {
@@ -219,11 +221,12 @@ export function ReservationWizard({
               </div>
             ) : (
               <>
-                <label>氏名<input value={draft.displayName} maxLength={120} autoComplete="off" onChange={(event) => patch({ displayName: event.target.value })} /></label>
+                <label>氏名<input value={draft.displayName} maxLength={120} autoComplete="off" placeholder={trialMode ? "例: TRIAL-ゲスト01" : undefined} onChange={(event) => patch({ displayName: event.target.value })} /></label>
                 <div className={styles.formColumns}>
-                  <label>電話<input type="tel" value={draft.phone} maxLength={40} autoComplete="off" onChange={(event) => patch({ phone: event.target.value })} /></label>
-                  <label>Eメール<input type="email" value={draft.email} maxLength={254} autoComplete="off" onChange={(event) => patch({ email: event.target.value })} /></label>
+                  <label>電話<input type="tel" value={draft.phone} maxLength={40} autoComplete="off" disabled={trialMode} aria-describedby={trialMode ? "trial-phone-rule" : undefined} onChange={(event) => patch({ phone: event.target.value })} /></label>
+                  <label>Eメール<input type="email" value={draft.email} maxLength={254} autoComplete="off" placeholder={trialMode ? "trial-01@example.com" : undefined} pattern={trialMode ? "^[^@\\s]+@example\\.com$" : undefined} onChange={(event) => patch({ email: event.target.value })} /></label>
                 </div>
+                {trialMode ? <p id="trial-phone-rule" className={styles.trialInputHint}>TRIALでは電話番号は入力できません。Eメールは@example.comのみ使用できます。</p> : null}
                 <label>言語<select value={draft.languageCode} onChange={(event) => patch({ languageCode: event.target.value })}><option value="ja">日本語</option><option value="en">English</option><option value="zh">中文</option><option value="ko">한국어</option></select></label>
                 <p className={styles.wizardHint}>電話の完全一致を優先し、電話がない場合だけEメールで自動集約します。</p>
               </>
