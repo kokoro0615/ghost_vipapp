@@ -87,29 +87,31 @@ async function main() {
     const scheduledEndAt = new Date(now + 90 * 60_000).toISOString();
     const createResult = await command(
       client,
-      "/api/admin/v2/reservations",
+      "/api/admin/vip-floor/operations",
       "POST",
       {
-        eventDayId,
-        offeringId: offering.id,
-        scheduledStartAt,
-        scheduledEndAt,
-        guestCount: 2,
-        tableIds: [tableByCode.get("VIP-1").id],
-        expectedTableVersions: tableVersions([tableByCode.get("VIP-1")]),
-        existingCustomerId: null,
-        displayName: "Release Candidate Guest",
-        phone: null,
-        email: null,
-        languageCode: "ja",
-        guestLabel: "RC Guest",
-        operatorNote: "Synthetic release-candidate reservation",
-        sourceChannel: "admin_hold",
-        serviceStatus: "expected",
-        bookingStaffMemberId: null,
-        notificationPreference: "none",
-        capacityOverride: false,
-        reason: AUDIT_REASON,
+        kind: "reservation_create",
+        payload: {
+          eventDayId,
+          offeringId: offering.id,
+          scheduledStartAt,
+          scheduledEndAt,
+          guestCount: 2,
+          tableIds: [tableByCode.get("VIP-1").id],
+          expectedTableVersions: tableVersions([tableByCode.get("VIP-1")]),
+          existingCustomerId: null,
+          displayName: "Release Candidate Guest",
+          phone: null,
+          email: "release-candidate@example.com",
+          languageCode: "ja",
+          guestLabel: "RC Guest",
+          operatorNote: "Synthetic release-candidate reservation",
+          sourceChannel: "admin_hold",
+          serviceStatus: "expected",
+          bookingStaffMemberId: null,
+          notificationPreference: "none",
+          capacityOverride: false,
+        },
       },
       "reservation.created",
     );
@@ -122,55 +124,53 @@ async function main() {
     const currentVip1 = findTable(board, "VIP-1");
     const editResult = await command(
       client,
-      `/api/admin/v2/reservations/${reservationId}`,
-      "PATCH",
+      "/api/admin/vip-floor/operations",
+      "POST",
       {
-        expectedVersion: staleVersion,
-        offeringId: offering.id,
-        scheduledStartAt,
-        scheduledEndAt,
-        guestCount: 3,
-        tableIds: [currentVip1.id],
-        expectedTableVersions: tableVersions([currentVip1]),
-        guestLabel: "RC Guest Edited",
-        operatorNote: "Synthetic edit verified",
-        sourceChannel: "admin_hold",
-        serviceStatus: "expected",
-        bookingStaffMemberId: null,
-        notificationPreference: "none",
-        capacityOverride: false,
-        reason: AUDIT_REASON,
+        kind: "reservation_update",
+        payload: {
+          reservationId,
+          expectedVersion: staleVersion,
+          offeringId: offering.id,
+          scheduledStartAt,
+          scheduledEndAt,
+          guestCount: 3,
+          tableIds: [currentVip1.id],
+          expectedTableVersions: tableVersions([currentVip1]),
+          guestLabel: "RC Guest Edited",
+          operatorNote: "Synthetic edit verified",
+          sourceChannel: "admin_hold",
+          serviceStatus: "expected",
+          bookingStaffMemberId: null,
+          notificationPreference: "none",
+          capacityOverride: false,
+        },
       },
       "reservation.updated",
     );
     assert(editResult.entityVersion > staleVersion, "reservation_edit_version_not_advanced");
 
     const staleConflict = await client.requestJson(
-      `/api/admin/v2/reservations/${reservationId}/notes`,
+      "/api/admin/vip-floor/commands",
       {
         method: "POST",
         json: {
+          kind: "note",
+          reservationId,
           expectedVersion: staleVersion,
-          noteId: null,
-          expectedNoteVersion: null,
-          kind: "floor",
-          body: "Stale conflict probe",
-          pinned: false,
-          reason: AUDIT_REASON,
+          payload: { note: "Stale conflict probe" },
         },
         headers: { "Idempotency-Key": `rc-conflict-${randomUUID()}` },
       },
     );
     assert(staleConflict.response.status === 409, "stale_version_conflict_not_409");
 
-    board = await readBoard(client, config.businessDate);
-    reservation = findReservation(board, reservationId);
-    await command(
+    await reservationCommand(
       client,
-      `/api/admin/v2/reservations/${reservationId}/notes`,
-      "POST",
+      config.businessDate,
+      reservationId,
+      "notes",
       {
-        expectedVersion: positiveInteger(reservation.version, "note_reservation_version_missing"),
         noteId: null,
         expectedNoteVersion: null,
         kind: "floor",
@@ -181,20 +181,14 @@ async function main() {
       "reservation_note.upserted",
     );
 
-    await reservationCommand(client, config.businessDate, reservationId, "arrival-time", {
-      arrivedAt: new Date().toISOString(),
-      reason: AUDIT_REASON,
-    }, "reservation.arrival_time.updated");
-
     board = await readBoard(client, config.businessDate);
-    reservation = findReservation(board, reservationId);
     const vip2 = findTable(board, "VIP-2");
-    await command(
+    await reservationCommand(
       client,
-      `/api/admin/v2/reservations/${reservationId}/assignments`,
-      "POST",
+      config.businessDate,
+      reservationId,
+      "assignments",
       {
-        expectedVersion: positiveInteger(reservation.version, "assignment_reservation_version_missing"),
         operation: "replace",
         tableIds: [vip2.id],
         capacityOverride: false,
@@ -203,10 +197,62 @@ async function main() {
       "reservation.assignments.changed",
     );
 
+    const waitlist = await command(
+      client,
+      "/api/admin/vip-floor/waitlist",
+      "POST",
+      {
+        action: "create",
+        payload: {
+          eventDayId,
+          guestCount: 1,
+          guestLabel: "RC Waitlist",
+          email: null,
+        },
+      },
+      "waitlist.created",
+    );
+    const waitlistEntryId = requireUuid(waitlist.waitlistEntryId, "waitlist_entry_id_missing");
+    const waitlistCalled = await command(
+      client,
+      "/api/admin/vip-floor/waitlist",
+      "POST",
+      {
+        action: "call",
+        payload: {
+          waitlistEntryId,
+          expectedVersion: positiveInteger(waitlist.entityVersion, "waitlist_version_missing"),
+          reservationId: null,
+        },
+      },
+      "waitlist.called",
+    );
+    await command(
+      client,
+      "/api/admin/vip-floor/waitlist",
+      "POST",
+      {
+        action: "seat",
+        payload: {
+          waitlistEntryId,
+          expectedVersion: positiveInteger(
+            waitlistCalled.entityVersion,
+            "called_waitlist_version_missing",
+          ),
+          reservationId,
+        },
+      },
+      "waitlist.seated",
+    );
+
     await reservationCommand(client, config.businessDate, reservationId, "check-in", {
       occurredAt: new Date().toISOString(),
       reason: AUDIT_REASON,
     }, "reservation.checked_in");
+    await reservationCommand(client, config.businessDate, reservationId, "arrival-time", {
+      arrivedAt: new Date(Date.now() - 60_000).toISOString(),
+      reason: AUDIT_REASON,
+    }, "reservation.arrival_time.updated");
     await reservationCommand(client, config.businessDate, reservationId, "service-status", {
       toStatus: "bottle_pending",
       occurredAt: new Date().toISOString(),
@@ -221,168 +267,128 @@ async function main() {
     const vip3 = findTable(board, "VIP-3");
     const walkIn = await command(
       client,
-      "/api/admin/v2/walk-ins",
+      "/api/admin/vip-floor/operations",
       "POST",
       {
-        eventDayId,
-        offeringId: offering.id,
-        scheduledStartAt: new Date(now - 15 * 60_000).toISOString(),
-        scheduledEndAt: new Date(now + 60 * 60_000).toISOString(),
-        guestCount: 2,
-        tableIds: [vip3.id],
-        guestLabel: "RC Walk-in",
-        operatorNote: "Synthetic walk-in",
-        expectedTableVersions: tableVersions([vip3]),
-        capacityOverride: false,
-        reason: AUDIT_REASON,
+        kind: "walk_in",
+        payload: {
+          eventDayId,
+          offeringId: offering.id,
+          scheduledStartAt: new Date(now - 15 * 60_000).toISOString(),
+          scheduledEndAt: new Date(now + 60 * 60_000).toISOString(),
+          guestCount: 2,
+          tableIds: [vip3.id],
+          guestLabel: "RC Walk-in",
+          operatorNote: "Synthetic walk-in",
+          expectedTableVersions: tableVersions([vip3]),
+          capacityOverride: false,
+        },
       },
       "walk_in.created",
     );
-    const walkInReservationId = requireUuid(
+    requireUuid(
       walkIn.reservationId,
       "walk_in_reservation_id_missing",
-    );
-
-    const waitlist = await command(
-      client,
-      "/api/admin/v2/waitlist",
-      "POST",
-      {
-        eventDayId,
-        guestCount: 1,
-        guestLabel: "RC Waitlist",
-        email: null,
-        reason: AUDIT_REASON,
-      },
-      "waitlist.created",
-    );
-    const waitlistEntryId = requireUuid(waitlist.waitlistEntryId, "waitlist_entry_id_missing");
-    const waitlistCalled = await command(
-      client,
-      `/api/admin/v2/waitlist/${waitlistEntryId}/call`,
-      "POST",
-      {
-        expectedVersion: positiveInteger(waitlist.entityVersion, "waitlist_version_missing"),
-        reservationId: null,
-        reason: AUDIT_REASON,
-      },
-      "waitlist.called",
-    );
-    await command(
-      client,
-      `/api/admin/v2/waitlist/${waitlistEntryId}/seat`,
-      "POST",
-      {
-        expectedVersion: positiveInteger(
-          waitlistCalled.entityVersion,
-          "called_waitlist_version_missing",
-        ),
-        reservationId: walkInReservationId,
-        reason: AUDIT_REASON,
-      },
-      "waitlist.seated",
     );
 
     board = await readBoard(client, config.businessDate);
     const vip4 = findTable(board, "VIP-4");
     const blockFields = {
       scope: "all_operations",
-      kind: "manual",
+      blockKind: "manual",
       startAt: new Date(now + 2 * 60 * 60_000).toISOString(),
       endAt: new Date(now + 3 * 60 * 60_000).toISOString(),
       memo: "RC block",
       seatResourceIds: [vip4.id],
-      floorSectionIds: [],
       venueWide: false,
-      reason: AUDIT_REASON,
     };
     const block = await command(
       client,
-      "/api/admin/v2/vip-blocks",
+      "/api/admin/vip-floor/operations",
       "POST",
-      { eventDayId, ...blockFields },
+      {
+        kind: "block_create",
+        payload: {
+          eventDayId,
+          businessDate: config.businessDate,
+          repeatDays: 1,
+          ...blockFields,
+        },
+      },
       "reservation_block.created",
     );
     const blockId = requireUuid(block.blockId, "block_id_missing");
     const blockUpdated = await command(
       client,
-      `/api/admin/v2/vip-blocks/${blockId}`,
-      "PATCH",
+      "/api/admin/vip-floor/operations",
+      "POST",
       {
-        expectedVersion: positiveInteger(block.entityVersion, "block_version_missing"),
-        ...blockFields,
-        memo: "RC block updated",
+        kind: "block_update",
+        payload: {
+          blockId,
+          expectedVersion: positiveInteger(block.entityVersion, "block_version_missing"),
+          ...blockFields,
+          memo: "RC block updated",
+        },
       },
       "reservation_block.updated",
     );
     await command(
       client,
-      `/api/admin/v2/vip-blocks/${blockId}`,
-      "DELETE",
+      "/api/admin/vip-floor/operations",
+      "POST",
       {
-        expectedVersion: positiveInteger(blockUpdated.entityVersion, "updated_block_version_missing"),
-        reason: AUDIT_REASON,
+        kind: "block_cancel",
+        payload: {
+          blockId,
+          expectedVersion: positiveInteger(
+            blockUpdated.entityVersion,
+            "updated_block_version_missing",
+          ),
+        },
       },
       "reservation_block.cancelled",
     );
 
     const staff = await command(
       client,
-      "/api/admin/v2/staff",
+      "/api/admin/vip-floor/staff",
       "POST",
-      { displayName: "RC Staff", reason: AUDIT_REASON },
+      { action: "create", payload: { displayName: "RC Staff" } },
       "staff_member.created",
     );
     const staffMemberId = requireUuid(staff.staffMemberId, "staff_member_id_missing");
     board = await readBoard(client, config.businessDate);
     await command(
       client,
-      "/api/admin/v2/staff/assignments",
+      "/api/admin/vip-floor/staff",
       "POST",
       {
-        eventDayId,
-        tableId: findTable(board, "VIP-5").id,
-        staffMemberId,
-        expectedAssignmentVersion: null,
-        reason: AUDIT_REASON,
+        action: "assign",
+        payload: {
+          eventDayId,
+          tableId: findTable(board, "VIP-5").id,
+          staffMemberId,
+          expectedAssignmentVersion: null,
+        },
       },
       "table_staff_assignment.set",
     );
 
-    const customerRead = await client.requestJson(`/api/admin/v2/customers/${customerId}`);
+    const customerRead = await client.requestJson(
+      `/api/admin/vip-floor/customers/${customerId}`,
+    );
     assert(customerRead.response.ok && customerRead.payload?.ok === true, "customer_read_failed");
     const profileVersion = positiveInteger(
       customerRead.payload?.customer?.profileVersion,
       "customer_profile_version_missing",
     );
-    const customerUpdated = await command(
+    await command(
       client,
-      `/api/admin/v2/customers/${customerId}`,
+      `/api/admin/vip-floor/customers/${customerId}`,
       "PATCH",
       {
         expectedVersion: profileVersion,
-        eventDayId,
-        reservationId,
-        displayName: "Release Candidate Guest Updated",
-        nameKana: "リリース候補",
-        phone: null,
-        email: null,
-        languageCode: "ja",
-        allergies: "Synthetic none",
-        preferences: "Synthetic verification",
-        reason: AUDIT_REASON,
-      },
-      "customer_profile.upserted",
-    );
-    await command(
-      client,
-      `/api/admin/v2/customers/${customerId}/attributes`,
-      "PATCH",
-      {
-        expectedVersion: positiveInteger(
-          customerUpdated.entityVersion,
-          "updated_customer_version_missing",
-        ),
         eventDayId,
         reservationId,
         nationalityCode: "JP",
@@ -398,7 +404,7 @@ async function main() {
     reservation = findReservation(board, reservationId);
     const unlinked = await command(
       client,
-      `/api/admin/v2/reservations/${reservationId}/customer-link`,
+      `/api/admin/vip-floor/reservations/${reservationId}/customer-link`,
       "PATCH",
       {
         expectedVersion: positiveInteger(reservation.version, "customer_unlink_version_missing"),
@@ -409,7 +415,7 @@ async function main() {
     );
     await command(
       client,
-      `/api/admin/v2/reservations/${reservationId}/customer-link`,
+      `/api/admin/vip-floor/reservations/${reservationId}/customer-link`,
       "PATCH",
       {
         expectedVersion: positiveInteger(unlinked.entityVersion, "customer_relink_version_missing"),
@@ -440,14 +446,19 @@ async function main() {
       "gap_recovery_revision_not_advanced",
     );
 
-    const slo = await client.requestJson("/api/admin/v2/observability/slo?windowMinutes=1440");
+    const slo = await client.requestJson(
+      "/api/admin/vip-floor/observability?windowMinutes=1440",
+    );
     assert(slo.response.ok && slo.payload?.ok === true, "slo_read_failed");
     assert(
       slo.payload?.alerts && Object.keys(slo.payload.alerts).length > 0,
       "slo_attention_alert_missing",
     );
 
-    browser = await runUiRegression(config, reservationId);
+    const uiReservationPlan = selectUiReservationPlan(
+      await readBoard(client, config.businessDate),
+    );
+    browser = await runUiRegression(config, reservationId, uiReservationPlan);
 
     const logout = await client.requestJson("/api/admin/session", { method: "DELETE" });
     assert(logout.response.ok, `logout_failed:${logout.response.status}`);
@@ -472,6 +483,7 @@ async function main() {
       realtimeGapRecovery: true,
       offlineReadOnly: true,
       sloAlert: true,
+      verifiedAuditActions: ["customer_profile.upserted"],
     });
   } catch (error) {
     primaryError = error;
@@ -484,6 +496,9 @@ async function main() {
       client.jar.clear();
     }
     try {
+      // Let browser polling and serverless metric writes quiesce before the
+      // exact-run delete reaches its final metrics/control-row assertions.
+      await delay(2_100);
       await runRequiredLifecycle(
         config.cleanupScript,
         "cleanup-vip-manager-trial.mjs",
@@ -524,25 +539,20 @@ function createClient(config) {
       { method: "POST", path: "/api/admin/session/pin" },
       { method: "GET", path: "/api/admin/session" },
       { method: "DELETE", path: "/api/admin/session" },
-      { method: "GET", path: "/api/admin/v2/vip-floor" },
-      { method: "GET", path: "/api/admin/v2/vip-floor/options" },
-      { method: "POST", path: "/api/admin/v2/reservations" },
-      { method: "PATCH", path: /^\/api\/admin\/v2\/reservations\/[0-9a-f-]+$/u },
-      { method: "POST", path: /^\/api\/admin\/v2\/reservations\/[0-9a-f-]+\/(?:arrival-time|assignments|check-in|service-status|extend-seat|notes)$/u },
-      { method: "PATCH", path: /^\/api\/admin\/v2\/reservations\/[0-9a-f-]+\/customer-link$/u },
-      { method: "POST", path: "/api/admin/v2/walk-ins" },
-      { method: "POST", path: "/api/admin/v2/waitlist" },
-      { method: "POST", path: /^\/api\/admin\/v2\/waitlist\/[0-9a-f-]+\/(?:call|seat)$/u },
-      { method: "POST", path: "/api/admin/v2/vip-blocks" },
-      { method: "PATCH", path: /^\/api\/admin\/v2\/vip-blocks\/[0-9a-f-]+$/u },
-      { method: "DELETE", path: /^\/api\/admin\/v2\/vip-blocks\/[0-9a-f-]+$/u },
-      { method: "POST", path: "/api/admin/v2/staff" },
-      { method: "POST", path: "/api/admin/v2/staff/assignments" },
-      { method: "GET", path: /^\/api\/admin\/v2\/customers\/[0-9a-f-]+$/u },
-      { method: "PATCH", path: /^\/api\/admin\/v2\/customers\/[0-9a-f-]+$/u },
-      { method: "PATCH", path: /^\/api\/admin\/v2\/customers\/[0-9a-f-]+\/attributes$/u },
-      { method: "POST", path: "/api/admin/v2/observability/events" },
-      { method: "GET", path: "/api/admin/v2/observability/slo" },
+      { method: "GET", path: "/api/admin/vip-floor" },
+      { method: "GET", path: "/api/admin/vip-floor/options" },
+      { method: "POST", path: "/api/admin/vip-floor/operations" },
+      { method: "POST", path: "/api/admin/vip-floor/commands" },
+      { method: "POST", path: "/api/admin/vip-floor/waitlist" },
+      { method: "POST", path: "/api/admin/vip-floor/staff" },
+      { method: "GET", path: /^\/api\/admin\/vip-floor\/customers\/[0-9a-f-]+$/u },
+      { method: "PATCH", path: /^\/api\/admin\/vip-floor\/customers\/[0-9a-f-]+$/u },
+      {
+        method: "PATCH",
+        path: /^\/api\/admin\/vip-floor\/reservations\/[0-9a-f-]+\/customer-link$/u,
+      },
+      { method: "POST", path: "/api/admin/vip-floor/observability" },
+      { method: "GET", path: "/api/admin/vip-floor/observability" },
     ],
   });
 }
@@ -560,7 +570,7 @@ async function login(client, pin) {
 
 async function readOptions(client, businessDate) {
   const result = await client.requestJson(
-    `/api/admin/v2/vip-floor/options?businessDate=${encodeURIComponent(businessDate)}`,
+    `/api/admin/vip-floor/options?date=${encodeURIComponent(businessDate)}`,
   );
   assert(result.response.ok && result.payload?.ok === true, "vip_floor_options_failed");
   return result.payload;
@@ -568,7 +578,7 @@ async function readOptions(client, businessDate) {
 
 async function readBoard(client, businessDate) {
   const result = await client.requestJson(
-    `/api/admin/v2/vip-floor?businessDate=${encodeURIComponent(businessDate)}`,
+    `/api/admin/vip-floor?date=${encodeURIComponent(businessDate)}`,
   );
   assert(result.response.ok && result.payload?.ok === true, `board_read_failed:${result.response.status}`);
   officialTables(result.payload);
@@ -617,12 +627,37 @@ async function command(client, pathname, method, json, expectedAction) {
   });
   assert(
     result.response.ok && result.payload?.ok === true,
-    `${expectedAction}_failed:${result.response.status}`,
+    `${expectedAction}_failed:${result.response.status}:${safeCommandFailureCode(result.payload)}`,
   );
-  assert(result.payload.action === expectedAction, `${expectedAction}_action_mismatch`);
-  requireUuid(result.payload.auditLogId, `${expectedAction}_audit_missing`);
-  positiveInteger(result.payload.entityVersion, `${expectedAction}_version_missing`);
-  return result.payload;
+  const payload = expectedAction === "reservation_block.created"
+    ? result.payload.results?.[0]
+    : result.payload;
+  assert(payload?.action === expectedAction, `${expectedAction}_action_mismatch`);
+  requireUuid(payload.auditLogId, `${expectedAction}_audit_missing`);
+  positiveInteger(payload.entityVersion, `${expectedAction}_version_missing`);
+  return payload;
+}
+
+function safeCommandFailureCode(payload) {
+  const error = payload?.error;
+  const code = typeof error === "string"
+    ? error
+    : error && typeof error === "object" && typeof error.code === "string"
+      ? error.code
+      : "unknown";
+  const details = error && typeof error === "object" && error.details
+    && typeof error.details === "object"
+    ? error.details
+    : payload?.details && typeof payload.details === "object"
+      ? payload.details
+      : null;
+  const diagnostic = [
+    code,
+    details?.field,
+    details?.reason,
+    details?.entityType,
+  ].filter((value) => typeof value === "string").join(":");
+  return diagnostic.replace(/[^A-Za-z0-9_:-]/gu, "_").slice(0, 160);
 }
 
 async function reservationCommand(
@@ -635,23 +670,46 @@ async function reservationCommand(
 ) {
   const board = await readBoard(client, businessDate);
   const reservation = findReservation(board, reservationId);
+  const kindByOperation = {
+    "arrival-time": "arrival_time",
+    assignments: "assignment",
+    "check-in": "check_in",
+    "service-status": "service_status",
+    "extend-seat": "seat_extension",
+    notes: "note",
+  };
+  const kind = kindByOperation[operation];
+  assert(kind, `reservation_command_operation_unknown:${operation}`);
+  const payloadByOperation = {
+    "arrival-time": { occurredAt: fields.arrivedAt },
+    assignments: { tableIds: fields.tableIds },
+    "check-in": { occurredAt: fields.occurredAt },
+    "service-status": {
+      serviceStatus: fields.toStatus,
+      occurredAt: fields.occurredAt,
+    },
+    "extend-seat": { extendMinutes: fields.extendMinutes },
+    notes: { note: fields.body },
+  };
   return command(
     client,
-    `/api/admin/v2/reservations/${reservationId}/${operation}`,
+    "/api/admin/vip-floor/commands",
     "POST",
     {
+      kind,
+      reservationId,
       expectedVersion: positiveInteger(
         reservation.version,
         `${operation}_reservation_version_missing`,
       ),
-      ...fields,
+      payload: payloadByOperation[operation],
     },
     action,
   );
 }
 
 async function postObservability(client, businessDate, event, gapSize) {
-  const result = await client.requestJson("/api/admin/v2/observability/events", {
+  const result = await client.requestJson("/api/admin/vip-floor/observability", {
     method: "POST",
     json: {
       event,
@@ -662,7 +720,23 @@ async function postObservability(client, businessDate, event, gapSize) {
   assert(result.response.ok && result.payload?.ok === true, `${event}_metric_failed`);
 }
 
-async function runUiRegression(config, reservationId) {
+function selectUiReservationPlan(board) {
+  const table = officialTables(board).find((item) => (
+    Array.isArray(item.reservationIds)
+    && item.reservationIds.length === 0
+    && Array.isArray(item.blockIds)
+    && item.blockIds.length === 0
+  ));
+  assert(table, "ui_reservation_plan_missing");
+  const startAt = Date.now() + 3 * 60 * 60_000;
+  return {
+    tableDisplayCode: table.displayCode,
+    startAt,
+    endAt: startAt + 60 * 60_000,
+  };
+}
+
+async function runUiRegression(config, reservationId, uiReservationPlan) {
   const browser = await chromium.launch({
     executablePath: process.env.CHROME_PATH ?? "/usr/bin/google-chrome",
     headless: true,
@@ -703,7 +777,7 @@ async function runUiRegression(config, reservationId) {
       );
     }
 
-    await runUiReservationCreateAndEdit(page);
+    await runUiReservationCreateAndEdit(page, uiReservationPlan);
 
     await page.getByRole("button", { name: "メニュー", exact: true }).click();
     await page.getByText("Owner session", { exact: true }).waitFor();
@@ -775,32 +849,40 @@ async function runUiRegression(config, reservationId) {
   }
 }
 
-async function runUiReservationCreateAndEdit(page) {
+async function runUiReservationCreateAndEdit(page, plan) {
   await page.getByRole("button", { name: /^新規オペレーション/u }).click();
   const dialog = page.getByRole("dialog", { name: "新規オペレーション" });
   await dialog.getByRole("tab", { name: "8段階予約" }).click();
   let wizard = dialog.locator('section[aria-label^="予約作成"]');
 
   await wizard.getByRole("button", { name: "次へ" }).click();
-  const now = Date.now();
-  await wizard.getByLabel("開始", { exact: true }).fill(tokyoLocalInput(now + 15 * 60_000));
-  await wizard.getByLabel("終了", { exact: true }).fill(tokyoLocalInput(now + 75 * 60_000));
+  await wizard.getByLabel("開始", { exact: true }).fill(tokyoLocalInput(plan.startAt));
+  await wizard.getByLabel("終了", { exact: true }).fill(tokyoLocalInput(plan.endAt));
   await wizard.getByRole("button", { name: "次へ" }).click();
   await wizard.getByLabel("人数", { exact: true }).fill("2");
   await wizard.getByRole("button", { name: "次へ" }).click();
   await wizard.getByRole("group", { name: "予約卓" })
-    .getByText("VIP-7", { exact: true })
+    .getByText(plan.tableDisplayCode, { exact: true })
     .click();
   await wizard.getByRole("button", { name: "次へ" }).click();
   await wizard.getByLabel("氏名", { exact: true }).fill("Release Candidate UI Guest");
+  await wizard.getByLabel("Eメール", { exact: true }).fill("release-candidate-ui@example.com");
   await wizard.getByRole("button", { name: "次へ" }).click();
   await wizard.getByLabel("入口表示名", { exact: true }).fill("RC UI Guest");
   await wizard.getByLabel("現場共有メモ", { exact: true }).fill("UI wizard release checkpoint");
   await wizard.getByRole("button", { name: "次へ" }).click();
   await wizard.getByRole("button", { name: "次へ" }).click();
+  const createResponsePromise = waitForUiOperationResponse(page);
   await wizard.getByRole("button", { name: "競合確認して作成" }).click();
+  await assertUiOperationSucceeded(createResponsePromise, "ui_reservation_create");
   await dialog.waitFor({ state: "detached" });
 
+  const listButton = page.getByRole("button", { name: "List", exact: true });
+  await listButton.click();
+  await assertEventually(
+    async () => await listButton.getAttribute("aria-current") === "page",
+    "ui_create_list_navigation_failed",
+  );
   const search = page.getByRole("toolbar", { name: "表示と絞り込み" })
     .getByPlaceholder("番号 / ゲスト / 席");
   await search.fill("RC UI Guest");
@@ -820,10 +902,28 @@ async function runUiReservationCreateAndEdit(page) {
   await wizard.getByLabel("入口表示名", { exact: true }).fill("RC UI Guest Edited");
   await wizard.getByRole("button", { name: "次へ" }).click();
   await wizard.getByRole("button", { name: "次へ" }).click();
+  const editResponsePromise = waitForUiOperationResponse(page);
   await wizard.getByRole("button", { name: "競合確認して更新" }).click();
+  await assertUiOperationSucceeded(editResponsePromise, "ui_reservation_edit");
   await editDialog.waitFor({ state: "detached" });
   await search.fill("RC UI Guest Edited");
   await page.getByText("RC UI Guest Edited", { exact: true }).first().waitFor();
+}
+
+function waitForUiOperationResponse(page) {
+  return page.waitForResponse((response) => (
+    new URL(response.url()).pathname === "/api/admin/vip-floor/operations"
+    && response.request().method() === "POST"
+  ));
+}
+
+async function assertUiOperationSucceeded(responsePromise, stage) {
+  const response = await responsePromise;
+  const payload = await response.json().catch(() => ({}));
+  assert(
+    response.ok() && payload?.ok === true,
+    `${stage}_failed:${response.status()}:${safeCommandFailureCode(payload)}`,
+  );
 }
 
 function tokyoLocalInput(timestamp) {

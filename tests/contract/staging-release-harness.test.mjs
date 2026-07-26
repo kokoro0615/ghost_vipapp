@@ -122,9 +122,22 @@ test("release regression source covers required business and cleanup boundaries"
     "cleanup-vip-manager-trial.mjs",
     "GHOST_VIPAPP_RELEASE_VIP_HOST",
     "GHOST_VIPAPP_RELEASE_BACKEND_HOST",
+    "/api/admin/vip-floor/options",
+    "/api/admin/vip-floor/operations",
+    "/api/admin/vip-floor/commands",
+    "/api/admin/vip-floor/waitlist",
+    "/api/admin/vip-floor/staff",
+    "/api/admin/vip-floor/observability",
     "release_candidate_pin_sources_mismatch",
     "lifecycle_script_fingerprint_mismatch",
+    "safeCommandFailureCode",
+    "assertUiOperationSucceeded",
+    "ui_reservation_plan_missing",
+    "ui_create_list_navigation_failed",
+    "serverless metric writes quiesce",
     "reservation.created",
+    "release-candidate@example.com",
+    "release-candidate-ui@example.com",
     "reservation.updated",
     "reservation.checked_in",
     "reservation.arrival_time.updated",
@@ -162,4 +175,14 @@ test("release regression source covers required business and cleanup boundaries"
   ]) {
     assert(source.includes(marker), `release regression marker missing: ${marker}`);
   }
+  assert(
+    source.indexOf('"reservation.checked_in"')
+      < source.indexOf('"reservation.arrival_time.updated"'),
+    "arrival-time correction must run after check-in establishes arrived_at",
+  );
+  assert(
+    source.indexOf('"waitlist.seated"')
+      < source.indexOf('"reservation.checked_in"'),
+    "waitlist seating must bind the reservation while it is still confirmed",
+  );
 });
