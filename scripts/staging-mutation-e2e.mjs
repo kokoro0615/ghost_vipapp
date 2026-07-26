@@ -226,6 +226,7 @@ async function main() {
     assert(beforeReservation, "trial_reservation_not_found");
     const beforeVersion = readPositiveInteger(beforeReservation.version, "trial_reservation_version_missing");
     const beforeRevision = readPositiveInteger(beforeBoard.payload?.boardRevision, "board_revision_missing");
+    const noteBody = "TRIAL E2E verification";
 
     const command = await client.requestJson("/api/admin/vip-floor/commands", {
       method: "POST",
@@ -233,7 +234,7 @@ async function main() {
         kind: "note",
         reservationId: config.reservationId,
         expectedVersion: beforeVersion,
-        payload: { note: "TRIAL E2E verification" },
+        payload: { note: noteBody },
       },
       headers: { "Idempotency-Key": `trial-e2e-${randomUUID()}` },
     });
@@ -241,15 +242,22 @@ async function main() {
     assert(typeof command.payload?.auditLogId === "string" && command.payload.auditLogId, "mutation_audit_id_missing");
     const commandVersion = readPositiveInteger(command.payload.entityVersion, "mutation_version_missing");
     const commandRevision = readPositiveInteger(command.payload.boardRevision, "mutation_revision_missing");
-    assert(commandVersion > beforeVersion, "mutation_version_not_advanced");
     assert(commandRevision > beforeRevision, "mutation_revision_not_advanced");
 
     const afterBoard = await client.requestJson(`/api/admin/vip-floor?date=${encodeURIComponent(config.businessDate)}`);
     assert(afterBoard.response.ok, `board_reread_failed:${afterBoard.response.status}`);
     const afterReservation = findReservation(afterBoard.payload, config.reservationId);
     assert(afterReservation, "trial_reservation_missing_after_mutation");
-    assert(readPositiveInteger(afterReservation.version, "post_mutation_version_missing") === commandVersion, "board_version_mismatch");
+    assert(readPositiveInteger(afterReservation.version, "post_mutation_version_missing") >= beforeVersion, "board_version_regressed");
     assert(readPositiveInteger(afterBoard.payload?.boardRevision, "post_mutation_revision_missing") >= commandRevision, "board_revision_mismatch");
+    const persistedNote = Array.isArray(afterBoard.payload?.notes)
+      ? afterBoard.payload.notes.find((note) =>
+        note?.reservationId === config.reservationId
+        && note?.body === noteBody
+      )
+      : null;
+    assert(persistedNote, "mutation_note_not_persisted");
+    assert(readPositiveInteger(persistedNote.version, "mutation_note_version_missing") === commandVersion, "mutation_note_version_mismatch");
 
     const verifyBefore = await runLifecycleScript(
       config.verifyScript,
@@ -259,7 +267,11 @@ async function main() {
       config.allowTestScript,
     );
     assert(verifyBefore.code === 0, "trial_verify_before_cleanup_failed");
-    emit("staging_mutation_verified", { versionAdvanced: true, revisionAdvanced: true, auditVerified: true });
+    emit("staging_mutation_verified", {
+      noteVersionPersisted: true,
+      revisionAdvanced: true,
+      auditVerified: true,
+    });
   } catch (error) {
     primaryError = error;
   } finally {

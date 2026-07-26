@@ -66,6 +66,7 @@ test("staging harness uses canonical proxy commands, verifies version/revision/a
   const sessionCookie = "staging-session-secret";
   let version = 4;
   let revision = 9;
+  let notes = [];
   const requests = [];
   const bypassHeaders = [];
   const server = createServer(async (request, response) => {
@@ -80,7 +81,11 @@ test("staging harness uses canonical proxy commands, verifies version/revision/a
       return;
     }
     if (url.pathname === "/api/admin/vip-floor" && request.method === "GET" && hasSession) {
-      response.end(JSON.stringify({ boardRevision: revision, reservations: [{ id: reservationId, version }] }));
+      response.end(JSON.stringify({
+        boardRevision: revision,
+        reservations: [{ id: reservationId, version }],
+        notes,
+      }));
       return;
     }
     if (url.pathname === "/api/admin/vip-floor/commands" && request.method === "POST" && hasSession) {
@@ -89,9 +94,14 @@ test("staging harness uses canonical proxy commands, verifies version/revision/a
       assert.equal(body.reservationId, reservationId);
       assert.equal(body.expectedVersion, 4);
       assert.match(String(request.headers["idempotency-key"]), /^trial-e2e-/u);
-      version = 5;
+      notes = [{
+        id: "00000000-0000-4000-8000-000000000002",
+        reservationId,
+        body: body.payload.note,
+        version: 1,
+      }];
       revision = 10;
-      response.end(JSON.stringify({ ok: true, auditLogId: "audit-e2e", entityVersion: version, boardRevision: revision }));
+      response.end(JSON.stringify({ ok: true, auditLogId: "audit-e2e", entityVersion: 1, boardRevision: revision }));
       return;
     }
     if (url.pathname === "/api/admin/session" && request.method === "DELETE") {
@@ -114,7 +124,7 @@ test("staging harness uses canonical proxy commands, verifies version/revision/a
   const result = await runNodeScript("scripts/staging-mutation-e2e.mjs", testEnv(files));
 
   assert.equal(result.code, 0, result.stderr || result.stdout);
-  assert.match(result.stdout, /"versionAdvanced":true/u);
+  assert.match(result.stdout, /"noteVersionPersisted":true/u);
   assert.match(result.stdout, /"revisionAdvanced":true/u);
   assert.match(result.stdout, /"auditVerified":true/u);
   assert.match(result.stdout, /"cleanupVerified":true/u);
