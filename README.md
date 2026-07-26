@@ -15,7 +15,10 @@ GHOST OsakaのVIPフロア現場オペレーション画面を、公開サイト
 
 ## Current scope
 
-- Floor / Timeline / List の3つの運用ビュー
+- Customer Trial終了後の正式Production data planeをrelease targetとし、Trial mode、staging origin、bypass、Trial banner、Trial資格情報は各Gateで撤去
+- active/UI卓は正式な`VIP-1`〜`VIP-8`だけ。`T1`〜`T8`はrun-scoped Trial fixtureとしてcleanupし、rename／移行しない
+- VIP Managerだけをwarm-white、graphite、限定champagneのlight operations UIとし、公開GHOST websiteのblack-violet paletteは維持
+- List / Floor / Chart の3つを直接到達可能な主要運用ビューとし、TableCheckは情報階層とworkflowだけを参照
 - 例外キュー、予約Inspector、command center
 - healthy / loading / stale / reconnecting / error / read-only / empty / dense の運用状態
 - GHOST本体管理APIを中継し、実予約データを表示
@@ -59,3 +62,5 @@ npm run build
 ## Deployment safety
 
 このアプリは管理画面です。Vercel Authenticationに加え、`VIPAPP_BASIC_USER` と `VIPAPP_BASIC_PASSWORD` によるアプリ内Basic Authenticationを必須とします。環境変数が欠けている場合はfail-closedで全画面を401にします。
+
+破壊的staging cleanup、Production DB migration、Website/VIP alias promotion、mutation flag有効化は別々のOwner承認Gateです。exact project/SHA/deployment/checksum/rollback evidenceを提示し、freshな明示承認を得るまで実行しません。履歴参照を持つinactive検証卓は物理削除せず、active read/UIからだけ除外します。

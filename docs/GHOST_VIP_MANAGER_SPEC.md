@@ -1,8 +1,8 @@
 # GHOST VIP Manager 正本仕様書
 
 > 文書ID: GHOST-VIP-MANAGER-SPEC  
-> 版: 1.0（正式正本）  
-> 基準日: 2026-07-26 JST  
+> 版: 1.1（Trial終了・Production light UI決定反映）
+> 基準日: 2026-07-27 JST
 > 正本所有者: GHOST Osaka Owner  
 > 実装リポジトリ: `ghost_vipapp`  
 > 公開予約リポジトリ: `ghost/website`
@@ -16,7 +16,7 @@
 旧文書と本書が矛盾する場合は本書を優先する。旧文書のGate名、TableCheck API接続、fixture前提、
 Stripe管理操作、旧UI-first合格条件は現行要件ではない。
 
-本書の全要件は2026-07-26のOwner回答で確定済みとする。
+本書のD-01〜D-08は2026-07-26、D-09〜D-12は2026-07-27のOwner決定で確定済みとする。
 変更はOwner承認、版更新、仕様書と実装計画の同時更新を必要とする。
 
 ## 2. 製品の目的
@@ -36,7 +36,7 @@ TableCheckはUI/操作研究の基準であり、TableCheck API、名称、ロ�
 - TableCheckと同じ画面階層、操作順、主要入力項目、状態選択、タッチ操作を再現する。
 - GHOSTで使わない機能は無効表示ではなく非表示にする。
 - レイアウトと操作モデルは基準に合わせ、名称、ロゴ、色、写真、素材はGHOSTへ置換する。
-- GHOSTの視覚言語はblack-violet lacquer、champagne metal、LED rhythm、実フロア形状を使う。
+- VIP Managerは白／ウォームホワイトのcanvas、白いpane、graphiteの文字と主要操作、限定的なchampagne hairline、実フロア形状を使う。このlight規定はVIP Managerに限り従来のblack-violet規定を置き換え、公開websiteには適用しない。
 - TableCheckの著作物、ロゴ、固有アイコン、CSS、画像、ソースコードは複製しない。
 
 ### 3.2 実機確認で得た基準画面
@@ -71,6 +71,8 @@ TableCheckはUI/操作研究の基準であり、TableCheck API、名称、ロ�
 - 現行TableCheckにない場合でも、Owner指定のWaitlist、スタッフ担当卓、mutation kill switch、
   競合検知、オフライン閲覧はGHOST拡張として実装する。
 - 現行TableCheckアカウントに独立画面がなくても、既存Timelineを時間軸の`Chart`として正式に残す。
+- TableCheckから参照するのはList初期階層、Floor/Chartの業務軸、sticky header、dense row、filter、iPad pane、mobile list-first/bottom sheetに限る。ロゴ、商標、固有blue、画像、CSS、DOM、font、文言、pixel geometry、private dataは複製しない。
+- List、Floor、Chartはdesktop/iPadの主要navigationから直接到達できる。mobileも明示controlから1操作で到達できる。
 
 ## 4. 対象端末とアクセシビリティ
 
@@ -106,6 +108,8 @@ TableCheckはUI/操作研究の基準であり、TableCheck API、名称、ロ�
 | 8 | FLOOR VIP | 1 | 6 |
 
 - 8卓MAPを唯一の正本フロアとする。
+- active masterとManager UIは正式な`VIP-1`〜`VIP-8`だけとする。Trial `T1`〜`T8`はrun-scoped fixtureであり、正式卓へのrename、予約・block・assignment・staff assignmentの移行、CSS/read filterだけの隠蔽を禁止する。
+- Trial終了時はexact runを依存順に破棄しseed前baselineを復元する。Productionに履歴参照付きinactive検証卓がある場合は物理削除せず、inactive/archiveとして保持しactive read/UIから除外する。
 - セクション分けはしない。
 - 接続可能な卓組合せはない。
 - 大人数予約は接続関係のない複数卓へ同時配席できる。
@@ -277,6 +281,8 @@ GHOSTの状態集合は次の13状態だけとする。TableCheckで確認した
 - 6操作、Walk-in、Waitlist、ブロック、受付停止、担当卓がOwner権限で動作する。
 - 競合、kill switch、realtime切断、stale閲覧をE2Eで確認する。
 - 3解像度で主要操作が見切れず、44px target、focus、非色覚依存状態を満たす。
+- login、shell、List、Floor、Chart、queue、Inspector、全作成/編集/command/customer/staff/SLO dialogとloading/empty/error/offline/stale/reconnecting/conflict/read-only stateがlight semantic tokensへ移行し、UI chromeの旧purple/black-violet raw colorが0件である。
+- `color-scheme: light`、WCAG 2.2 AA、2px以上の明確なfocus、重要操作44px、reduced motion、320/375/768/1024/1194/1366pxのpage overflow 0を満たす。
 - `lint`、`typecheck`、`build`、contract test、E2E、visual regressionが通る。
 - 本番切替は一括。障害時は現行`ghost_vipapp`の直前production deploymentへ戻す。
 
@@ -292,3 +298,7 @@ GHOSTの状態集合は次の13状態だけとする。TableCheckで確認した
 | D-06 | Waitlist呼出期限は30分 |
 | D-07 | 初期スタッフマスタは実装後にOwnerが登録する |
 | D-08 | 既存GHOST差出人を使い、失敗時は最大3回自動再送する |
+| D-09 | Customer Trialを終了し、固定URLを正式Production data planeへ切り替える |
+| D-10 | active/UI卓は`VIP-1`〜`VIP-8`だけ。Trial `T1`〜`T8`は移行せずexact run cleanupする |
+| D-11 | VIP Managerだけをwarm-white/graphite/限定champagneのlight UIへ全面改修し、公開website paletteは維持する |
+| D-12 | TableCheckは公開情報の業務文法だけを参照し、brand/asset/code/private dataを複製しない |

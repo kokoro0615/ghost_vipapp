@@ -1,9 +1,9 @@
 # GHOST VIP Manager 正本実装計画
 
 > 文書ID: GHOST-VIP-MANAGER-PLAN  
-> 版: 1.1（production監査反映・緊急実行版）  
-> 基準日: 2026-07-26 JST  
-> 対応仕様: `GHOST_VIP_MANAGER_SPEC.md` v1.0  
+> 版: 1.2（Trial終了・Production light UI実行版）
+> 基準日: 2026-07-27 JST
+> 対応仕様: `GHOST_VIP_MANAGER_SPEC.md` v1.1
 > 現況証拠: `GHOST_VIP_MANAGER_IMPLEMENTATION_AUDIT_2026-07-26.md`
 
 ## 0. 実行進捗（2026-07-26 JST）
@@ -41,6 +41,10 @@ Gate不合格時はproductionを変更せず、既存read-only fallbackを維持
 実顧客mutation、credential取扱い、schema切替は本書の隔離fixture・kill switch・rollback Gateを必ず通す。
 「承認待ち」を停止理由にせず、証拠不足はfixture、staging、feature flag、read-only検証へ切り替える。
 
+2026-07-27のD-09〜D-12を最新authorityとする。Trial fixtureは正式データへ変換せずexact run cleanupし、active/UI卓は`VIP-1`〜`VIP-8`だけにする。VIP Managerだけをsemantic light UIへ改修し、公開websiteのblack-violet paletteは変更しない。履歴参照を持つinactive検証卓は保持する。
+
+破壊的staging cleanup、Production DB migration、Website/VIP promotion、Production mutation enablementは別々のGateとし、exact manifestを提示したfresh Owner承認まで実行しない。
+
 ## 2. 現状
 
 ### 2.1 監査結論
@@ -72,6 +76,10 @@ Gate不合格時はproductionを変更せず、既存read-only fallbackを維持
 | P0 | command | 単一卓、30分固定、理由入力 | 複数卓、15〜120分、server固定理由 |
 | P1 | 公開予約 | hold/status未除外のlegacy read | confirmed-only、2秒、顧客確認、outbox |
 | P1 | UI shell | GHOST独自3 view/左rail | 4ナビ、Chart、TableCheck型階層 |
+| P0 | Trial exit | Trial mode/staging origin/Trial credential/T fixtureが稼働 | maintenance anchor→exact run cleanup→Production credential/origin |
+| P0 | Production seat history | inactive検証卓2件に履歴参照 | 物理削除せずarchive/inactive保持、active read exact 8 |
+| P1 | Light UI | black-violet/purple chromeと`color-scheme: dark` | 全route/surfaceをsemantic OKLCH light tokensへ移行、旧purple chrome 0 |
+| P1 | Chart discoverability | ChartがMenu内 | desktop/iPad/mobileのprimary controlから1操作 |
 | P1 | 新規予約 | 未実装 | 8段階作成、編集、通知選択 |
 | P1 | 現場機能 | Walk-in/Waitlist/block/担当卓未実装 | 正本全flow |
 | P1 | 顧客 | マスク済み表示名のみ | 自動集約、VIP属性、履歴、Owner PII |
@@ -103,6 +111,8 @@ Gate不合格時はproductionを変更せず、既存read-only fallbackを維持
 - API・DB contractを先に確定し、UIから直接DBへ書かない。
 - すべてのmutationは認証、権限、kill switch、version、idempotency、監査を通る。
 - TableCheck外観のコピーではなく、操作モデルをGHOST design tokensで再構築する。
+- semantic tokenはwarm-white canvas、white surface、graphite text/action、限定champagne hairline、状態色で構成し、raw colorをcomponentへ散在させない。
+- business logic、API payload、state transitionはlight UI改修のために変更しない。
 - 公開予約holdと確定予約を混同しない。
 - 本番データをfixtureやvisual testへ保存しない。
 - PIIをログ、screenshot、analytics、error payloadへ出さない。
@@ -255,7 +265,9 @@ Phase 2のactor/session/audit最小schemaを先に固定し、そのactor IDを�
 ### 作業
 
 - iPad横の2段top bar、営業日移動、集計、当日メモ、下部4ナビを構築する。
-- 現行のGHOST tokensを使い、TableCheck白/紫、ロゴ、固有アイコンは使用しない。
+- VIP Manager専用light tokensを使い、TableCheck blue/紫、ロゴ、固有アイコンは使用しない。
+- root metadata、theme color、login、route state、scrollbar、scrim、skeleton、toast、form controlを`color-scheme: light`へ統一する。
+- primary navigationを「新規 / List / Floor / Chart / メニュー」の5項目とし、Chartを全対象幅で1操作にする。
 - 店舗切替、言語切替、Insight、決済、exportを非表示にする。
 - 1024×768、1194×834、1366×1024で固定header/footerとsafe areaを検証する。
 - touch target、focus、keyboard、reduced motionを共通component testへ入れる。
@@ -264,8 +276,9 @@ Phase 2のactor/session/audit最小schemaを先に固定し、そのactor IDを�
 
 ### 完了条件
 
-- 3解像度でhorizontal overflowなし。
+- 320、375、768、1024、1194、1366pxでhorizontal overflowなし。
 - visual regressionで基準の情報階層・寸法・操作位置を確認できる。
+- UI chromeの旧black-violet/purple raw color 0、主要surface lightness、WCAG 2.2 AA、focus、44px、長い日本語/英語label、reduced motionをcomputed styleとscreenshotで確認できる。
 
 ## 9. Phase 5 — List / Floor / Chart / 詳細
 
@@ -382,6 +395,8 @@ Phase 2のactor/session/audit最小schemaを先に固定し、そのactor IDを�
 - Playwright E2E
 - 3解像度visual regression
 - accessibility scan
+- loginと全route/state/dialogのlight screenshot/computed-style regression
+- UI chrome raw purple/black-violet 0（floor-plan bitmapは機能資産として別allowlist）
 
 ### 専用テストデータ
 
@@ -399,6 +414,9 @@ Phase 2のactor/session/audit最小schemaを先に固定し、そのactor IDを�
 - 切替前に現行production deployment URLとDB migration状態を記録する。
 - Git commit SHA、API schema version、migration version、feature flag状態をrelease manifestへ固定する。
 - kill switchはOFFから開始し、smoke確認後にON。
+- Production DB backupは暗号化logical dumpをisolated Postgresへrestoreし、schema/RPC/row count/hash/FK/RLSがPASSしてからmigrationする。
+- migrationはexact allowlist/checksumを使用し、Trial専用`20260726180000`/`20260726181000`をProductionへ適用しない。
+- Website read-only candidate→VIP read-only candidate→Website alias→VIP alias→read-only witness→flagを1つずつ有効化する。
 - 本番smokeは認証、当日読込、日付切替、検索、専用テスト予約だけを使う。
 
 ### rollback
@@ -422,6 +440,7 @@ Phase 2のactor/session/audit最小schemaを先に固定し、そのactor IDを�
 | G5 Operations | 6操作、Walk-in、Waitlist、block、担当卓合格 |
 | G6 Resilience | realtime/offline/conflict/SLO合格 |
 | G7 Production | release manifest、backup/restore、rollback rehearsal、隔離test、production read-only smoke |
+| G8 Trial exit / light UI | exact Trial cleanup、active official 8、inactive history保持、全light surface、Chart直接nav、Trial credential/bypass/staging origin失効 |
 
 G7合格前に本番mutationを全面有効化しない。
 
@@ -477,7 +496,7 @@ W4の各機能はAPI+UI+testを1本ずつ縦切りし、全API完成待ちの大
 | T-013 | P1 | `website` | confirmed-only read、hold除外 | T-002 | hold exclusion test |
 | T-014 | P1 | `website` | customer confirmation read model同期 | T-013 | customer E2E |
 | T-015 | P1 | `website` | email outbox、最大3回、dead/再送 | T-005,T-013 | worker/notification test |
-| T-016 | P1 | `ghost_vipapp` | TableCheck型shell、4ナビ、URL state | T-002,T-007 | visual/keyboard |
+| T-016 | P1 | `ghost_vipapp` | TableCheck型shell、5ナビ、URL state、semantic light tokens | T-002,T-007 | visual/keyboard/light chrome |
 | T-017 | P1 | `ghost_vipapp` | List/Floor/Chart/詳細の正本化 | T-009,T-010,T-016 | state fixture E2E |
 | T-018 | P1 | 両方 | 予約作成8段階・編集 | T-009,T-014,T-016 | create/edit E2E |
 | T-019 | P1 | 両方 | Walk-in短縮flow | T-018 | atomic arrival E2E |
@@ -515,6 +534,9 @@ Lunaが実行環境で利用可能な場合は単純なinventory、文言監査�
 - 8段階作成、Walk-in、Waitlist、block/online stop、担当卓、顧客統合がhappy/error/conflictで動く。
 - realtime切断、revision gap、duplicate/out-of-order、offline再起動、reconnectを再現できる。
 - 1024×768、1194×834、1366×1024と補助320pxでoverflow、44px、focus、keyboard、非色cue、長文が合格。
+- 375px、768pxを含む6幅で全主要surface/state/dialogのlight screenshotとcomputed styleが合格し、Chartへ1操作で到達できる。
+- Trial run row/T卓/TRIAL sectionが0、active official卓がexact 8、inactive historical rowの参照が保全される。
+- permanent origin/Basic/PINへ切替後、Trial mode/credential/bypass/staging接続が失効する。
 - staging fixture cleanup後に予約、顧客、block、Waitlist、outbox、auditの孤児が0件。
 - production smokeは本番顧客を変更せず、異常時はkill switch OFFまたは直前deploymentへ即時復旧できる。
 
