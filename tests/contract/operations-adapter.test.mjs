@@ -29,7 +29,8 @@ test("Owner operation adapters expose only canonical Walk-in and block routes", 
 
   assert.match(hook, /Date\.now\(\) - 5 \* 60 \* 60 \* 1000/u);
   assert.match(hook, /await loadBoard\(businessDate\)/u);
-  assert.match(workspace, /新規 \/ Walk-in/u);
+  assert.match(workspace, /新規オペレーション/u);
+  assert.match(workspace, /予約・Walk-in/u);
   assert.match(operationCenter, /expectedTableVersions/u);
   assert.match(operationCenter, /7営業日/u);
   assert.match(operationCenter, /14営業日/u);

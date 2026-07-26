@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { usePathname, useSearchParams } from "next/navigation";
-import { type FormEvent, useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
+import { type FormEvent, type KeyboardEvent, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   Activity,
@@ -35,7 +35,6 @@ import { ObservabilityPanel } from "./observability/ObservabilityPanel";
 import { ExceptionRail } from "./shell/ExceptionRail";
 import { useVipFloorWorkspace } from "./state/useVipFloorWorkspace";
 import { StaffPanel } from "./staff/StaffPanel";
-import { TrialModeCue } from "./TrialMode";
 import { WaitlistPanel } from "./waitlist/WaitlistPanel";
 import styles from "./VipFloorWorkspace.module.css";
 import { canExecuteVipCommand } from "@/lib/adminPermissions";
@@ -62,6 +61,28 @@ function parseWorkspaceView(value: string | null): WorkspaceView {
 
 function parseInspectorTab(value: string | null): InspectorTab {
   return INSPECTOR_TABS.some((tab) => tab.key === value) ? value as InspectorTab : "overview";
+}
+
+function trapKeyboardFocus(event: KeyboardEvent<HTMLElement>, onClose: () => void) {
+  if (event.key === "Escape") {
+    event.preventDefault();
+    onClose();
+    return;
+  }
+  if (event.key !== "Tab") return;
+  const controls = [...event.currentTarget.querySelectorAll<HTMLElement>(
+    'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+  )].filter((element) => element.getClientRects().length > 0);
+  if (!controls.length) return;
+  const first = controls[0];
+  const last = controls.at(-1);
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault();
+    last?.focus();
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first.focus();
+  }
 }
 
 export default function VipFloorWorkspace() {
@@ -100,6 +121,9 @@ export default function VipFloorWorkspace() {
   const [staffFilter, setStaffFilter] = useState("");
   const [customerOpen, setCustomerOpen] = useState(false);
   const [observabilityOpen, setObservabilityOpen] = useState(false);
+  const menuRef = useRef<HTMLElement>(null);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const mobileSheetRef = useRef<HTMLDivElement>(null);
   const inspectorTab = parseInspectorTab(searchParams.get("detail"));
   const deferredQuery = useDeferredValue(state.query);
   const allReservations = useMemo(() => toUiReservations(state.board), [state.board]);
@@ -128,6 +152,22 @@ export default function VipFloorWorkspace() {
       cancelled = true;
     };
   }, [businessDate, isOwner, loadStaff]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const frame = window.requestAnimationFrame(() => {
+      menuRef.current?.querySelector<HTMLElement>("button")?.focus();
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [menuOpen]);
+
+  useEffect(() => {
+    if (!state.mobileInspectorOpen) return;
+    const frame = window.requestAnimationFrame(() => {
+      mobileSheetRef.current?.querySelector<HTMLElement>("button")?.focus();
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [state.mobileInspectorOpen]);
 
   const readOnly = offline
     || ["loading", "stale", "reconnecting", "error", "read_only"].includes(state.globalState)
@@ -230,7 +270,6 @@ export default function VipFloorWorkspace() {
           <div className={styles.loginMark}><span>G</span></div>
           <p className={styles.loginEyebrow}>GHOST OSAKA · OWNER ACCESS</p>
           <h1>現場オペレーション</h1>
-          <TrialModeCue className={styles.loginTrialCue} />
           <p className={styles.loginMessage} role="status">{state.message}</p>
           <label>
             Owner専用PIN
@@ -241,7 +280,6 @@ export default function VipFloorWorkspace() {
               autoComplete="one-time-code"
               minLength={4}
               maxLength={8}
-              autoFocus
               aria-describedby="pin-security"
             />
           </label>
@@ -264,7 +302,6 @@ export default function VipFloorWorkspace() {
           <span>GHOST OSAKA</span>
             <strong>VIP MANAGER</strong>
         </div>
-        <TrialModeCue className={styles.headerTrialCue} />
         <label className={styles.ribbonControl}>
           <CalendarDays size={15} />
           <span>営業日</span>
@@ -480,15 +517,25 @@ export default function VipFloorWorkspace() {
       </div>
 
       {menuOpen ? (
-        <section className={styles.shellMenu} aria-label="メニュー">
+        <section
+          ref={menuRef}
+          className={styles.shellMenu}
+          role="dialog"
+          aria-modal="false"
+          aria-labelledby="workspace-menu-title"
+          onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              event.preventDefault();
+              setMenuOpen(false);
+              menuButtonRef.current?.focus();
+            }
+          }}
+        >
           <header>
-            <div><span>GHOST OSAKA</span><strong>メニュー</strong></div>
+            <div><span>GHOST OSAKA</span><strong id="workspace-menu-title">メニュー</strong></div>
             <button type="button" onClick={() => setMenuOpen(false)} aria-label="メニューを閉じる"><X size={18} /></button>
           </header>
           <div className={styles.shellMenuGrid}>
-            <button type="button" data-active={state.view === "timeline" || undefined} onClick={() => switchView("timeline")}>
-              <ChartNoAxesGantt size={18} /><span>Chart</span><small>時間軸</small>
-            </button>
             <button type="button" onClick={() => void loadBoard()} disabled={state.pending}>
               <RefreshCw size={18} /><span>再読込</span><small>台帳同期</small>
             </button>
@@ -518,7 +565,7 @@ export default function VipFloorWorkspace() {
           aria-label={`新規オペレーション（${isOwner ? "Walk-inまたは受付ブロック" : "Owner専用"}）`}
           onClick={() => void openOperation()}
         >
-          <CalendarPlus size={19} /><span>新規 / Walk-in</span><small>{isOwner ? "即時来店・ブロック" : "Ownerのみ"}</small>
+          <CalendarPlus size={19} /><span>新規</span><small>{isOwner ? "予約・Walk-in" : "Ownerのみ"}</small>
         </button>
         <button type="button" aria-current={state.view === "list" ? "page" : undefined} data-active={state.view === "list" || undefined} onClick={() => switchView("list")}>
           <ClipboardList size={19} /><span>List</span>
@@ -526,10 +573,14 @@ export default function VipFloorWorkspace() {
         <button type="button" aria-current={state.view === "floor" ? "page" : undefined} data-active={state.view === "floor" || undefined} onClick={() => switchView("floor")}>
           <LayoutGrid size={19} /><span>Floor</span>
         </button>
+        <button type="button" aria-current={state.view === "timeline" ? "page" : undefined} data-active={state.view === "timeline" || undefined} onClick={() => switchView("timeline")}>
+          <ChartNoAxesGantt size={19} /><span>Chart</span>
+        </button>
         <button
+          ref={menuButtonRef}
           type="button"
           aria-expanded={menuOpen}
-          data-active={menuOpen || state.view === "timeline" || undefined}
+          data-active={menuOpen || undefined}
           onClick={() => setMenuOpen((open) => !open)}
         >
           <Menu size={19} /><span>メニュー</span>
@@ -537,11 +588,13 @@ export default function VipFloorWorkspace() {
       </nav>
 
       <div
+        ref={mobileSheetRef}
         className={styles.mobileSheet}
         data-open={state.mobileInspectorOpen || undefined}
         role={state.mobileInspectorOpen ? "dialog" : undefined}
         aria-modal={state.mobileInspectorOpen || undefined}
         aria-label="予約詳細"
+        onKeyDown={(event) => trapKeyboardFocus(event, () => dispatch({ type: "mobileInspector", open: false }))}
       >
         <button
           type="button"

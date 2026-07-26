@@ -10,7 +10,7 @@ import type {
   StaffWorkspaceData,
 } from "../contract/uiTypes";
 import styles from "../VipFloorWorkspace.module.css";
-import { TrialModeCue, useTrialMode } from "../TrialMode";
+import { useTrialMode } from "../TrialMode";
 
 type Props = {
   open: boolean;
@@ -103,7 +103,7 @@ export function StaffPanel({ open, pending, board, data, onClose, onRefresh, onA
         onKeyDown={trapFocus}
       >
         <header className={styles.commandHeader}>
-          <div><span>GHOST FLOOR CREW</span><h2 id="staff-title">スタッフ担当卓</h2><TrialModeCue className={styles.dialogTrialCue} compact /></div>
+          <div><span>GHOST FLOOR CREW</span><h2 id="staff-title">スタッフ担当卓</h2></div>
           <button type="button" onClick={onClose} aria-label="スタッフ担当卓を閉じる"><X size={19} /></button>
         </header>
         <div className={styles.operationTabs} role="tablist" aria-label="スタッフ管理">

@@ -116,7 +116,13 @@ export function Inspector({
             ))}
           </div>
 
-          <div className={styles.inspectorPanel} role="tabpanel" id={`${instance}-${activeTab}-panel`} aria-labelledby={`${instance}-${activeTab}-tab`}>
+          <div
+            className={styles.inspectorPanel}
+            role="tabpanel"
+            id={`${instance}-${activeTab}-panel`}
+            aria-labelledby={`${instance}-${activeTab}-tab`}
+            tabIndex={0}
+          >
             {activeTab === "overview" ? <dl className={styles.detailList}>
               <div><dt><CalendarClock size={14} /> 時間</dt><dd>{reservation.startLabel}-{reservation.endLabel}</dd></div>
               <div><dt><UsersRound size={14} /> 人数</dt><dd>{reservation.guestCount}名</dd></div>

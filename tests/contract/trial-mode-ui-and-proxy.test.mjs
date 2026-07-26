@@ -6,7 +6,7 @@ import test from "node:test";
 const root = process.cwd();
 const read = (relativePath) => readFile(path.join(root, relativePath), "utf8");
 
-test("trial mode is server-evaluated and marks the document title without exposing an environment value", async () => {
+test("trial mode utility remains server-only while the production shell is permanently cue-free", async () => {
   const [mode, layout, cue] = await Promise.all([
     read("src/lib/server/trialMode.ts"),
     read("src/app/layout.tsx"),
@@ -16,13 +16,13 @@ test("trial mode is server-evaluated and marks the document title without exposi
   assert.match(mode, /import "server-only"/u);
   assert.match(mode, /process\.env\.GHOST_VIP_TRIAL_MODE === "true"/u);
   assert.match(layout, /generateMetadata/u);
-  assert.match(layout, /TRIAL \/ 仮データ専用/u);
-  assert.match(layout, /TrialModeProvider enabled=\{trialMode\}/u);
+  assert.doesNotMatch(layout, /GHOST_VIP_TRIAL_MODE|TrialModeProvider|TRIAL \/ 仮データ専用/u);
+  assert.match(layout, /colorScheme: "light"/u);
   assert.match(cue, /実在する顧客・スタッフ・電話・メール・決済情報を入力しない/u);
   assert.doesNotMatch(cue, /process\.env/u);
 });
 
-test("trial cues are persistent on login and header and are repeated in every dialog family", async () => {
+test("production workspace and every dialog family contain no Trial cue", async () => {
   const paths = [
     "src/components/admin/vip-floor-v2/VipFloorWorkspace.tsx",
     "src/components/admin/vip-floor-v2/commands/CommandCenter.tsx",
@@ -34,9 +34,9 @@ test("trial cues are persistent on login and header and are repeated in every di
   ];
   const sources = await Promise.all(paths.map(read));
 
-  assert.match(sources[0], /loginTrialCue/u);
-  assert.match(sources[0], /headerTrialCue/u);
-  for (const source of sources.slice(1)) assert.match(source, /TrialModeCue/u);
+  for (const source of sources) {
+    assert.doesNotMatch(source, /TrialModeCue|TRIAL \/ 仮データ専用/u);
+  }
 });
 
 test("trial form constraints disable phone capture and limit generated email domains", async () => {

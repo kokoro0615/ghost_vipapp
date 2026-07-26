@@ -1,6 +1,29 @@
 :root {
-  background: #0d0911;
-  color: #f4eee7;
+  --canvas: oklch(0.975 0.004 260);
+  --surface: oklch(1 0 0);
+  --surface-sunken: oklch(0.955 0.006 260);
+  --surface-hover: oklch(0.94 0.008 260);
+  --surface-selected: oklch(0.965 0.018 82);
+  --text-primary: oklch(0.22 0.01 270);
+  --text-secondary: oklch(0.4 0.01 270);
+  --text-tertiary: oklch(0.52 0.01 270);
+  --border: oklch(0.89 0.006 260);
+  --border-strong: oklch(0.81 0.008 260);
+  --action: oklch(0.22 0.01 270);
+  --action-hover: oklch(0.29 0.012 270);
+  --action-text: oklch(0.99 0 0);
+  --champagne: oklch(0.48 0.07 82);
+  --champagne-soft: oklch(0.94 0.025 82);
+  --focus: oklch(0.38 0.12 255);
+  --success: oklch(0.4 0.1 150);
+  --success-soft: oklch(0.95 0.025 150);
+  --warning: oklch(0.48 0.12 78);
+  --warning-soft: oklch(0.96 0.035 85);
+  --danger: oklch(0.46 0.16 28);
+  --danger-soft: oklch(0.96 0.03 28);
+  background: var(--canvas);
+  color: var(--text-primary);
+  color-scheme: light;
   font-family:
     ui-sans-serif,
     -apple-system,
@@ -21,7 +44,7 @@ body {
 
 body {
   overflow: hidden;
-  background: #0d0911;
+  background: var(--canvas);
 }
 
 button,

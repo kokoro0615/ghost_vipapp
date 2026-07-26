@@ -382,18 +382,19 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
       const payload = await response.json().catch(() => ({})) as Record<string, unknown>;
       if (!response.ok) {
         if (response.status === 401) setAuth({ status: "unauthenticated", session: null });
+        const outcome = {
+          ok: false as const,
+          code: String(payload.error ?? response.status),
+          message: readErrorMessage(response.status, payload),
+          recovery: response.status === 409
+            ? "最新状態を読み込み、内容を確認してから再実行してください。"
+            : "入力内容と通信状態を確認してください。",
+        };
+        if (response.status === 409) await loadBoard(businessDate);
         dispatch({
           type: "commandOutcome",
-          outcome: {
-            ok: false,
-            code: String(payload.error ?? response.status),
-            message: readErrorMessage(response.status, payload),
-            recovery: response.status === 409
-              ? "最新状態を読み込み、内容を確認してから再実行してください。"
-              : "入力内容と通信状態を確認してください。",
-          },
+          outcome,
         });
-        if (response.status === 409) await loadBoard(businessDate);
         return;
       }
 

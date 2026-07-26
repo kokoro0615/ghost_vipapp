@@ -17,7 +17,7 @@ import type {
   WaitlistEntry,
 } from "../contract/uiTypes";
 import styles from "../VipFloorWorkspace.module.css";
-import { TrialModeCue, useTrialMode } from "../TrialMode";
+import { useTrialMode } from "../TrialMode";
 
 type Props = {
   open: boolean;
@@ -132,7 +132,6 @@ export function WaitlistPanel({
           <div>
             <span>GHOST ARRIVAL QUEUE</span>
             <h2 id="waitlist-title">Waitlist</h2>
-            <TrialModeCue className={styles.dialogTrialCue} compact />
           </div>
           <button type="button" onClick={onClose} aria-label="Waitlistを閉じる">
             <X size={19} />

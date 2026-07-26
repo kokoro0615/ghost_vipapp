@@ -5,7 +5,6 @@ import { Link2, Save, Unlink, UserRound, X } from "lucide-react";
 
 import type { CustomerDetail, UiReservation } from "../contract/uiTypes";
 import styles from "../VipFloorWorkspace.module.css";
-import { TrialModeCue } from "../TrialMode";
 
 type Props = {
   open: boolean;
@@ -29,6 +28,7 @@ export function CustomerPanel({
   const [message, setMessage] = useState("");
   const [targetCustomerId, setTargetCustomerId] = useState("");
   const panelRef = useRef<HTMLDivElement>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     if (!open || !reservation?.customerId) return;
@@ -59,11 +59,37 @@ export function CustomerPanel({
 
   useEffect(() => {
     if (!open) return;
+    previousFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const frame = window.requestAnimationFrame(() =>
       panelRef.current?.querySelector<HTMLElement>("button, input")?.focus(),
     );
-    return () => window.cancelAnimationFrame(frame);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      previousFocusRef.current?.focus();
+    };
   }, [open]);
+
+  function trapFocus(event: React.KeyboardEvent<HTMLDivElement>) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      onClose();
+      return;
+    }
+    if (event.key !== "Tab") return;
+    const controls = [...(panelRef.current?.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+    ) ?? [])].filter((element) => element.getClientRects().length > 0);
+    if (!controls.length) return;
+    const first = controls[0];
+    const last = controls.at(-1);
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last?.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
 
   if (!open || !reservation) return null;
   const activeReservation = reservation;
@@ -139,15 +165,12 @@ export function CustomerPanel({
         role="dialog"
         aria-modal="true"
         aria-labelledby="customer-panel-title"
-        onKeyDown={(event) => {
-          if (event.key === "Escape") onClose();
-        }}
+        onKeyDown={trapFocus}
       >
         <header className={styles.commandHeader}>
           <div>
             <span>OWNER · ENCRYPTED CUSTOMER</span>
             <h2 id="customer-panel-title">顧客詳細と紐付け</h2>
-            <TrialModeCue className={styles.dialogTrialCue} compact />
           </div>
           <button type="button" onClick={onClose} aria-label="顧客詳細を閉じる">
             <X size={19} />

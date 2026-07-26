@@ -1,17 +1,16 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 
-import { TrialModeProvider } from "@/components/admin/vip-floor-v2/TrialMode";
-import { isGhostVipTrialMode } from "@/lib/server/trialMode";
+import { isGhostVipMaintenanceMode } from "@/lib/server/maintenanceMode";
 
 import "./globals.css";
 
 export function generateMetadata(): Metadata {
-  const trialMode = isGhostVipTrialMode();
+  const maintenanceMode = isGhostVipMaintenanceMode();
   return {
-    title: `${trialMode ? "TRIAL / 仮データ専用 — " : ""}VIP Floor Operations | GHOST OSAKA`,
-    description: trialMode
-      ? "GHOST Osaka VIP Floorの仮データ専用トライアル環境。実在する個人情報を入力しないでください。"
+    title: `${maintenanceMode ? "本番移行作業中 — " : ""}VIP Manager | GHOST OSAKA`,
+    description: maintenanceMode
+      ? "GHOST Osaka VIP Managerは正式Productionへの移行作業中です。"
       : "GHOST Osaka VIP Floorの現場オペレーション画面。",
     robots: {
       index: false,
@@ -25,17 +24,14 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  colorScheme: "dark",
-  themeColor: "#0d0911",
+  colorScheme: "light",
+  themeColor: "#f8f8f7",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
-  const trialMode = isGhostVipTrialMode();
   return (
     <html lang="ja">
-      <body data-trial-mode={trialMode || undefined}>
-        <TrialModeProvider enabled={trialMode}>{children}</TrialModeProvider>
-      </body>
+      <body>{children}</body>
     </html>
   );
 }

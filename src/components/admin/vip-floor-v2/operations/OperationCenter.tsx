@@ -19,7 +19,6 @@ import type {
 } from "../contract/uiTypes";
 import { ReservationWizard } from "./ReservationWizard";
 import styles from "../VipFloorWorkspace.module.css";
-import { TrialModeCue } from "../TrialMode";
 
 type OperationKind = "walk_in" | "block_create" | "reservation_create";
 
@@ -177,7 +176,6 @@ export function OperationCenter({
           <div>
             <span>GHOST ARRIVAL CONTROL</span>
             <h2 id="operation-title">{editReservation ? "予約編集" : "新規オペレーション"}</h2>
-            <TrialModeCue className={styles.dialogTrialCue} compact />
           </div>
           <button type="button" onClick={onClose} aria-label="新規作成を閉じる">
             <X size={19} />
