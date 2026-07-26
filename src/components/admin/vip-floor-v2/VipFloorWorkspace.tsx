@@ -175,14 +175,14 @@ export default function VipFloorWorkspace() {
     || !canMutate;
 
   const updateRoute = useCallback((updates: Record<string, string | null>) => {
-    const params = new URLSearchParams(searchParams.toString());
+    const params = new URLSearchParams(window.location.search);
     Object.entries(updates).forEach(([key, value]) => {
       if (value) params.set(key, value);
       else params.delete(key);
     });
     const query = params.toString();
     window.history.replaceState(null, "", query ? `${pathname}?${query}` : pathname);
-  }, [pathname, searchParams]);
+  }, [pathname]);
 
   useEffect(() => {
     const nextView = parseWorkspaceView(searchParams.get("view"));
