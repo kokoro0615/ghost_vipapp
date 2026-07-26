@@ -1,6 +1,6 @@
 # Production migration exact allowlist
 
-Status: `HOLD_RESTORE_AND_REHEARSAL`
+Status: `HOLD_PRODUCTION_SNAPSHOT_RESTORE`
 
 Production migration head is `20260604090000`. The Website release branch
 verifier binds this 24-file forward-only allowlist to the source files by
@@ -55,6 +55,12 @@ references remain 2+2, active official seats exact 8, T/TRIAL rows 0 and
 orphans 0.
 
 The Website verifier passed the exact file count, exclusions, active filters
-and archive policy. A clean DB and production-snapshot restore rehearsal could
-not run because PostgreSQL/Supabase local runtime and Docker integration are
-not available. Gate B therefore remains HOLD.
+and archive policy. Portable PostgreSQL 16.14 rehearsals passed both a clean
+20+24 migration/restore and a production-shaped synthetic case with inactive
+seats 2, reservation references 2 and offering references 2. The latter
+retained all references, returned only eight official tables from the v14
+board RPC, and restored with 52/52 RLS tables, 159 routines, 100 validated
+foreign keys and zero invalid foreign keys.
+
+The encrypted production logical snapshot and its isolated restore are still
+missing, so Gate B remains HOLD.

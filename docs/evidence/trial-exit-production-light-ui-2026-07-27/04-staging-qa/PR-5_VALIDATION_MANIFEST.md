@@ -6,6 +6,12 @@ Use a new synthetic release-candidate run on the isolated staging project,
 referencing only `VIP-1` through `VIP-8`. Provider delivery, Stripe, LINE,
 email and webhook execution must remain disabled.
 
+The execution prompt orders PR-5 after Gate A cleanup and requires staging to
+contain only the eight official tables. The frozen 2026-07-27 inventory still
+contains Trial `T1` through `T8`, so no new staging mutation run was started.
+Running the release-candidate fixture before exact-run cleanup would test the
+wrong 16-table state and would invalidate this manifest.
+
 Required authenticated flow:
 
 1. login, session expiry and logout;
