@@ -59,9 +59,36 @@ Customer browser
 - Website/API candidate: `665fcf4d1eefca6bc790d5967f221a4d9fb48a06`
 - VIP App branch: `codex/vip-manager-g0-5-20260726`
 - VIP App code candidate: `fc5c24f20867d80a45564249afcc1a8f13e1ac7b`
-- このprompt改訂前のVIP App docs baseline: `ced639935f56527230bdb0a013bdec7ebc6d7a47`
+- このbaseline明文化前のVIP App docs tip: `6d77586229883c31625457448dbd9b4bd2e255f8`
 - 実行開始時のVIP App docs tipは、remote branch上でこのpromptを含む最新commitを解決して
   manifestへ記録する。code candidateのtreeを意図なく変更しない。
+
+### 完了済みbaselineと変更禁止
+
+T-001〜T-028、G0.5〜G7、candidate機能、candidate作成、rollback固定は完了済みである。
+上記exact commitとrelease candidate evidenceを実装baselineとして扱い、次を厳守する。
+
+- 予約作成/編集、6操作、Walk-in、Waitlist、block、担当卓、顧客統合、outbox、
+  realtime、SLO、restoreを再実装しない。
+- 完成済みcandidateの全面リファクタリング、設計の作り直し、UIの再制作、
+  contract/schemaの不要な再定義を禁止する。
+- 既存CI結果は完成済みbaselineの証拠として扱う。
+- trial差分を追加した後、同じCIを「新規実装のやり直し」ではなく回帰確認として再実行する。
+- baseline検証がPASSしている項目は、trial差分で影響を受けた場合だけ原因を局所修正する。
+- candidate sourceの変更は下記trial差分に必要な最小範囲へ限定し、無関係なcleanup、
+  dependency更新、命名変更、format一括変更を行わない。
+
+今後実装するのは完成機能の作り直しではなく、次のtrial差分だけである。
+
+1. Trial表示・PII入力制限
+2. protected backendへのserver-only bypass
+3. staging専用seed／cleanup
+4. Website stagingへの永続化E2E
+5. production-target build
+6. 固定URLへのpromoteと顧客handoff
+
+上記6項目以外の実装が必要に見える場合は、まずrelease evidenceとexact candidateを再照合する。
+真にtrial rolloutを阻害する欠陥だけを最小修正し、evidenceへ理由、影響範囲、回帰結果を記録する。
 
 既知のproduction rollback anchor：
 
@@ -115,9 +142,9 @@ cross-repo contract、Gate判定、promote/rollback判断だけを担当する�
 
 | Lane | Model | 所有範囲 |
 |---|---|---|
-| Data/API | Terra | `website`本番contract完成、trial guard、migration、seed/cleanup、auth、external side-effect停止 |
-| Manager UI | Terra | `ghost_vipapp/src`本番完成UI、runtime trial banner、proxy bypass、入力安全 |
-| QA/Release | Terra | tests、live staging E2E、Vercel、observability、manifest、rollback |
+| Data/API | Terra | 完成済み`website` candidateを維持し、trial guard、staging seed/cleanup、bypass、side-effect停止だけを追加 |
+| Manager UI | Terra | 完成済み`ghost_vipapp` UIを維持し、runtime trial banner、PII入力制限だけを追加 |
+| QA/Release | Terra | baseline CIの回帰再実行、live staging E2E、Vercel、manifest、promote/rollback |
 | Inventory/Audit | Luna | `rg`、env名、route/migration inventory、反復validation、artifact照合 |
 
 - Lunaが実行環境にない場合はTerraの低〜中reasoningへ置換し、Solへ戻さない。
@@ -153,13 +180,15 @@ Gate TR-0：
 - production DB mutationが0
 - production release lockと、認証可能なrollback deploymentが確定
 
-## Wave TR-1: 本番コード完成＋Trial data-plane safety
+## Wave TR-1: 完成済みcandidateへのTrial差分のみ実装
 
-開始時点ではtrial mode、protection bypass header、seed/cleanup harnessは未実装である。
+T-001〜T-028とcandidate機能は完成済みであり、再実装・全面リファクタリングを禁止する。
+開始時点で未実装なのはtrial mode、protection bypass header、seed/cleanup harnessなど、
+上記「完了済みbaselineと変更禁止」で許可したtrial差分だけである。
 既存4幅/axe suiteはAPIをsynthetic mockするUI regressionであり、live staging統合証拠ではない。
-これらを「既にある」と仮定せず、このWaveで実装して別々のGateとして検証する。
-ただしtrial専用の機能縮小版を作ってはならない。正本仕様の本番機能を完成させ、
-trial差分はserver-side runtime flagによる安全制御と注意表示だけに閉じ込める。
+既存CIはbaselineとして扱い、trial差分追加後の回帰確認として再実行する。
+trial専用の機能縮小版を作らず、trial差分はserver-side runtime flagによる
+安全制御と注意表示だけに閉じ込める。
 
 ### 1. Trial mode
 
