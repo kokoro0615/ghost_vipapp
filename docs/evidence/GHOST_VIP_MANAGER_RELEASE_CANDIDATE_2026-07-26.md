@@ -91,6 +91,13 @@ The VIP App candidate points at the website candidate through
 protection. Protection-bypassed unauthenticated smoke returned 401 for the VIP
 App root/API paths and website admin API paths.
 
+These URLs prove the exact sources build and start in Vercel. They are not an
+integrated customer trial URL: after a user bypasses VIP App protection, the VIP
+App server would still need a separate automation-bypass credential to call the
+protected backend preview. No secret was copied into source or evidence to work
+around that boundary. The controlled production build sequence below is the
+supported integration path.
+
 ## Rollback anchor
 
 No production alias was changed. The known-good production deployments remain:

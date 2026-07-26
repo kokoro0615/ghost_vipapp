@@ -286,9 +286,9 @@ production用はread-only smokeへ縮小し、mutation E2Eは隔離stagingまた
 
 ## 8. 顧客提供判定
 
-### Candidateで触れてよい範囲
+### Candidateで確認してよい範囲
 
-- Owner/指定確認者によるVercel protected previewのUI・read-only確認。
+- Owner/指定確認者によるVercel protected previewのbuild/外周認証確認。
 - Basic/PIN認証境界、画面・検索・日付切替、synthetic/staging fixture。
 - promotion runbookと旧deploymentへのrollback確認。
 
@@ -301,6 +301,8 @@ production用はread-only smokeへ縮小し、mutation E2Eは隔離stagingまた
 ### 完成判定
 
 G0.5〜G7のcandidate Gate、production read-only smoke、隔離fixture mutation、
-rollback rehearsalを完了したため「protected previewでお客様が触れるレベル」の
-production candidateと判定する。production promotionは実Safari機witnessとOwner
+rollback rehearsalを完了したため、production環境へ同一SHAを再buildする
+promotion-ready candidateと判定する。現在の2 previewは個別にVercel protection
+配下であり、VIP App serverからbackend previewへの通信には別のbypass構成が必要なため、
+統合顧客trial URLとは扱わない。production promotionは実Safari機witnessとOwner
 sign-offを別途記録し、backend flags OFF→VIP Appの順で行う。
