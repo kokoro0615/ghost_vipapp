@@ -5,6 +5,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { type FormEvent, useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
+  BellRing,
   CalendarPlus,
   CalendarDays,
   ChartNoAxesGantt,
@@ -31,9 +32,11 @@ import { Inspector, INSPECTOR_TABS, type InspectorTab } from "./inspector/Inspec
 import { OperationCenter } from "./operations/OperationCenter";
 import { ExceptionRail } from "./shell/ExceptionRail";
 import { useVipFloorWorkspace } from "./state/useVipFloorWorkspace";
+import { WaitlistPanel } from "./waitlist/WaitlistPanel";
 import styles from "./VipFloorWorkspace.module.css";
 import { canExecuteVipCommand } from "@/lib/adminPermissions";
 import type { OperationOptions } from "./contract/uiTypes";
+import type { WaitlistEntry } from "./contract/uiTypes";
 
 const ChartView = dynamic(() => import("./chart/ChartView"), {
   loading: () => <WorkspaceSkeleton label="Chartを準備中" />,
@@ -68,6 +71,8 @@ export default function VipFloorWorkspace() {
     runCommand,
     runOperation,
     loadOperationOptions,
+    loadWaitlist,
+    runWaitlistAction,
     auth,
     businessDate,
     offline,
@@ -80,6 +85,8 @@ export default function VipFloorWorkspace() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [operationOpen, setOperationOpen] = useState(false);
   const [operationOptions, setOperationOptions] = useState<OperationOptions | null>(null);
+  const [waitlistOpen, setWaitlistOpen] = useState(false);
+  const [waitlistEntries, setWaitlistEntries] = useState<WaitlistEntry[]>([]);
   const inspectorTab = parseInspectorTab(searchParams.get("detail"));
   const deferredQuery = useDeferredValue(state.query);
   const allReservations = useMemo(() => toUiReservations(state.board), [state.board]);
@@ -151,6 +158,18 @@ export default function VipFloorWorkspace() {
     if (readOnly || !isOwner) return;
     setOperationOpen(true);
     setOperationOptions(await loadOperationOptions());
+  }
+
+  async function refreshWaitlist() {
+    const entries = await loadWaitlist();
+    if (entries) setWaitlistEntries(entries);
+  }
+
+  async function openWaitlist() {
+    if (!isOwner) return;
+    setMenuOpen(false);
+    setWaitlistOpen(true);
+    await refreshWaitlist();
   }
 
   async function submitPin(event: FormEvent<HTMLFormElement>) {
@@ -403,7 +422,9 @@ export default function VipFloorWorkspace() {
             <button type="button" onClick={() => void loadBoard()} disabled={state.pending}>
               <RefreshCw size={18} /><span>再読込</span><small>台帳同期</small>
             </button>
-            <span aria-disabled="true"><Radio size={18} /><span>オンライン</span><small>準備中</small></span>
+            <button type="button" onClick={() => void openWaitlist()}>
+              <BellRing size={18} /><span>Waitlist</span><small>呼出・30分期限</small>
+            </button>
             <span aria-disabled="true"><UsersRound size={18} /><span>顧客</span><small>準備中</small></span>
             <span aria-disabled="true"><ShieldCheck size={18} /><span>設定</span><small>準備中</small></span>
             <button type="button" onClick={() => void logout()}>
@@ -491,6 +512,16 @@ export default function VipFloorWorkspace() {
           setOperationOptions(null);
         }}
         onRun={runOperation}
+      />
+
+      <WaitlistPanel
+        open={waitlistOpen}
+        pending={state.pending}
+        board={state.board}
+        entries={waitlistEntries}
+        onClose={() => setWaitlistOpen(false)}
+        onRefresh={refreshWaitlist}
+        onAction={runWaitlistAction}
       />
     </main>
   );

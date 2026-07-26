@@ -85,6 +85,43 @@ export type BlockCreateDraft = {
 
 export type OperationDraft = WalkInDraft | BlockCreateDraft;
 
+export type WaitlistStatus = "waiting" | "called" | "expired" | "seated" | "cancelled";
+
+export type WaitlistEntry = {
+  id: string;
+  eventDayId: string;
+  guestCount: number;
+  guestLabel: string | null;
+  email: string | null;
+  status: WaitlistStatus;
+  storedStatus: WaitlistStatus;
+  calledAt: string | null;
+  callExpiresAt: string | null;
+  seatedReservationId: string | null;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type WaitlistAction =
+  | {
+      action: "create";
+      payload: {
+        eventDayId: string;
+        guestCount: number;
+        guestLabel: string | null;
+        email: string | null;
+      };
+    }
+  | {
+      action: "call" | "expire" | "cancel" | "seat";
+      payload: {
+        waitlistEntryId: string;
+        expectedVersion: number;
+        reservationId: string | null;
+      };
+    };
+
 export type CommandOutcome =
   | { ok: true; message: string }
   | { ok: false; code: string; message: string; recovery: string };

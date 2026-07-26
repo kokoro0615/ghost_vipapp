@@ -22,6 +22,8 @@ import type {
   LiveCommandDraft,
   OperationDraft,
   OperationOptions,
+  WaitlistAction,
+  WaitlistEntry,
 } from "../contract/uiTypes";
 import { createInitialState, workspaceReducer } from "./reducer";
 
@@ -537,12 +539,114 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
     }
   }, [auth.session?.role, businessDate, loadBoard, mutationBlocked, offline]);
 
+  const loadWaitlist = useCallback(async () => {
+    if (offline || auth.session?.role !== "owner") return null;
+    try {
+      const response = await fetch(
+        `/api/admin/vip-floor/waitlist?date=${encodeURIComponent(businessDate)}`,
+        { cache: "no-store" },
+      );
+      const payload = await response.json().catch(() => ({})) as Record<string, unknown>;
+      if (!response.ok || payload.ok !== true || !Array.isArray(payload.entries)) {
+        dispatch({
+          type: "commandOutcome",
+          outcome: {
+            ok: false,
+            code: String(payload.error ?? response.status),
+            message: readErrorMessage(response.status, payload),
+            recovery: "Owner sessionと営業日を確認して再読込してください。",
+          },
+        });
+        return null;
+      }
+      return payload.entries as WaitlistEntry[];
+    } catch {
+      dispatch({
+        type: "commandOutcome",
+        outcome: {
+          ok: false,
+          code: "NETWORK_ERROR",
+          message: "Waitlistを取得できませんでした。",
+          recovery: "通信状態を確認して再試行してください。",
+        },
+      });
+      return null;
+    }
+  }, [auth.session?.role, businessDate, offline]);
+
+  const runWaitlistAction = useCallback(async (draft: WaitlistAction) => {
+    if (mutationBlocked || auth.session?.role !== "owner") {
+      dispatch({
+        type: "commandOutcome",
+        outcome: {
+          ok: false,
+          code: mutationBlocked ? "STALE_READ_ONLY" : "INSUFFICIENT_ROLE",
+          message: "台帳が閲覧専用か、この操作を行う権限がありません。",
+          recovery: "接続とOwner sessionを確認して再読込してください。",
+        },
+      });
+      return false;
+    }
+    dispatch({ type: "pending", pending: true });
+    try {
+      const response = await fetch("/api/admin/vip-floor/waitlist", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "idempotency-key": crypto.randomUUID(),
+        },
+        body: JSON.stringify(draft),
+      });
+      const payload = await response.json().catch(() => ({})) as Record<string, unknown>;
+      if (!response.ok) {
+        dispatch({
+          type: "commandOutcome",
+          outcome: {
+            ok: false,
+            code: String(payload.error ?? response.status),
+            message: readErrorMessage(response.status, payload),
+            recovery: response.status === 409
+              ? "Waitlistを再読込して最新versionから実行してください。"
+              : "入力内容と30分期限を確認してください。",
+          },
+        });
+        return false;
+      }
+      const labels: Record<WaitlistAction["action"], string> = {
+        create: "Waitlistへ登録しました",
+        call: "ゲストを呼出しました（30分）",
+        expire: "呼出期限切れへ更新しました",
+        cancel: "Waitlistを取消しました",
+        seat: "予約へ紐付けて着席済みにしました",
+      };
+      dispatch({
+        type: "commandOutcome",
+        outcome: { ok: true, message: labels[draft.action] },
+      });
+      await loadBoard(businessDate);
+      return true;
+    } catch {
+      dispatch({
+        type: "commandOutcome",
+        outcome: {
+          ok: false,
+          code: "NETWORK_ERROR",
+          message: "Waitlistの保存結果を確認できませんでした。",
+          recovery: "再送せずWaitlistと台帳を再読込してください。",
+        },
+      });
+      return false;
+    }
+  }, [auth.session?.role, businessDate, loadBoard, mutationBlocked]);
+
   return {
     state,
     dispatch,
     runCommand,
     runOperation,
     loadOperationOptions,
+    loadWaitlist,
+    runWaitlistAction,
     auth,
     businessDate,
     offline,

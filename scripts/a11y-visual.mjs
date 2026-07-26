@@ -74,6 +74,14 @@ async function main() {
       await page.getByRole("button", { name: /新規オペレーション/u }).click();
       await page.getByRole("dialog", { name: "新規オペレーション" }).waitFor();
       results.push(await auditPage(page, `${viewport.width}x${viewport.height}:operations`));
+
+      await page.goto(`${origin}/?view=floor&date=2026-07-26`, {
+        waitUntil: "domcontentloaded",
+      });
+      await page.getByRole("button", { name: "メニュー", exact: true }).click();
+      await page.getByRole("button", { name: /Waitlist/u }).click();
+      await page.getByRole("dialog", { name: "Waitlist" }).waitFor();
+      results.push(await auditPage(page, `${viewport.width}x${viewport.height}:waitlist`));
       await context.close();
     }
 
@@ -133,6 +141,11 @@ async function installSyntheticRoutes(page) {
     status: 200,
     contentType: "application/json",
     body: JSON.stringify(operationOptions),
+  }));
+  await page.route("**/api/admin/vip-floor/waitlist?**", (route) => route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify(waitlist),
   }));
   await page.route("**/api/admin/vip-floor?**", (route) => route.fulfill({
     status: 200,
@@ -299,6 +312,26 @@ const operationOptions = {
     minGuests: 1,
     maxGuests: 20,
     minSpendYen: 0,
+  }],
+};
+
+const waitlist = {
+  ok: true,
+  businessDate: "2026-07-26",
+  entries: [{
+    id: "40000000-0000-4000-8000-000000000001",
+    eventDayId: board.businessDay.id,
+    guestCount: 3,
+    guestLabel: "WAITING GUEST",
+    email: "synthetic@example.invalid",
+    status: "called",
+    storedStatus: "called",
+    calledAt: "2026-07-26T13:10:00.000Z",
+    callExpiresAt: "2026-07-26T13:40:00.000Z",
+    seatedReservationId: null,
+    version: 2,
+    createdAt: "2026-07-26T13:00:00.000Z",
+    updatedAt: "2026-07-26T13:10:00.000Z",
   }],
 };
 
