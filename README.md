@@ -8,6 +8,7 @@ GHOST OsakaのVIPフロア現場オペレーション画面を、公開サイト
 - [GHOST VIP Manager 正本実装計画](docs/GHOST_VIP_MANAGER_IMPLEMENTATION_PLAN.md)
 - [2026-07-26 実装完了度監査](docs/GHOST_VIP_MANAGER_IMPLEMENTATION_AUDIT_2026-07-26.md)
 - [一気通貫実行プロンプト](docs/GHOST_VIP_MANAGER_EXECUTION_PROMPT.md)
+- [顧客Trial一気通貫デプロイプロンプト](docs/GHOST_VIP_MANAGER_CUSTOMER_TRIAL_DEPLOYMENT_PROMPT.md)
 
 旧TableCheck関連文書は`docs/archive/tablecheck-legacy-2026-07/`の履歴資料であり、
 現行の実装指示として使用しません。
