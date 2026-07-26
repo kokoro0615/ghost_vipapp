@@ -498,7 +498,7 @@ async function main() {
     try {
       // Let browser polling and serverless metric writes quiesce before the
       // exact-run delete reaches its final metrics/control-row assertions.
-      await delay(2_100);
+      await delay(5_000);
       await runRequiredLifecycle(
         config.cleanupScript,
         "cleanup-vip-manager-trial.mjs",
@@ -802,7 +802,10 @@ async function runUiRegression(config, reservationId, uiReservationPlan) {
       "all",
     ]) {
       await statusFilter.selectOption(value);
-      assert(await statusFilter.inputValue() === value, `ui_status_filter_failed:${value}`);
+      await assertEventually(
+        async () => await statusFilter.inputValue() === value,
+        `ui_status_filter_failed:${value}`,
+      );
     }
     await page.getByLabel("例外と到着queue")
       .getByText(uiReservationPublicCode, { exact: true })
