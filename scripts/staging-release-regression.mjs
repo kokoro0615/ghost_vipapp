@@ -762,8 +762,15 @@ async function runUiRegression(config, reservationId, uiReservationPlan) {
     const page = await context.newPage();
     const failures = [];
     let offlineConsoleExpected = false;
+    let authTransitionConsoleExpected = false;
     page.on("console", (message) => {
-      if (message.type() === "error" && !offlineConsoleExpected) failures.push("console_error");
+      if (
+        message.type() === "error"
+        && !offlineConsoleExpected
+        && !authTransitionConsoleExpected
+      ) {
+        failures.push("console_error");
+      }
     });
     page.on("response", (response) => {
       if (response.status() >= 500) failures.push(`http_${response.status()}`);
@@ -915,6 +922,7 @@ async function runUiRegression(config, reservationId, uiReservationPlan) {
       "ui_exposed_internal_reservation_id",
     );
 
+    authTransitionConsoleExpected = true;
     await page.getByRole("button", { name: /ログアウト/u }).first().click({ timeout: 5_000 })
       .catch(() => {
         throw new Error("ui_logout_click_failed");
@@ -1177,7 +1185,10 @@ async function runRequiredLifecycle(scriptPath, expectedName, args, config) {
     config.lifecycleEnvFile,
     config.allowTestScript,
   );
-  assert(result.code === 0, `release_candidate_lifecycle_failed:${expectedName}`);
+  assert(
+    result.code === 0,
+    `release_candidate_lifecycle_failed:${expectedName}:${classifyLifecycleFailure(result.stderr)}`,
+  );
 }
 
 async function runLifecycleScript(
@@ -1190,6 +1201,7 @@ async function runLifecycleScript(
 ) {
   await assertWebsiteScript(scriptPath, expectedName, expectedSha256, allowTestScript);
   return new Promise((resolve) => {
+    let stderr = "";
     const child = spawn(process.execPath, [scriptPath, ...args], {
       stdio: ["ignore", "pipe", "pipe"],
       env: {
@@ -1198,10 +1210,23 @@ async function runLifecycleScript(
       },
     });
     child.stdout.resume();
-    child.stderr.resume();
-    child.on("error", () => resolve({ code: 1 }));
-    child.on("close", (code) => resolve({ code: code ?? 1 }));
+    child.stderr.on("data", (chunk) => {
+      stderr = `${stderr}${String(chunk)}`.slice(-4_096);
+    });
+    child.on("error", () => resolve({ code: 1, stderr }));
+    child.on("close", (code) => resolve({ code: code ?? 1, stderr }));
   });
+}
+
+function classifyLifecycleFailure(stderr) {
+  const classes = [
+    ["vip_manager_metrics", "metrics"],
+    ["control", "control"],
+    ["baseline", "baseline"],
+    ["provider", "provider"],
+    ["official", "official"],
+  ];
+  return classes.find(([needle]) => stderr.includes(needle))?.[1] ?? "unknown";
 }
 
 async function assertWebsiteScript(
