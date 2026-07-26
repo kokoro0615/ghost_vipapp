@@ -40,9 +40,11 @@ export function OperationCenter({
 }: Props) {
   const [kind, setKind] = useState<OperationKind>("walk_in");
   const [venueWide, setVenueWide] = useState(false);
+  const [editingBlockId, setEditingBlockId] = useState<string | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
   const defaults = useMemo(() => operationDefaults(board), [board]);
+  const editingBlock = board.blocks.find((block) => block.id === editingBlockId) ?? null;
 
   useEffect(() => {
     if (!open) return;
@@ -109,10 +111,18 @@ export function OperationCenter({
       };
     } else {
       draft = {
-        kind,
+        kind: editingBlock ? "block_update" : kind,
         payload: {
-          eventDayId: options.businessDay.id,
-          businessDate: options.businessDay.businessDate,
+          ...(editingBlock
+            ? {
+                blockId: editingBlock.id,
+                expectedVersion: editingBlock.version,
+              }
+            : {
+                eventDayId: options.businessDay.id,
+                businessDate: options.businessDay.businessDate,
+                repeatDays: Number(data.get("repeatDays")),
+              }),
           scope: String(data.get("scope")) as "online_only" | "all_operations",
           blockKind: String(data.get("blockKind")) as "manual",
           startAt,
@@ -120,12 +130,23 @@ export function OperationCenter({
           memo: nullableText(data.get("memo")),
           seatResourceIds: venueWide ? [] : tableIds,
           venueWide,
-          repeatDays: Number(data.get("repeatDays")),
         },
-      };
+      } as OperationDraft;
     }
 
-    if (await onRun(draft)) onClose();
+    if (await onRun(draft)) {
+      setEditingBlockId(null);
+      onClose();
+    }
+  }
+
+  async function cancelBlock(blockId: string, expectedVersion: number) {
+    if (await onRun({
+      kind: "block_cancel",
+      payload: { blockId, expectedVersion },
+    })) {
+      setEditingBlockId(null);
+    }
   }
 
   return (
@@ -178,7 +199,11 @@ export function OperationCenter({
           </button>
         </div>
 
-        <form className={styles.commandForm} onSubmit={submit}>
+        <form
+          key={`${kind}:${editingBlockId ?? "new"}`}
+          className={styles.commandForm}
+          onSubmit={submit}
+        >
           <div className={styles.commandContext}>
             <strong>{kind === "walk_in" ? "即時来店" : "販売・運用停止"}</strong>
             <span>{board.businessDay.businessDate} / 22:00–05:00</span>
@@ -199,11 +224,21 @@ export function OperationCenter({
               <div className={styles.formColumns}>
                 <label>
                   開始
-                  <input type="datetime-local" name="startAt" defaultValue={defaults.start} required />
+                  <input
+                    type="datetime-local"
+                    name="startAt"
+                    defaultValue={editingBlock ? localInputValue(editingBlock.startAt) : defaults.start}
+                    required
+                  />
                 </label>
                 <label>
                   終了
-                  <input type="datetime-local" name="endAt" defaultValue={defaults.end} required />
+                  <input
+                    type="datetime-local"
+                    name="endAt"
+                    defaultValue={editingBlock ? localInputValue(editingBlock.endAt) : defaults.end}
+                    required
+                  />
                 </label>
               </div>
 
@@ -239,14 +274,14 @@ export function OperationCenter({
                   <div className={styles.formColumns}>
                     <label>
                       停止範囲
-                      <select name="scope" defaultValue="all_operations">
+                      <select name="scope" defaultValue={editingBlock?.scope ?? "all_operations"}>
                         <option value="all_operations">全受付・現場運用</option>
                         <option value="online_only">オンライン受付のみ</option>
                       </select>
                     </label>
                     <label>
                       種別
-                      <select name="blockKind" defaultValue="manual">
+                      <select name="blockKind" defaultValue={editingBlock?.kind ?? "manual"}>
                         <option value="manual">手動停止</option>
                         <option value="maintenance">メンテナンス</option>
                         <option value="owner_hold">Owner確保</option>
@@ -255,14 +290,21 @@ export function OperationCenter({
                     </label>
                   </div>
                   <div className={styles.formColumns}>
-                    <label>
-                      毎日繰返し
-                      <select name="repeatDays" defaultValue="1">
-                        <option value="1">なし（当日のみ）</option>
-                        <option value="7">7営業日</option>
-                        <option value="14">14営業日</option>
-                      </select>
-                    </label>
+                    {editingBlock ? (
+                      <div className={styles.commandContext}>
+                        <strong>REV {editingBlock.version}</strong>
+                        <span>このブロックだけ更新</span>
+                      </div>
+                    ) : (
+                      <label>
+                        毎日繰返し
+                        <select name="repeatDays" defaultValue="1">
+                          <option value="1">なし（当日のみ）</option>
+                          <option value="7">7営業日</option>
+                          <option value="14">14営業日</option>
+                        </select>
+                      </label>
+                    )}
                     <label className={styles.checkRow}>
                       <input
                         type="checkbox"
@@ -274,7 +316,12 @@ export function OperationCenter({
                   </div>
                   <label>
                     監査メモ（任意）
-                    <textarea name="memo" maxLength={1000} placeholder="現場に必要な理由・解除条件" />
+                    <textarea
+                      name="memo"
+                      maxLength={1000}
+                      defaultValue={editingBlock?.memo ?? ""}
+                      placeholder="現場に必要な理由・解除条件"
+                    />
                   </label>
                 </>
               )}
@@ -287,7 +334,11 @@ export function OperationCenter({
                         type="checkbox"
                         name="tableIds"
                         value={table.id}
-                        defaultChecked={table.id === selectedTableId}
+                        defaultChecked={
+                          editingBlock
+                            ? editingBlock.targets.tableIds.includes(table.id)
+                            : table.id === selectedTableId
+                        }
                       />
                       <span>{table.displayCode}</span>
                       <small>{table.capacityMax}名</small>
@@ -303,10 +354,51 @@ export function OperationCenter({
               取消
             </button>
             <button type="submit" className={styles.primaryButton} disabled={pending || !options}>
-              <Check size={16} />{pending ? "保存中…" : "競合確認して保存"}
+              <Check size={16} />{pending
+                ? "保存中…"
+                : editingBlock
+                  ? "変更を保存"
+                  : "競合確認して保存"}
             </button>
           </footer>
         </form>
+
+        {kind === "block_create" && board.blocks.length > 0 ? (
+          <section className={styles.blockLedger} aria-label="有効ブロック">
+            <header>
+              <strong>ACTIVE BLOCKS</strong>
+              <span>{board.blocks.length}件</span>
+            </header>
+            {board.blocks.map((block) => (
+              <div key={block.id}>
+                <span>{formatClock(block.startAt)}–{formatClock(block.endAt)}</span>
+                <strong>{block.targets.venueWide
+                  ? "会場全体"
+                  : block.targets.tableIds.map((tableId) =>
+                    board.tables.find((table) => table.id === tableId)?.displayCode ?? "卓",
+                  ).join(" / ")}</strong>
+                <small>REV {block.version} / {block.scope === "online_only" ? "ONLINE" : "ALL"}</small>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingBlockId(block.id);
+                    setVenueWide(block.targets.venueWide);
+                  }}
+                  disabled={pending}
+                >
+                  編集
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void cancelBlock(block.id, block.version)}
+                  disabled={pending}
+                >
+                  解除
+                </button>
+              </div>
+            ))}
+          </section>
+        ) : null}
       </div>
     </div>
   );
@@ -345,4 +437,13 @@ function toTokyoTimestamp(value: FormDataEntryValue | null) {
 function nullableText(value: FormDataEntryValue | null) {
   const text = String(value ?? "").trim();
   return text || null;
+}
+
+function formatClock(value: string) {
+  return new Intl.DateTimeFormat("ja-JP", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: "Asia/Tokyo",
+  }).format(new Date(value));
 }

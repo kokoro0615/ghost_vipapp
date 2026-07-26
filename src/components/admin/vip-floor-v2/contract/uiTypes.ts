@@ -83,7 +83,34 @@ export type BlockCreateDraft = {
   };
 };
 
-export type OperationDraft = WalkInDraft | BlockCreateDraft;
+export type BlockUpdateDraft = {
+  kind: "block_update";
+  payload: {
+    blockId: string;
+    expectedVersion: number;
+    scope: "online_only" | "all_operations";
+    blockKind: "manual" | "maintenance" | "owner_hold" | "event";
+    startAt: string;
+    endAt: string;
+    memo: string | null;
+    seatResourceIds: string[];
+    venueWide: boolean;
+  };
+};
+
+export type BlockCancelDraft = {
+  kind: "block_cancel";
+  payload: {
+    blockId: string;
+    expectedVersion: number;
+  };
+};
+
+export type OperationDraft =
+  | WalkInDraft
+  | BlockCreateDraft
+  | BlockUpdateDraft
+  | BlockCancelDraft;
 
 export type WaitlistStatus = "waiting" | "called" | "expired" | "seated" | "cancelled";
 
@@ -119,6 +146,52 @@ export type WaitlistAction =
         waitlistEntryId: string;
         expectedVersion: number;
         reservationId: string | null;
+      };
+    };
+
+export type StaffMember = {
+  id: string;
+  displayName: string;
+  active: boolean;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type TableStaffAssignment = {
+  id: string;
+  tableId: string;
+  staffMemberId: string;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type StaffWorkspaceData = {
+  ok: true;
+  eventDayId: string;
+  staffMembers: StaffMember[];
+  tableAssignments: TableStaffAssignment[];
+};
+
+export type StaffAction =
+  | { action: "create"; payload: { displayName: string } }
+  | {
+      action: "update";
+      payload: {
+        staffMemberId: string;
+        expectedVersion: number;
+        displayName: string;
+        active: boolean;
+      };
+    }
+  | {
+      action: "assign";
+      payload: {
+        eventDayId: string;
+        tableId: string;
+        staffMemberId: string | null;
+        expectedAssignmentVersion: number | null;
       };
     };
 

@@ -15,7 +15,7 @@ const BUSINESS_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/u;
 const FIXED_REASON = "管理画面操作";
 
 type OperationBody = {
-  kind?: "walk_in" | "block_create";
+  kind?: "walk_in" | "block_create" | "block_update" | "block_cancel";
   payload?: Record<string, unknown>;
 };
 
@@ -74,6 +74,50 @@ export async function POST(request: Request) {
     }
 
     return createRepeatedBlocks(payload.value, idempotencyKey, token);
+  }
+
+  if (body.kind === "block_update") {
+    const payload = parseBlockMutation(body.payload, true);
+    if (!payload.ok) {
+      return NextResponse.json({ ok: false, error: payload.error }, { status: 400 });
+    }
+    return forwardOperation(
+      `/api/admin/v2/vip-blocks/${encodeURIComponent(payload.value.blockId)}`,
+      {
+        expectedVersion: payload.value.expectedVersion,
+        scope: payload.value.scope,
+        kind: payload.value.blockKind,
+        startAt: payload.value.startAt,
+        endAt: payload.value.endAt,
+        memo: payload.value.memo,
+        seatResourceIds: payload.value.seatResourceIds,
+        floorSectionIds: [],
+        venueWide: payload.value.venueWide,
+        reason: FIXED_REASON,
+      },
+      idempotencyKey,
+      token,
+      "PATCH",
+    );
+  }
+
+  if (body.kind === "block_cancel") {
+    const blockId = readUuid(body.payload.blockId);
+    const expectedVersion = readInteger(
+      body.payload.expectedVersion,
+      1,
+      Number.MAX_SAFE_INTEGER,
+    );
+    if (!blockId || expectedVersion === null) {
+      return NextResponse.json({ ok: false, error: "invalid_block_cancel" }, { status: 400 });
+    }
+    return forwardOperation(
+      `/api/admin/v2/vip-blocks/${encodeURIComponent(blockId)}`,
+      { expectedVersion, reason: FIXED_REASON },
+      idempotencyKey,
+      token,
+      "DELETE",
+    );
   }
 
   return NextResponse.json({ ok: false, error: "unsupported_operation" }, { status: 400 });
@@ -194,6 +238,52 @@ function parseBlock(payload: Record<string, unknown>) {
   };
 }
 
+function parseBlockMutation(payload: Record<string, unknown>, requireIdentity: boolean) {
+  const blockId = readUuid(payload.blockId);
+  const expectedVersion = readInteger(payload.expectedVersion, 1, Number.MAX_SAFE_INTEGER);
+  const scope = payload.scope === "online_only" || payload.scope === "all_operations"
+    ? payload.scope
+    : null;
+  const kind = ["manual", "maintenance", "owner_hold", "event"].includes(String(payload.blockKind))
+    ? String(payload.blockKind)
+    : null;
+  const startAt = readIso(payload.startAt);
+  const endAt = readIso(payload.endAt);
+  const memo = readNullableString(payload.memo, 1000);
+  const seatResourceIds = readUuidArray(payload.seatResourceIds, 0, 8);
+  const venueWide = payload.venueWide === true;
+
+  if (
+    (requireIdentity && (!blockId || expectedVersion === null))
+    || !scope
+    || !kind
+    || !startAt
+    || !endAt
+    || Date.parse(startAt) >= Date.parse(endAt)
+    || memo === undefined
+    || !seatResourceIds
+    || (!venueWide && seatResourceIds.length === 0)
+    || (venueWide && seatResourceIds.length > 0)
+  ) {
+    return { ok: false as const, error: "invalid_block_update" };
+  }
+
+  return {
+    ok: true as const,
+    value: {
+      blockId: blockId!,
+      expectedVersion: expectedVersion!,
+      scope,
+      blockKind: kind,
+      startAt,
+      endAt,
+      memo,
+      seatResourceIds,
+      venueWide,
+    },
+  };
+}
+
 async function createRepeatedBlocks(
   payload: ReturnType<typeof parseBlock> & { ok: true } extends { value: infer Value } ? Value : never,
   idempotencyKey: string,
@@ -284,11 +374,12 @@ async function forwardOperation(
   payload: Record<string, unknown>,
   idempotencyKey: string,
   token: string,
+  method: "POST" | "PATCH" | "DELETE" = "POST",
 ) {
   const response = await ghostAdminFetch(
     path,
     {
-      method: "POST",
+      method,
       headers: {
         "content-type": "application/json",
         "idempotency-key": idempotencyKey,

@@ -82,6 +82,14 @@ async function main() {
       await page.getByRole("button", { name: /Waitlist/u }).click();
       await page.getByRole("dialog", { name: "Waitlist" }).waitFor();
       results.push(await auditPage(page, `${viewport.width}x${viewport.height}:waitlist`));
+
+      await page.goto(`${origin}/?view=floor&date=2026-07-26`, {
+        waitUntil: "domcontentloaded",
+      });
+      await page.getByRole("button", { name: "メニュー", exact: true }).click();
+      await page.getByRole("button", { name: /担当卓/u }).click();
+      await page.getByRole("dialog", { name: "スタッフ担当卓" }).waitFor();
+      results.push(await auditPage(page, `${viewport.width}x${viewport.height}:staff`));
       await context.close();
     }
 
@@ -146,6 +154,11 @@ async function installSyntheticRoutes(page) {
     status: 200,
     contentType: "application/json",
     body: JSON.stringify(waitlist),
+  }));
+  await page.route("**/api/admin/vip-floor/staff?**", (route) => route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify(staff),
   }));
   await page.route("**/api/admin/vip-floor?**", (route) => route.fulfill({
     status: 200,
@@ -332,6 +345,37 @@ const waitlist = {
     version: 2,
     createdAt: "2026-07-26T13:00:00.000Z",
     updatedAt: "2026-07-26T13:10:00.000Z",
+  }],
+};
+
+const staff = {
+  ok: true,
+  eventDayId: board.businessDay.id,
+  staffMembers: [
+    {
+      id: "50000000-0000-4000-8000-000000000001",
+      displayName: "ENTRY",
+      active: true,
+      version: 1,
+      createdAt: "2026-07-26T12:00:00.000Z",
+      updatedAt: "2026-07-26T12:00:00.000Z",
+    },
+    {
+      id: "50000000-0000-4000-8000-000000000002",
+      displayName: "VIP FLOOR",
+      active: true,
+      version: 2,
+      createdAt: "2026-07-26T12:00:00.000Z",
+      updatedAt: "2026-07-26T12:30:00.000Z",
+    },
+  ],
+  tableAssignments: [{
+    id: "60000000-0000-4000-8000-000000000001",
+    tableId: tableIds[0],
+    staffMemberId: "50000000-0000-4000-8000-000000000002",
+    version: 1,
+    createdAt: "2026-07-26T12:30:00.000Z",
+    updatedAt: "2026-07-26T12:30:00.000Z",
   }],
 };
 

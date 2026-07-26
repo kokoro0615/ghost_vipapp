@@ -6,7 +6,7 @@ import { Link2, LockKeyhole, MapPinned, MoveRight } from "lucide-react";
 import type { VipFloorBoardV2 } from "@/lib/vipFloorV2Contract";
 
 import { getStatusMeta } from "../contract/statusModel";
-import type { UiReservation } from "../contract/uiTypes";
+import type { StaffWorkspaceData, UiReservation } from "../contract/uiTypes";
 import styles from "../VipFloorWorkspace.module.css";
 
 type FloorViewProps = {
@@ -16,9 +16,20 @@ type FloorViewProps = {
   selectedTableId: string | null;
   onSelectTable: (tableId: string, reservationId: string | null) => void;
   onOpenAssignment: () => void;
+  staffData: StaffWorkspaceData | null;
+  staffFilter: string;
 };
 
-export default function FloorView({ board, reservations, selectedReservationId, selectedTableId, onSelectTable, onOpenAssignment }: FloorViewProps) {
+export default function FloorView({
+  board,
+  reservations,
+  selectedReservationId,
+  selectedTableId,
+  onSelectTable,
+  onOpenAssignment,
+  staffData,
+  staffFilter,
+}: FloorViewProps) {
   const reservationById = new Map(reservations.map((item) => [item.id, item]));
 
   return (
@@ -53,6 +64,15 @@ export default function FloorView({ board, reservations, selectedReservationId, 
           const Icon = meta.icon;
           const blocked = table.blockIds.length > 0;
           const selected = table.id === selectedTableId || reservation?.id === selectedReservationId;
+          const staffAssignment = staffData?.tableAssignments.find(
+            (assignment) => assignment.tableId === table.id,
+          );
+          const staff = staffData?.staffMembers.find(
+            (member) => member.id === staffAssignment?.staffMemberId,
+          );
+          const filteredOut = staffFilter === "unassigned"
+            ? Boolean(staffAssignment)
+            : Boolean(staffFilter && staffAssignment?.staffMemberId !== staffFilter);
           return (
             <button
               key={table.id}
@@ -61,6 +81,7 @@ export default function FloorView({ board, reservations, selectedReservationId, 
               data-tone={blocked || table.operationalLocked ? "danger" : meta.tone}
               data-cue={blocked ? "double" : meta.cue}
               data-selected={selected || undefined}
+              data-staff-filtered={filteredOut || undefined}
               style={{
                 left: `${table.geometry.xPercent}%`,
                 top: `${table.geometry.yPercent}%`,
@@ -70,7 +91,7 @@ export default function FloorView({ board, reservations, selectedReservationId, 
               }}
               onClick={() => onSelectTable(table.id, reservation?.id ?? null)}
               aria-pressed={selected}
-              aria-label={`${table.displayCode}、${table.name}、${blocked ? "予約ブロック" : table.operationalLocked ? "席ロック" : meta.label}${reservation ? `、${reservation.publicCode}、${reservation.startLabel}` : "、空席"}`}
+              aria-label={`${table.displayCode}、${table.name}、担当${staff?.displayName ?? "なし"}、${blocked ? "予約ブロック" : table.operationalLocked ? "席ロック" : meta.label}${reservation ? `、${reservation.publicCode}、${reservation.startLabel}` : "、空席"}`}
               title={table.operationalLocked ? table.lockReason ?? "席ロック" : reservation?.guestLabel ?? "空席"}
             >
               <span className={styles.nodeCode}>{table.displayCode}</span>
@@ -79,6 +100,7 @@ export default function FloorView({ board, reservations, selectedReservationId, 
                 {blocked ? "ブロック" : table.operationalLocked ? "ロック" : meta.shortLabel}
               </span>
               <span className={styles.nodeDetail}>{reservation ? `${reservation.startLabel} / ${reservation.guestCount}名` : `${table.capacityMax}名 / 空席`}</span>
+              {staff ? <span className={styles.nodeStaff}>担当 {staff.displayName}</span> : null}
             </button>
           );
         })}

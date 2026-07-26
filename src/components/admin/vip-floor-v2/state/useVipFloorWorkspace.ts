@@ -22,6 +22,8 @@ import type {
   LiveCommandDraft,
   OperationDraft,
   OperationOptions,
+  StaffAction,
+  StaffWorkspaceData,
   WaitlistAction,
   WaitlistEntry,
 } from "../contract/uiTypes";
@@ -515,7 +517,13 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
         return false;
       }
 
-      const label = draft.kind === "walk_in" ? "Walk-inを登録しました" : "受付ブロックを保存しました";
+      const labels: Record<OperationDraft["kind"], string> = {
+        walk_in: "Walk-inを登録しました",
+        block_create: "受付ブロックを保存しました",
+        block_update: "受付ブロックを更新しました",
+        block_cancel: "受付ブロックを解除しました",
+      };
+      const label = labels[draft.kind];
       const createdCount = typeof payload.createdCount === "number"
         ? `（${payload.createdCount}日分）`
         : "";
@@ -639,6 +647,77 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
     }
   }, [auth.session?.role, businessDate, loadBoard, mutationBlocked]);
 
+  const loadStaff = useCallback(async () => {
+    if (offline || auth.session?.role !== "owner") return null;
+    try {
+      const response = await fetch(
+        `/api/admin/vip-floor/staff?date=${encodeURIComponent(businessDate)}`,
+        { cache: "no-store" },
+      );
+      const payload = await response.json().catch(() => ({})) as Record<string, unknown>;
+      if (
+        !response.ok
+        || payload.ok !== true
+        || !Array.isArray(payload.staffMembers)
+        || !Array.isArray(payload.tableAssignments)
+      ) {
+        return null;
+      }
+      return payload as StaffWorkspaceData;
+    } catch {
+      return null;
+    }
+  }, [auth.session?.role, businessDate, offline]);
+
+  const runStaffAction = useCallback(async (draft: StaffAction) => {
+    if (mutationBlocked || auth.session?.role !== "owner") return false;
+    dispatch({ type: "pending", pending: true });
+    try {
+      const response = await fetch("/api/admin/vip-floor/staff", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "idempotency-key": crypto.randomUUID(),
+        },
+        body: JSON.stringify(draft),
+      });
+      const payload = await response.json().catch(() => ({})) as Record<string, unknown>;
+      if (!response.ok) {
+        dispatch({
+          type: "commandOutcome",
+          outcome: {
+            ok: false,
+            code: String(payload.error ?? response.status),
+            message: readErrorMessage(response.status, payload),
+            recovery: response.status === 409
+              ? "担当卓を再読込し、最新versionで再実行してください。"
+              : "Owner sessionと入力内容を確認してください。",
+          },
+        });
+        return false;
+      }
+      const labels: Record<StaffAction["action"], string> = {
+        create: "スタッフを登録しました",
+        update: "スタッフmasterを更新しました",
+        assign: "担当卓を更新しました",
+      };
+      dispatch({ type: "commandOutcome", outcome: { ok: true, message: labels[draft.action] } });
+      await loadBoard(businessDate);
+      return true;
+    } catch {
+      dispatch({
+        type: "commandOutcome",
+        outcome: {
+          ok: false,
+          code: "NETWORK_ERROR",
+          message: "担当卓の保存結果を確認できませんでした。",
+          recovery: "再送せず、担当卓を再読込してください。",
+        },
+      });
+      return false;
+    }
+  }, [auth.session?.role, businessDate, loadBoard, mutationBlocked]);
+
   return {
     state,
     dispatch,
@@ -647,6 +726,8 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
     loadOperationOptions,
     loadWaitlist,
     runWaitlistAction,
+    loadStaff,
+    runStaffAction,
     auth,
     businessDate,
     offline,

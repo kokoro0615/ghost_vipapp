@@ -17,6 +17,9 @@ test("Owner operation adapters expose only canonical Walk-in and block routes", 
   assert.match(options, /session\.actor\.role !== "owner"/u);
   assert.match(operations, /"\/api\/admin\/v2\/walk-ins"/u);
   assert.match(operations, /"\/api\/admin\/v2\/vip-blocks"/u);
+  assert.match(operations, /token,\n\s+"PATCH"/u);
+  assert.match(operations, /token,\n\s+"DELETE"/u);
+  assert.match(operations, /expectedVersion/u);
   assert.match(options, /\/api\/admin\/v2\/vip-floor\/options\?businessDate=/u);
   assert.match(operations, /const FIXED_REASON = "管理画面操作"/u);
   assert.match(operations, /readInteger\(payload\.repeatDays, 1, 14\)/u);
@@ -30,5 +33,7 @@ test("Owner operation adapters expose only canonical Walk-in and block routes", 
   assert.match(operationCenter, /expectedTableVersions/u);
   assert.match(operationCenter, /7営業日/u);
   assert.match(operationCenter, /14営業日/u);
+  assert.match(operationCenter, /ACTIVE BLOCKS/u);
+  assert.match(operationCenter, /block_cancel/u);
   assert.doesNotMatch(operationCenter, /name="reason"/u);
 });

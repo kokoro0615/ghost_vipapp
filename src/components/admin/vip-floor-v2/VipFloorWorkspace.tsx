@@ -32,11 +32,13 @@ import { Inspector, INSPECTOR_TABS, type InspectorTab } from "./inspector/Inspec
 import { OperationCenter } from "./operations/OperationCenter";
 import { ExceptionRail } from "./shell/ExceptionRail";
 import { useVipFloorWorkspace } from "./state/useVipFloorWorkspace";
+import { StaffPanel } from "./staff/StaffPanel";
 import { WaitlistPanel } from "./waitlist/WaitlistPanel";
 import styles from "./VipFloorWorkspace.module.css";
 import { canExecuteVipCommand } from "@/lib/adminPermissions";
 import type { OperationOptions } from "./contract/uiTypes";
 import type { WaitlistEntry } from "./contract/uiTypes";
+import type { StaffWorkspaceData } from "./contract/uiTypes";
 
 const ChartView = dynamic(() => import("./chart/ChartView"), {
   loading: () => <WorkspaceSkeleton label="Chartを準備中" />,
@@ -73,6 +75,8 @@ export default function VipFloorWorkspace() {
     loadOperationOptions,
     loadWaitlist,
     runWaitlistAction,
+    loadStaff,
+    runStaffAction,
     auth,
     businessDate,
     offline,
@@ -87,6 +91,9 @@ export default function VipFloorWorkspace() {
   const [operationOptions, setOperationOptions] = useState<OperationOptions | null>(null);
   const [waitlistOpen, setWaitlistOpen] = useState(false);
   const [waitlistEntries, setWaitlistEntries] = useState<WaitlistEntry[]>([]);
+  const [staffOpen, setStaffOpen] = useState(false);
+  const [staffData, setStaffData] = useState<StaffWorkspaceData | null>(null);
+  const [staffFilter, setStaffFilter] = useState("");
   const inspectorTab = parseInspectorTab(searchParams.get("detail"));
   const deferredQuery = useDeferredValue(state.query);
   const allReservations = useMemo(() => toUiReservations(state.board), [state.board]);
@@ -104,6 +111,17 @@ export default function VipFloorWorkspace() {
     && auth.status === "authenticated"
     && !!auth.session?.role
     && canExecuteVipCommand(auth.session.role, kind);
+
+  useEffect(() => {
+    if (!isOwner) return;
+    let cancelled = false;
+    void loadStaff().then((data) => {
+      if (!cancelled) setStaffData(data);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [businessDate, isOwner, loadStaff]);
 
   const readOnly = offline
     || ["loading", "stale", "reconnecting", "error", "read_only"].includes(state.globalState)
@@ -170,6 +188,17 @@ export default function VipFloorWorkspace() {
     setMenuOpen(false);
     setWaitlistOpen(true);
     await refreshWaitlist();
+  }
+
+  async function refreshStaff() {
+    setStaffData(await loadStaff());
+  }
+
+  async function openStaff() {
+    if (!isOwner) return;
+    setMenuOpen(false);
+    setStaffOpen(true);
+    await refreshStaff();
   }
 
   async function submitPin(event: FormEvent<HTMLFormElement>) {
@@ -324,6 +353,22 @@ export default function VipFloorWorkspace() {
               <option value="bill_requested">会計</option>
             </select>
           </label>
+          {state.view === "floor" && staffData ? (
+            <label className={styles.toolbarSelect}>
+              <span>担当</span>
+              <select
+                aria-label="担当スタッフでFloorを絞り込み"
+                value={staffFilter}
+                onChange={(event) => setStaffFilter(event.target.value)}
+              >
+                <option value="">全担当</option>
+                <option value="unassigned">担当なし</option>
+                {staffData.staffMembers.filter((member) => member.active).map((member) => (
+                  <option key={member.id} value={member.id}>{member.displayName}</option>
+                ))}
+              </select>
+            </label>
+          ) : null}
           <button
             type="button"
             className={styles.paneButton}
@@ -368,6 +413,8 @@ export default function VipFloorWorkspace() {
               selectedTableId={state.selectedTableId}
               onSelectTable={(tableId, reservationId) => dispatch({ type: "selectTable", tableId, reservationId })}
               onOpenAssignment={() => openCommand("assignment")}
+              staffData={staffData}
+              staffFilter={staffFilter}
             />
           ) : null}
           {!["loading", "error", "empty"].includes(state.globalState) && state.view === "timeline" ? (
@@ -426,7 +473,9 @@ export default function VipFloorWorkspace() {
               <BellRing size={18} /><span>Waitlist</span><small>呼出・30分期限</small>
             </button>
             <span aria-disabled="true"><UsersRound size={18} /><span>顧客</span><small>準備中</small></span>
-            <span aria-disabled="true"><ShieldCheck size={18} /><span>設定</span><small>準備中</small></span>
+            <button type="button" onClick={() => void openStaff()}>
+              <ShieldCheck size={18} /><span>担当卓</span><small>スタッフMaster</small>
+            </button>
             <button type="button" onClick={() => void logout()}>
               <LogOut size={18} /><span>ログアウト</span><small>Owner session</small>
             </button>
@@ -522,6 +571,16 @@ export default function VipFloorWorkspace() {
         onClose={() => setWaitlistOpen(false)}
         onRefresh={refreshWaitlist}
         onAction={runWaitlistAction}
+      />
+
+      <StaffPanel
+        open={staffOpen}
+        pending={state.pending}
+        board={state.board}
+        data={staffData}
+        onClose={() => setStaffOpen(false)}
+        onRefresh={refreshStaff}
+        onAction={runStaffAction}
       />
     </main>
   );
