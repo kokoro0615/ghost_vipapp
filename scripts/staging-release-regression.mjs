@@ -1186,7 +1186,9 @@ async function runRequiredLifecycle(scriptPath, expectedName, args, config) {
   );
   assert(
     result.code === 0,
-    `release_candidate_lifecycle_failed:${expectedName}:${classifyLifecycleFailure(result.stderr)}`,
+    `release_candidate_lifecycle_failed:${expectedName}:${
+      result.signal ? "signal" : `exit_${result.code}`
+    }:${classifyLifecycleFailure(result.stderr)}`,
   );
 }
 
@@ -1240,8 +1242,8 @@ async function runLifecycleScript(
     child.stderr.on("data", (chunk) => {
       stderr = `${stderr}${String(chunk)}`.slice(-4_096);
     });
-    child.on("error", () => resolve({ code: 1, stderr }));
-    child.on("close", (code) => resolve({ code: code ?? 1, stderr }));
+    child.on("error", () => resolve({ code: 1, signal: null, stderr }));
+    child.on("close", (code, signal) => resolve({ code: code ?? 1, signal, stderr }));
   });
 }
 
