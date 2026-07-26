@@ -889,7 +889,10 @@ async function runUiReservationCreateAndEdit(page, plan, businessDate) {
   await dialog.waitFor({ state: "detached" });
 
   const boardResponse = await page.request.get(
-    `/api/admin/vip-floor?date=${encodeURIComponent(businessDate)}`,
+    new URL(
+      `/api/admin/vip-floor?date=${encodeURIComponent(businessDate)}`,
+      page.url(),
+    ).href,
   );
   const boardPayload = await boardResponse.json().catch(() => ({}));
   assert(
