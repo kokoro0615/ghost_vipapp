@@ -1191,33 +1191,31 @@ async function runRequiredLifecycle(scriptPath, expectedName, args, config) {
 }
 
 async function verifyCleanRelease(config) {
-  let lastError = null;
-  for (let cleanupCycle = 0; cleanupCycle < 2; cleanupCycle += 1) {
-    for (let attempt = 0; attempt < 3; attempt += 1) {
-      try {
-        await runRequiredLifecycle(
-          config.verifyScript,
-          "verify-vip-manager-release-candidate.mjs",
-          lifecycleArgs(config, "after-cleanup", false),
-          config,
-        );
-        return;
-      } catch (error) {
-        lastError = error;
-        if (attempt < 2) await delay(3_000);
-      }
-    }
-    if (cleanupCycle === 0) {
-      await delay(5_000);
-      await runRequiredLifecycle(
-        config.cleanupScript,
-        "cleanup-vip-manager-trial.mjs",
-        lifecycleArgs(config, "cleanup", false),
-        config,
-      );
-    }
+  await delay(10_000);
+  try {
+    await runRequiredLifecycle(
+      config.verifyScript,
+      "verify-vip-manager-release-candidate.mjs",
+      lifecycleArgs(config, "after-cleanup", false),
+      config,
+    );
+    return;
+  } catch {
+    await delay(15_000);
+    await runRequiredLifecycle(
+      config.cleanupScript,
+      "cleanup-vip-manager-trial.mjs",
+      lifecycleArgs(config, "cleanup", false),
+      config,
+    );
+    await delay(10_000);
+    await runRequiredLifecycle(
+      config.verifyScript,
+      "verify-vip-manager-release-candidate.mjs",
+      lifecycleArgs(config, "after-cleanup", false),
+      config,
+    );
   }
-  throw lastError ?? new Error("release_candidate_clean_verify_failed");
 }
 
 async function runLifecycleScript(
@@ -1250,6 +1248,7 @@ async function runLifecycleScript(
 function classifyLifecycleFailure(stderr) {
   const classes = [
     ["vip_manager_metrics", "metrics"],
+    ["trial_count_failed", "read"],
     ["control", "control"],
     ["baseline", "baseline"],
     ["provider", "provider"],
