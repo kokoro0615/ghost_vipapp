@@ -14,7 +14,8 @@
     "test:pii-safety": "node scripts/check-artifact-safety.mjs",
     "smoke:production": "node scripts/prod-e2e.mjs",
     "e2e:staging:mutation": "node scripts/staging-mutation-e2e.mjs",
-    "ci": "npm run lint && npm run typecheck && npm run test && npm run build"
+    "test:a11y": "node scripts/a11y-visual.mjs",
+    "ci": "npm run lint && npm run typecheck && npm run test && npm run build && npm run test:a11y"
   },
   "engines": {
     "node": ">=24"
@@ -29,8 +30,10 @@
     "@types/node": "^24",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "axe-core": "^4.12.1",
     "eslint": "9.39.5",
     "eslint-config-next": "16.2.11",
+    "playwright-core": "^1.61.1",
     "typescript": "^5"
   },
   "overrides": {

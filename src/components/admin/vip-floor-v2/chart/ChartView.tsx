@@ -103,7 +103,7 @@ export default function ChartView({ board, reservations, selectedReservationId, 
                   {board.blocks.filter((block) => block.targets.tableIds.includes(table.id)).map((block) => (
                   <span key={block.id} className={styles.timelineBlock} style={positionStyle(block.startAt, block.endAt, board.businessDay.operatingStartAt, board.businessDay.operatingEndAt)}>ブロック</span>
                   ))}
-                  <span className={styles.nowLine} style={nowStyle} aria-label="現在時刻" />
+                  <span className={styles.nowLine} style={nowStyle} aria-hidden="true" />
                 </div>
               </div>
             );

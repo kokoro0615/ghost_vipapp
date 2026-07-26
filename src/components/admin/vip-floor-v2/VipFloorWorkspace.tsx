@@ -204,6 +204,7 @@ export default function VipFloorWorkspace() {
           <span>営業日</span>
           <input
             type="date"
+            aria-label="営業日"
             value={businessDate}
             onChange={(event) => {
               if (event.target.value) {
@@ -288,6 +289,7 @@ export default function VipFloorWorkspace() {
           <label className={styles.toolbarSelect}>
             <span>ステータス</span>
             <select
+              aria-label="予約ステータス"
               value={state.statusFilter}
               onChange={(event) => {
                 dispatch({ type: "statusFilter", status: event.target.value });

@@ -173,9 +173,9 @@ export function OperationCenter({
           >
             <Ban size={16} />受付ブロック
           </button>
-          <span aria-disabled="true">
+          <button type="button" role="tab" aria-selected="false" disabled>
             <CalendarPlus size={16} />8段階予約 <small>T-018準備中</small>
-          </span>
+          </button>
         </div>
 
         <form className={styles.commandForm} onSubmit={submit}>
