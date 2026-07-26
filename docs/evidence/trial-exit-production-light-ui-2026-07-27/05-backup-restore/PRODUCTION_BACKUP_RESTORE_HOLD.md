@@ -1,6 +1,6 @@
 # Production backup and restore Gate
 
-Status: `HOLD_BACKUP_RESTORE_NOT_REHEARSED`
+Status: `HOLD_PRODUCTION_DUMP_CREDENTIAL`
 
 Read-only Supabase Management API evidence on 2026-07-27 JST:
 
@@ -12,6 +12,27 @@ Read-only Supabase Management API evidence on 2026-07-27 JST:
 No production dump, restore or database mutation was performed by this lane.
 The prior transaction-scoped synthetic logical-restore fixture does not satisfy
 this Gate.
+
+## Portable clean rehearsal
+
+A repo-external PostgreSQL 16.14 cluster was initialized without sudo. The 20
+base migrations through `20260604090000` and the exact 24-file production
+allowlist applied successfully; Trial v16/v17 were not applied. The resulting
+clean v15 schema had active official seats 8, active unmapped seats 0, all 52
+public tables on RLS, 159 public routines and no Trial control tables.
+
+A mode-600 custom-format dump was restored into a second isolated database
+without error. The clean rehearsal artifact is
+`/tmp/ghost-pg16-portable-20260727-tYlSuT/clean-v15-rehearsal.dump`, size
+866074 bytes, SHA-256
+`c9ebc6f86598f600f7e737d347e3f2d1fae745565ddb8291ac5231dbe2c36a92`.
+It contains only clean synthetic seed data.
+
+This proves the clean migration and logical restore toolchain, not production
+recoverability. The production database password is unavailable; a
+service-role JWT cannot replace it. Credential reset, production dump,
+encrypted retention and restored production snapshot verification remain
+required before Gate B.
 
 Before Gate B approval:
 

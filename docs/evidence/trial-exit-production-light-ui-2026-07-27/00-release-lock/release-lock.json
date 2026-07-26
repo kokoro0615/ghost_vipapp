@@ -20,7 +20,7 @@
       "isolatedWorktree": "/home/kokoro/projects/clients/ghost/.worktrees/vip-manager-production-light-ui"
     },
     "website": {
-      "repository": "https://github.com/kokoro0615/ghost.git",
+      "repository": "https://github.com/kokoro0615/ghost-website.git",
       "releaseBranch": "codex/vip-manager-production-backend-20260727",
       "releaseHead": "41dd0f9956127256239d9f364978dc9fd56db331",
       "releaseTree": "a52c0970afc1cfc3bae5c1b298c831ad9689e637",

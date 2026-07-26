@@ -84,3 +84,17 @@ Owner approval. It is not automatic authorization to recreate the Trial.
 Gate A remains HOLD because active sessions were nonzero, the lifecycle
 credential was unavailable and fresh Owner approval was not obtained. No
 cleanup was executed.
+
+## Latest pre-promotion re-freeze
+
+At 2026-07-27 03:13:02 JST, all run-scoped counts were unchanged except
+`vip_manager_metrics`, which had increased from 1646 to 3100 while the Trial
+remained live. The 28-table total was therefore 3227; control rows remained
+run 1, baseline 1 and run events 0. Baseline SHA-256 remained unchanged,
+active seats remained 16 with Trial seats 8, and sent provider jobs remained
+0.
+
+Two active sessions remained. Their non-secret expiry times were 2026-07-27
+13:19:44 JST and 13:29:22 JST. The cleanup manifest must be re-frozen again
+after exact-run session retirement and maintenance alias promotion, then
+presented for a separate fresh Gate A approval.
