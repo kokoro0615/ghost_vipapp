@@ -14,6 +14,7 @@
     "test:pii-safety": "node scripts/check-artifact-safety.mjs",
     "smoke:production": "node scripts/prod-e2e.mjs",
     "e2e:staging:mutation": "node scripts/staging-mutation-e2e.mjs",
+    "e2e:staging:release": "node scripts/staging-release-regression.mjs",
     "test:a11y": "node scripts/a11y-visual.mjs",
     "test:maintenance": "node scripts/maintenance-anchor-runtime.mjs",
     "verify:backup-restore": "node scripts/verify-backup-restore-manifest.mjs",
