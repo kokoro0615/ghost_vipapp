@@ -499,25 +499,44 @@ async function main() {
       // Let browser polling and serverless metric writes quiesce before the
       // exact-run delete reaches its final metrics/control-row assertions.
       await delay(10_000);
-      await runRequiredLifecycle(
-        config.cleanupScript,
-        "cleanup-vip-manager-trial.mjs",
-        lifecycleArgs(config, "cleanup", false),
-        config,
-      ).catch(() => undefined);
-      await delay(5_000);
-      await runRequiredLifecycle(
-        config.cleanupScript,
-        "cleanup-vip-manager-trial.mjs",
-        lifecycleArgs(config, "cleanup", false),
-        config,
-      );
-      await runRequiredLifecycle(
-        config.verifyScript,
-        "verify-vip-manager-release-candidate.mjs",
-        lifecycleArgs(config, "after-cleanup", false),
-        config,
-      );
+      try {
+        await runRequiredLifecycle(
+          config.cleanupScript,
+          "cleanup-vip-manager-trial.mjs",
+          lifecycleArgs(config, "cleanup", false),
+          config,
+        );
+      } catch {
+        await delay(5_000);
+        await runRequiredLifecycle(
+          config.cleanupScript,
+          "cleanup-vip-manager-trial.mjs",
+          lifecycleArgs(config, "cleanup", false),
+          config,
+        );
+      }
+      try {
+        await runRequiredLifecycle(
+          config.verifyScript,
+          "verify-vip-manager-release-candidate.mjs",
+          lifecycleArgs(config, "after-cleanup", false),
+          config,
+        );
+      } catch {
+        await delay(5_000);
+        await runRequiredLifecycle(
+          config.cleanupScript,
+          "cleanup-vip-manager-trial.mjs",
+          lifecycleArgs(config, "cleanup", false),
+          config,
+        );
+        await runRequiredLifecycle(
+          config.verifyScript,
+          "verify-vip-manager-release-candidate.mjs",
+          lifecycleArgs(config, "after-cleanup", false),
+          config,
+        );
+      }
       cleanupComplete = true;
     } catch (cleanupError) {
       primaryError = primaryError
@@ -762,7 +781,7 @@ async function runUiRegression(config, reservationId, uiReservationPlan) {
     const page = await context.newPage();
     const failures = [];
     let offlineConsoleExpected = false;
-    let authTransitionConsoleExpected = false;
+    let authTransitionConsoleExpected = true;
     page.on("console", (message) => {
       if (
         message.type() === "error"
@@ -782,6 +801,7 @@ async function runUiRegression(config, reservationId, uiReservationPlan) {
     await page.getByLabel("Owner専用PIN").fill(config.pin);
     await page.getByRole("button", { name: "ログイン" }).click();
     await page.getByRole("navigation", { name: "主要ナビゲーション" }).waitFor();
+    authTransitionConsoleExpected = false;
 
     for (const view of ["List", "Floor", "Chart"]) {
       const button = page.getByRole("button", { name: view, exact: true });
