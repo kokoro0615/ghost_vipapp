@@ -1188,7 +1188,7 @@ async function runRequiredLifecycle(scriptPath, expectedName, args, config) {
     result.code === 0,
     `release_candidate_lifecycle_failed:${expectedName}:${
       result.signal ? "signal" : `exit_${result.code}`
-    }:${classifyLifecycleFailure(result.stderr)}`,
+    }:${classifyLifecycleFailure(result.stderr)}:${safeLifecycleFailure(result.stderr)}`,
   );
 }
 
@@ -1257,6 +1257,11 @@ function classifyLifecycleFailure(stderr) {
     ["official", "official"],
   ];
   return classes.find(([needle]) => stderr.includes(needle))?.[1] ?? "unknown";
+}
+
+function safeLifecycleFailure(stderr) {
+  const lastLine = stderr.trim().split(/\r?\n/u).at(-1) ?? "no_stderr";
+  return lastLine.replace(/[^A-Za-z0-9_:,-]/gu, "_").slice(0, 160);
 }
 
 async function assertWebsiteScript(
