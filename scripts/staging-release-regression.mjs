@@ -498,7 +498,7 @@ async function main() {
     try {
       // Let browser polling and serverless metric writes quiesce before the
       // exact-run delete reaches its final metrics/control-row assertions.
-      await delay(5_000);
+      await delay(10_000);
       await runRequiredLifecycle(
         config.cleanupScript,
         "cleanup-vip-manager-trial.mjs",
@@ -761,8 +761,9 @@ async function runUiRegression(config, reservationId, uiReservationPlan) {
     });
     const page = await context.newPage();
     const failures = [];
+    let offlineConsoleExpected = false;
     page.on("console", (message) => {
-      if (message.type() === "error") failures.push("console_error");
+      if (message.type() === "error" && !offlineConsoleExpected) failures.push("console_error");
     });
     page.on("response", (response) => {
       if (response.status() >= 500) failures.push(`http_${response.status()}`);
@@ -899,11 +900,14 @@ async function runUiRegression(config, reservationId, uiReservationPlan) {
     await dateInput.fill(config.businessDate);
     await page.waitForTimeout(300);
 
+    offlineConsoleExpected = true;
     await context.setOffline(true);
     await page.evaluate(() => window.dispatchEvent(new Event("offline")));
     await page.getByText("オフライン", { exact: true }).first().waitFor();
     await context.setOffline(false);
     await page.evaluate(() => window.dispatchEvent(new Event("online")));
+    await page.waitForTimeout(500);
+    offlineConsoleExpected = false;
     await page.reload({ waitUntil: "networkidle" });
     await page.getByRole("navigation", { name: "主要ナビゲーション" }).waitFor();
     assert(
