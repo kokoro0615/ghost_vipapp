@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
 import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
@@ -16,7 +16,7 @@ import {
 const CONFIRMATION = "E2E削除可";
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/u;
 const FINGERPRINT_PATTERN = /^[a-f0-9]{64}$/u;
-const RUN_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$/u;
+const RUN_ID_PATTERN = /^trial-[a-z0-9][a-z0-9-]{7,80}$/u;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 
 function normalizeMode(mode) {
@@ -29,6 +29,13 @@ async function readMode600File(filePath, code) {
   assert(fileStat.isFile(), `${code}_not_file`);
   assert(normalizeMode(fileStat.mode) === 0o600, `${code}_must_be_mode_600`);
   return readFile(filePath, "utf8");
+}
+
+async function assertMode600File(filePath, code) {
+  assert(typeof filePath === "string" && path.isAbsolute(filePath), `${code}_path_invalid`);
+  const fileStat = await stat(filePath);
+  assert(fileStat.isFile(), `${code}_not_file`);
+  assert(normalizeMode(fileStat.mode) === 0o600, `${code}_must_be_mode_600`);
 }
 
 function parseEnvFile(source) {
@@ -71,6 +78,8 @@ function assertManifestHost(manifest, key, allowInsecureLocalhost) {
   const origin = parseOrigin(value.origin, key, allowInsecureLocalhost);
   assert(typeof value.host === "string" && value.host === origin.hostname, `trial_manifest_${key}_host_mismatch`);
   assert(FINGERPRINT_PATTERN.test(value.fingerprint ?? ""), `trial_manifest_${key}_fingerprint_invalid`);
+  const expectedFingerprint = createHash("sha256").update(origin.origin).digest("hex");
+  assert(constantTimeEqual(value.fingerprint, expectedFingerprint), `trial_manifest_${key}_fingerprint_mismatch`);
   return origin;
 }
 
@@ -102,13 +111,16 @@ function isWebsiteScript(scriptPath, expectedName, allowTestScript) {
     && path.basename(path.dirname(parsed.dir)) === "website";
 }
 
-function runLifecycleScript(scriptPath, expectedName, args, allowTestScript) {
+function runLifecycleScript(scriptPath, expectedName, args, lifecycleEnvFile, allowTestScript) {
   assert(typeof scriptPath === "string" && path.isAbsolute(scriptPath), "lifecycle_script_path_invalid");
   assert(isWebsiteScript(scriptPath, expectedName, allowTestScript), "lifecycle_script_path_rejected");
   return new Promise((resolve) => {
     const child = spawn(process.execPath, [scriptPath, ...args], {
       stdio: ["ignore", "pipe", "pipe"],
-      env: { PATH: process.env.PATH ?? "" },
+      env: {
+        PATH: process.env.PATH ?? "",
+        GHOST_VIP_MANAGER_LIFECYCLE_ENV_FILE: lifecycleEnvFile,
+      },
     });
     // Never forward lifecycle script output: it can contain operational details.
     child.stdout.resume();
@@ -149,8 +161,10 @@ async function loadConfiguration() {
     && vipOrigin.hostname === "localhost";
   const cleanupScript = readRequired(manifest, "cleanupScript");
   const verifyScript = readRequired(manifest, "verifyScript");
+  const lifecycleEnvFile = readRequired(manifest, "websiteLifecycleEnvFile");
   assert(isWebsiteScript(cleanupScript, "cleanup-vip-manager-trial.mjs", allowTestScript), "cleanup_script_path_rejected");
   assert(isWebsiteScript(verifyScript, "verify-vip-manager-trial.mjs", allowTestScript), "verify_script_path_rejected");
+  await assertMode600File(lifecycleEnvFile, "website_lifecycle_env_file");
 
   return {
     origin: vipOrigin,
@@ -159,10 +173,12 @@ async function loadConfiguration() {
     reservationId,
     cleanupScript,
     verifyScript,
+    lifecycleEnvFile,
     allowTestScript,
     basicUser: readRequired(env, "VIPAPP_BASIC_USER"),
     basicPassword: readRequired(env, "VIPAPP_BASIC_PASSWORD"),
     pin: readRequired(env, "VIPAPP_OWNER_PIN"),
+    protectionBypass: readRequired(env, "GHOST_VIPAPP_PROTECTION_BYPASS"),
   };
 }
 
@@ -181,6 +197,7 @@ async function main() {
     origin: config.origin,
     basicUser: config.basicUser,
     basicPassword: config.basicPassword,
+    defaultHeaders: { "x-vercel-protection-bypass": config.protectionBypass },
     rules: [
       { method: "POST", path: "/api/admin/session/pin" },
       { method: "GET", path: "/api/admin/session" },
@@ -189,7 +206,6 @@ async function main() {
       { method: "POST", path: "/api/admin/vip-floor/commands" },
     ],
   });
-  let mutationAttempted = false;
   let loggedIn = false;
   let cleanupComplete = false;
   let primaryError = null;
@@ -211,7 +227,6 @@ async function main() {
     const beforeVersion = readPositiveInteger(beforeReservation.version, "trial_reservation_version_missing");
     const beforeRevision = readPositiveInteger(beforeBoard.payload?.boardRevision, "board_revision_missing");
 
-    mutationAttempted = true;
     const command = await client.requestJson("/api/admin/vip-floor/commands", {
       method: "POST",
       json: {
@@ -240,6 +255,7 @@ async function main() {
       config.verifyScript,
       "verify-vip-manager-trial.mjs",
       lifecycleArgs(config, "before-cleanup"),
+      config.lifecycleEnvFile,
       config.allowTestScript,
     );
     assert(verifyBefore.code === 0, "trial_verify_before_cleanup_failed");
@@ -247,12 +263,13 @@ async function main() {
   } catch (error) {
     primaryError = error;
   } finally {
-    if (mutationAttempted) {
+    if (config) {
       try {
         const cleanup = await runLifecycleScript(
           config.cleanupScript,
           "cleanup-vip-manager-trial.mjs",
           lifecycleArgs(config, "cleanup"),
+          config.lifecycleEnvFile,
           config.allowTestScript,
         );
         assert(cleanup.code === 0, "trial_cleanup_failed");
@@ -260,6 +277,7 @@ async function main() {
           config.verifyScript,
           "verify-vip-manager-trial.mjs",
           lifecycleArgs(config, "after-cleanup"),
+          config.lifecycleEnvFile,
           config.allowTestScript,
         );
         assert(verifyAfter.code === 0, "trial_cleanup_verify_failed");

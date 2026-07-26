@@ -112,12 +112,14 @@ export class SafeHttpClient {
     basicUser,
     basicPassword,
     rules,
+    defaultHeaders,
     fetchImpl = fetch,
   }) {
     this.origin = new URL(origin);
     this.basicUser = basicUser;
     this.basicPassword = basicPassword;
     this.rules = rules;
+    this.defaultHeaders = new Headers(defaultHeaders);
     this.fetchImpl = fetchImpl;
     this.jar = new CookieJar();
     this.ledger = [];
@@ -142,7 +144,8 @@ export class SafeHttpClient {
     const normalizedMethod = method.toUpperCase();
     this.#assertAllowed(normalizedMethod, url.pathname);
 
-    const headers = new Headers(inputHeaders);
+    const headers = new Headers(this.defaultHeaders);
+    for (const [key, value] of new Headers(inputHeaders).entries()) headers.set(key, value);
     if (basic) {
       assert(this.basicUser && this.basicPassword, "basic_auth_missing");
       headers.set(
