@@ -802,13 +802,24 @@ async function runUiRegression(config, reservationId, uiReservationPlan) {
       "all",
     ]) {
       await statusFilter.selectOption(value);
+      await page.waitForTimeout(250);
       await assertEventually(
-        async () => await statusFilter.inputValue() === value,
+        async () => {
+          const routeFilter = new URL(page.url()).searchParams.get("filter");
+          return await statusFilter.inputValue() === value
+            && routeFilter === (value === "all" ? null : value);
+        },
         `ui_status_filter_failed:${value}`,
       );
     }
     await search.fill(uiReservationPublicCode);
-    const queueItem = page.getByLabel("例外と到着queue")
+    const queue = page.getByLabel("例外と到着queue");
+    const openQueue = queue.getByRole("button", { name: "例外queueを開く" });
+    if (await openQueue.count()) {
+      await openQueue.click();
+      await queue.getByRole("button", { name: "例外queueを閉じる" }).waitFor();
+    }
+    const queueItem = queue
       .getByRole("button")
       .filter({ hasText: uiReservationPublicCode });
     await queueItem.waitFor();
