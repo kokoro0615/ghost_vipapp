@@ -505,6 +505,13 @@ async function main() {
         lifecycleArgs(config, "cleanup", false),
         config,
       );
+      await delay(5_000);
+      await runRequiredLifecycle(
+        config.cleanupScript,
+        "cleanup-vip-manager-trial.mjs",
+        lifecycleArgs(config, "cleanup", false),
+        config,
+      );
       await runRequiredLifecycle(
         config.verifyScript,
         "verify-vip-manager-release-candidate.mjs",
@@ -814,10 +821,12 @@ async function runUiRegression(config, reservationId, uiReservationPlan) {
     }
     await search.fill(uiReservationPublicCode);
     const queue = page.getByLabel("例外と到着queue");
-    const openQueue = queue.getByRole("button", { name: "例外queueを開く" });
-    if (await openQueue.count()) {
-      await openQueue.click();
-      await queue.getByRole("button", { name: "例外queueを閉じる" }).waitFor();
+    if (await queue.getAttribute("data-collapsed") !== null) {
+      await page.getByRole("button", { name: "キューパネルを切替" }).click();
+      await assertEventually(
+        async () => await queue.getAttribute("data-collapsed") === null,
+        "ui_queue_open_failed",
+      );
     }
     await statusFilter.selectOption("expected");
     await page.waitForTimeout(250);
