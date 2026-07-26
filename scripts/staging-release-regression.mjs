@@ -515,28 +515,7 @@ async function main() {
           config,
         );
       }
-      try {
-        await runRequiredLifecycle(
-          config.verifyScript,
-          "verify-vip-manager-release-candidate.mjs",
-          lifecycleArgs(config, "after-cleanup", false),
-          config,
-        );
-      } catch {
-        await delay(5_000);
-        await runRequiredLifecycle(
-          config.cleanupScript,
-          "cleanup-vip-manager-trial.mjs",
-          lifecycleArgs(config, "cleanup", false),
-          config,
-        );
-        await runRequiredLifecycle(
-          config.verifyScript,
-          "verify-vip-manager-release-candidate.mjs",
-          lifecycleArgs(config, "after-cleanup", false),
-          config,
-        );
-      }
+      await verifyCleanRelease(config);
       cleanupComplete = true;
     } catch (cleanupError) {
       primaryError = primaryError
@@ -1209,6 +1188,36 @@ async function runRequiredLifecycle(scriptPath, expectedName, args, config) {
     result.code === 0,
     `release_candidate_lifecycle_failed:${expectedName}:${classifyLifecycleFailure(result.stderr)}`,
   );
+}
+
+async function verifyCleanRelease(config) {
+  let lastError = null;
+  for (let cleanupCycle = 0; cleanupCycle < 2; cleanupCycle += 1) {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        await runRequiredLifecycle(
+          config.verifyScript,
+          "verify-vip-manager-release-candidate.mjs",
+          lifecycleArgs(config, "after-cleanup", false),
+          config,
+        );
+        return;
+      } catch (error) {
+        lastError = error;
+        if (attempt < 2) await delay(3_000);
+      }
+    }
+    if (cleanupCycle === 0) {
+      await delay(5_000);
+      await runRequiredLifecycle(
+        config.cleanupScript,
+        "cleanup-vip-manager-trial.mjs",
+        lifecycleArgs(config, "cleanup", false),
+        config,
+      );
+    }
+  }
+  throw lastError ?? new Error("release_candidate_clean_verify_failed");
 }
 
 async function runLifecycleScript(
