@@ -400,6 +400,39 @@
 .staffAssignmentGrid > label > span { display: flex; flex-direction: column; }
 .staffAssignmentGrid small { color: var(--muted); font-size: 9px; }
 .staffAssignmentGrid select { min-height: 44px; border: 1px solid var(--line); background: var(--lacquer-0); color: var(--ivory); padding: 0 8px; }
+.reservationWizard { display: flex; min-height: 0; flex: 1; flex-direction: column; overflow: hidden; background: var(--lacquer-1); }
+.wizardRail { display: grid; margin: 0; padding: 0; grid-template-columns: repeat(8, minmax(0, 1fr)); border-bottom: 1px solid var(--line); background: var(--lacquer-0); list-style: none; }
+.wizardRail li { display: flex; min-width: 0; min-height: 42px; align-items: center; justify-content: center; gap: 4px; border-right: 1px solid var(--line-soft); color: var(--muted); }
+.wizardRail li > span { display: grid; width: 20px; height: 20px; place-items: center; border: 1px solid var(--line); border-radius: 50%; font-family: var(--font-operator); font-size: 9px; }
+.wizardRail li small { font-size: 8px; }
+.wizardRail li[data-current] { background: var(--accent-tint); color: var(--metal-strong); box-shadow: inset 0 -2px var(--metal); }
+.wizardRail li[data-complete] > span { border-color: var(--success); color: var(--success); }
+.wizardBody { min-height: 0; flex: 1; overflow: auto; padding: 14px; }
+.wizardBody fieldset { display: grid; gap: 10px; min-width: 0; margin: 0; padding: 0; border: 0; }
+.wizardBody legend { margin-bottom: 8px; color: var(--metal-strong); font-family: var(--font-operator); font-size: 16px; }
+.wizardBody label { display: grid; gap: 5px; color: var(--muted); font-size: 10px; }
+.wizardBody input:not([type="checkbox"]):not([type="radio"]),
+.wizardBody select,
+.wizardBody textarea { min-height: 44px; border: 1px solid var(--line); background: var(--lacquer-0); color: var(--ivory); padding: 0 9px; }
+.wizardBody textarea { min-height: 84px; padding-block: 8px; resize: vertical; }
+.wizardStatement { display: grid; min-height: 250px; place-content: center; text-align: center; }
+.wizardStatement span,
+.wizardConfirm header span { color: var(--metal); font-size: 9px; letter-spacing: 0.14em; }
+.wizardStatement strong { color: var(--ivory); font-family: var(--font-operator); font-size: clamp(30px, 5vw, 54px); }
+.wizardStatement p,
+.wizardHint { color: var(--muted); font-size: 10px; }
+.wizardWarning { color: var(--danger); font-size: 10px; font-weight: 700; }
+.wizardConfirm { display: grid; gap: 12px; }
+.wizardConfirm > header { display: flex; align-items: center; gap: 9px; color: var(--metal); }
+.wizardConfirm > header div { display: flex; flex-direction: column; }
+.wizardConfirm > header strong { color: var(--ivory); font-family: var(--font-operator); font-size: 17px; }
+.wizardConfirm dl { margin: 0; border-top: 1px solid var(--line); }
+.wizardConfirm dl div { display: grid; min-height: 40px; grid-template-columns: 38% 1fr; align-items: center; border-bottom: 1px solid var(--line-soft); }
+.wizardConfirm dt { color: var(--muted); }
+.wizardConfirm dd { margin: 0; text-align: right; }
+.choiceRow { display: flex !important; min-height: 44px; grid-auto-flow: column; align-items: center; justify-content: start; gap: 8px; padding: 0 9px; border: 1px solid var(--line); background: var(--lacquer-0); color: var(--ivory) !important; }
+.wizardFooter { display: grid; min-height: 58px; grid-template-columns: minmax(110px, auto) 1fr minmax(110px, auto); align-items: center; gap: 8px; padding: 7px 10px; border-top: 1px solid var(--line); background: var(--lacquer-0); }
+.wizardFooter > span { color: var(--muted); font-size: 10px; text-align: center; }
 .waitlistBody { min-height: 0; overflow-y: auto; padding: 10px; }
 .waitlistRow { margin-bottom: 8px; border: 1px solid var(--line); border-left: 3px solid var(--metal); background: var(--lacquer-0); }
 .waitlistRow[data-status="called"] { border-left-color: var(--warning); }
@@ -476,6 +509,8 @@
   color: var(--muted);
 }
 .bottomNav button:last-child { border-right: 0; }
+.bottomNav button:first-child { color: var(--accent-press); }
+.bottomNav button:first-child small { color: #cfc2cf; }
 .bottomNav button[data-active] { background: var(--accent-tint); color: var(--accent-press); box-shadow: inset 0 2px var(--accent); }
 .bottomNav button span { font-weight: 800; letter-spacing: 0.02em; }
 .bottomNav button small { grid-column: 1 / -1; color: var(--text-tertiary); font-size: 9px; }
@@ -622,6 +657,15 @@
   .commandForm input, .commandForm select, .commandForm textarea { min-height: 44px; font-size: 16px; }
   .commandFooter { bottom: -10px; margin: 12px -10px -10px; }
   .commandFooter button { min-height: 44px; }
+  .wizardRail li { min-height: 48px; flex-direction: column; gap: 1px; }
+  .wizardRail li small { font-size: 7px; }
+  .wizardBody { padding: 10px; }
+  .wizardFooter { grid-template-columns: 92px 1fr 112px; padding-inline: 6px; }
+  .wizardFooter button { min-width: 0; padding-inline: 6px; font-size: 10px; }
+  .staffAssignmentGrid > label { grid-template-columns: 72px minmax(120px, 1fr); }
+  .staffAssignmentGrid > label > small { grid-column: 1 / -1; }
+  .blockLedger > div { grid-template-columns: 70px minmax(70px, 1fr) 48px 48px; }
+  .blockLedger > div > small { display: none; }
 }
 
 @media (max-width: 359px) {

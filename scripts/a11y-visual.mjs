@@ -75,6 +75,10 @@ async function main() {
       await page.getByRole("dialog", { name: "新規オペレーション" }).waitFor();
       results.push(await auditPage(page, `${viewport.width}x${viewport.height}:operations`));
 
+      await page.getByRole("tab", { name: /8段階予約/u }).click();
+      await page.getByLabel(/予約作成 1\/8/u).waitFor();
+      results.push(await auditPage(page, `${viewport.width}x${viewport.height}:reservation-create`));
+
       await page.goto(`${origin}/?view=floor&date=2026-07-26`, {
         waitUntil: "domcontentloaded",
       });

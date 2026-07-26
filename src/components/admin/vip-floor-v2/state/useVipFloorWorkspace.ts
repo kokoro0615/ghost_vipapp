@@ -519,6 +519,7 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
 
       const labels: Record<OperationDraft["kind"], string> = {
         walk_in: "Walk-inを登録しました",
+        reservation_create: "予約を作成しました",
         block_create: "受付ブロックを保存しました",
         block_update: "受付ブロックを更新しました",
         block_cancel: "受付ブロックを解除しました",

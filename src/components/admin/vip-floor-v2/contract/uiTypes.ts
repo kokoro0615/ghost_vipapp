@@ -106,11 +106,36 @@ export type BlockCancelDraft = {
   };
 };
 
+export type ReservationCreateDraft = {
+  kind: "reservation_create";
+  payload: {
+    eventDayId: string;
+    offeringId: string;
+    scheduledStartAt: string;
+    scheduledEndAt: string;
+    guestCount: number;
+    tableIds: string[];
+    expectedTableVersions: Array<{ tableId: string; expectedVersion: number }>;
+    existingCustomerId: string | null;
+    displayName: string | null;
+    phone: string | null;
+    email: string | null;
+    languageCode: string | null;
+    guestLabel: string | null;
+    operatorNote: string | null;
+    sourceChannel: "admin_hold" | "online";
+    serviceStatus: VipServiceStatus;
+    bookingStaffMemberId: string | null;
+    notificationPreference: "none" | "email";
+  };
+};
+
 export type OperationDraft =
   | WalkInDraft
   | BlockCreateDraft
   | BlockUpdateDraft
-  | BlockCancelDraft;
+  | BlockCancelDraft
+  | ReservationCreateDraft;
 
 export type WaitlistStatus = "waiting" | "called" | "expired" | "seated" | "cancelled";
 

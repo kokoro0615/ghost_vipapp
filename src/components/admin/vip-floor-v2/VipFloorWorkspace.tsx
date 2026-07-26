@@ -556,6 +556,7 @@ export default function VipFloorWorkspace() {
         board={state.board}
         options={operationOptions}
         selectedTableId={state.selectedTableId}
+        staffData={staffData}
         onClose={() => {
           setOperationOpen(false);
           setOperationOptions(null);

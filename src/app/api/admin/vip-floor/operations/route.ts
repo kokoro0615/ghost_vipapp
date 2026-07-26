@@ -15,7 +15,7 @@ const BUSINESS_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/u;
 const FIXED_REASON = "管理画面操作";
 
 type OperationBody = {
-  kind?: "walk_in" | "block_create" | "block_update" | "block_cancel";
+  kind?: "walk_in" | "block_create" | "block_update" | "block_cancel" | "reservation_create";
   payload?: Record<string, unknown>;
 };
 
@@ -64,6 +64,64 @@ export async function POST(request: Request) {
       idempotencyKey,
       token,
     );
+  }
+
+  if (body.kind === "reservation_create") {
+    const payload = parseReservationCreate(body.payload);
+    if (!payload.ok) {
+      return NextResponse.json({ ok: false, error: payload.error }, { status: 400 });
+    }
+    const createResponse = await ghostAdminFetch(
+      "/api/admin/v2/reservations",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "idempotency-key": idempotencyKey,
+        },
+        body: JSON.stringify({ ...payload.value, reason: FIXED_REASON }),
+      },
+      token,
+    );
+    const createResult = await copyJson(createResponse) as Record<string, unknown>;
+    if (!createResponse.ok) {
+      return NextResponse.json(createResult, { status: createResponse.status });
+    }
+    if (payload.value.notificationPreference !== "email") {
+      return NextResponse.json({ ...createResult, notification: { requested: false } });
+    }
+    const reservationId = readUuid(createResult.reservationId);
+    const entityVersion = readInteger(createResult.entityVersion, 1, Number.MAX_SAFE_INTEGER);
+    if (!reservationId || entityVersion === null) {
+      return NextResponse.json({
+        ...createResult,
+        notification: { requested: true, queued: false, error: "create_result_missing_identity" },
+      });
+    }
+    const notificationResponse = await ghostAdminFetch(
+      `/api/admin/v2/reservations/${encodeURIComponent(reservationId)}/notifications/email`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "idempotency-key": `${idempotencyKey}:email`,
+        },
+        body: JSON.stringify({
+          expectedVersion: entityVersion,
+          template: "reservation_created",
+          reason: FIXED_REASON,
+        }),
+      },
+      token,
+    );
+    return NextResponse.json({
+      ...createResult,
+      notification: {
+        requested: true,
+        queued: notificationResponse.ok,
+        status: notificationResponse.status,
+      },
+    });
   }
 
   if (body.kind === "block_create") {
@@ -183,6 +241,96 @@ function parseWalkIn(payload: Record<string, unknown>) {
       reason: FIXED_REASON,
     },
   };
+}
+
+function parseReservationCreate(payload: Record<string, unknown>) {
+  const eventDayId = readUuid(payload.eventDayId);
+  const offeringId = readUuid(payload.offeringId);
+  const scheduledStartAt = readIso(payload.scheduledStartAt);
+  const scheduledEndAt = readIso(payload.scheduledEndAt);
+  const guestCount = readInteger(payload.guestCount, 1, 99);
+  const tableIds = readUuidArray(payload.tableIds, 1, 8);
+  const versions = readTableVersions(payload.expectedTableVersions, tableIds);
+  const displayName = readNullableString(payload.displayName, 120);
+  const phone = readNullableString(payload.phone, 40);
+  const email = readNullableString(payload.email, 254);
+  const languageCode = readNullableString(payload.languageCode, 16);
+  const guestLabel = readNullableString(payload.guestLabel, 80);
+  const operatorNote = readNullableString(payload.operatorNote, 500);
+  const sourceChannel = payload.sourceChannel === "admin_hold" || payload.sourceChannel === "online"
+    ? payload.sourceChannel
+    : null;
+  const serviceStatuses = [
+    "expected", "late", "no_contact", "arrived", "partial_arrival", "seated",
+    "bottle_pending", "bottle_served", "bill_requested", "paid", "resetting",
+    "completed", "no_show",
+  ];
+  const serviceStatus = serviceStatuses.includes(String(payload.serviceStatus))
+    ? String(payload.serviceStatus)
+    : null;
+  const bookingStaffMemberId = payload.bookingStaffMemberId === null
+    ? null
+    : readUuid(payload.bookingStaffMemberId);
+  const notificationPreference = payload.notificationPreference === "none"
+    || payload.notificationPreference === "email"
+    ? payload.notificationPreference
+    : null;
+  if (
+    !eventDayId || !offeringId || !scheduledStartAt || !scheduledEndAt
+    || Date.parse(scheduledStartAt) >= Date.parse(scheduledEndAt)
+    || guestCount === null || !tableIds || !versions
+    || displayName === undefined || phone === undefined || email === undefined
+    || languageCode === undefined || guestLabel === undefined || operatorNote === undefined
+    || !sourceChannel || !serviceStatus || !notificationPreference
+    || (payload.bookingStaffMemberId !== null && !bookingStaffMemberId)
+    || (email !== null && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/u.test(email))
+    || (notificationPreference === "email" && email === null)
+  ) {
+    return { ok: false as const, error: "invalid_reservation_create" };
+  }
+  return {
+    ok: true as const,
+    value: {
+      eventDayId,
+      offeringId,
+      scheduledStartAt,
+      scheduledEndAt,
+      guestCount,
+      tableIds,
+      expectedTableVersions: versions,
+      existingCustomerId: null,
+      displayName,
+      phone,
+      email,
+      languageCode,
+      guestLabel,
+      operatorNote,
+      sourceChannel,
+      serviceStatus,
+      bookingStaffMemberId,
+      notificationPreference,
+      capacityOverride: false,
+    },
+  };
+}
+
+function readTableVersions(value: unknown, tableIds: string[] | null) {
+  if (!tableIds || !Array.isArray(value) || value.length !== tableIds.length) return null;
+  const versions = value.map((item) => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) return null;
+    const entry = item as Record<string, unknown>;
+    const tableId = readUuid(entry.tableId);
+    const expectedVersion = readInteger(entry.expectedVersion, 1, Number.MAX_SAFE_INTEGER);
+    return tableId && expectedVersion !== null ? { tableId, expectedVersion } : null;
+  });
+  if (
+    versions.some((item) => item === null)
+    || new Set(versions.map((item) => item?.tableId)).size !== tableIds.length
+    || versions.some((item) => !tableIds.includes(item?.tableId ?? ""))
+  ) {
+    return null;
+  }
+  return versions as Array<{ tableId: string; expectedVersion: number }>;
 }
 
 function parseBlock(payload: Record<string, unknown>) {

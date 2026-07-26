@@ -14,10 +14,12 @@ import type { VipFloorBoardV2 } from "@/lib/vipFloorV2Contract";
 import type {
   OperationDraft,
   OperationOptions,
+  StaffWorkspaceData,
 } from "../contract/uiTypes";
+import { ReservationWizard } from "./ReservationWizard";
 import styles from "../VipFloorWorkspace.module.css";
 
-type OperationKind = "walk_in" | "block_create";
+type OperationKind = "walk_in" | "block_create" | "reservation_create";
 
 type Props = {
   open: boolean;
@@ -25,6 +27,7 @@ type Props = {
   board: VipFloorBoardV2;
   options: OperationOptions | null;
   selectedTableId: string | null;
+  staffData: StaffWorkspaceData | null;
   onClose: () => void;
   onRun: (draft: OperationDraft) => Promise<boolean>;
 };
@@ -35,6 +38,7 @@ export function OperationCenter({
   board,
   options,
   selectedTableId,
+  staffData,
   onClose,
   onRun,
 }: Props) {
@@ -194,16 +198,33 @@ export function OperationCenter({
           >
             <Ban size={16} />受付ブロック
           </button>
-          <button type="button" role="tab" aria-selected="false" disabled>
-            <CalendarPlus size={16} />8段階予約 <small>T-018準備中</small>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={kind === "reservation_create"}
+            data-active={kind === "reservation_create" || undefined}
+            onClick={() => setKind("reservation_create")}
+          >
+            <CalendarPlus size={16} />8段階予約
           </button>
         </div>
 
-        <form
-          key={`${kind}:${editingBlockId ?? "new"}`}
-          className={styles.commandForm}
-          onSubmit={submit}
-        >
+        {kind === "reservation_create" && options ? (
+          <ReservationWizard
+            board={board}
+            options={options}
+            staffData={staffData}
+            selectedTableId={selectedTableId}
+            pending={pending}
+            onRun={onRun}
+            onDone={onClose}
+          />
+        ) : (
+          <form
+            key={`${kind}:${editingBlockId ?? "new"}`}
+            className={styles.commandForm}
+            onSubmit={submit}
+          >
           <div className={styles.commandContext}>
             <strong>{kind === "walk_in" ? "即時来店" : "販売・運用停止"}</strong>
             <span>{board.businessDay.businessDate} / 22:00–05:00</span>
@@ -361,7 +382,8 @@ export function OperationCenter({
                   : "競合確認して保存"}
             </button>
           </footer>
-        </form>
+          </form>
+        )}
 
         {kind === "block_create" && board.blocks.length > 0 ? (
           <section className={styles.blockLedger} aria-label="有効ブロック">
