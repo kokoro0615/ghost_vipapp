@@ -777,7 +777,11 @@ async function runUiRegression(config, reservationId, uiReservationPlan) {
       );
     }
 
-    await runUiReservationCreateAndEdit(page, uiReservationPlan);
+    const uiReservationPublicCode = await runUiReservationCreateAndEdit(
+      page,
+      uiReservationPlan,
+      config.businessDate,
+    );
 
     await page.getByRole("button", { name: "メニュー", exact: true }).click();
     await page.getByText("Owner session", { exact: true }).waitFor();
@@ -786,7 +790,7 @@ async function runUiRegression(config, reservationId, uiReservationPlan) {
     await page.getByRole("button", { name: "List", exact: true }).click();
     const search = page.getByRole("toolbar", { name: "表示と絞り込み" })
       .getByPlaceholder("番号 / ゲスト / 席");
-    await search.fill("RC UI Guest Edited");
+    await search.fill(uiReservationPublicCode);
     const statusFilter = page.getByLabel("予約ステータス");
     for (const value of [
       "attention",
@@ -801,7 +805,7 @@ async function runUiRegression(config, reservationId, uiReservationPlan) {
       assert(await statusFilter.inputValue() === value, `ui_status_filter_failed:${value}`);
     }
     await page.getByLabel("例外と到着queue")
-      .getByText("RC UI Guest Edited", { exact: true })
+      .getByText(uiReservationPublicCode, { exact: true })
       .click();
     await page.locator('aside[aria-label="予約インスペクター"]:visible').waitFor();
     await search.fill("");
@@ -849,7 +853,7 @@ async function runUiRegression(config, reservationId, uiReservationPlan) {
   }
 }
 
-async function runUiReservationCreateAndEdit(page, plan) {
+async function runUiReservationCreateAndEdit(page, plan, businessDate) {
   await page.getByRole("button", { name: /^新規オペレーション/u }).click();
   const dialog = page.getByRole("dialog", { name: "新規オペレーション" });
   await dialog.getByRole("tab", { name: "8段階予約" }).click();
@@ -874,8 +878,32 @@ async function runUiReservationCreateAndEdit(page, plan) {
   await wizard.getByRole("button", { name: "次へ" }).click();
   const createResponsePromise = waitForUiOperationResponse(page);
   await wizard.getByRole("button", { name: "競合確認して作成" }).click();
-  await assertUiOperationSucceeded(createResponsePromise, "ui_reservation_create");
+  const createPayload = await assertUiOperationSucceeded(
+    createResponsePromise,
+    "ui_reservation_create",
+  );
+  const uiReservationId = requireUuid(
+    createPayload.reservationId,
+    "ui_created_reservation_id_missing",
+  );
   await dialog.waitFor({ state: "detached" });
+
+  const boardResponse = await page.request.get(
+    `/api/admin/vip-floor?date=${encodeURIComponent(businessDate)}`,
+  );
+  const boardPayload = await boardResponse.json().catch(() => ({}));
+  assert(
+    boardResponse.ok() && boardPayload?.ok === true,
+    `ui_created_board_read_failed:${boardResponse.status()}`,
+  );
+  const uiReservation = findReservation(boardPayload, uiReservationId);
+  const uiReservationPublicCode = uiReservation.publicCode;
+  assert(
+    typeof uiReservationPublicCode === "string"
+      && uiReservationPublicCode.length > 0
+      && !uiReservationPublicCode.includes(uiReservationId),
+    "ui_created_public_code_missing",
+  );
 
   const listButton = page.getByRole("button", { name: "List", exact: true });
   await listButton.click();
@@ -885,8 +913,11 @@ async function runUiReservationCreateAndEdit(page, plan) {
   );
   const search = page.getByRole("toolbar", { name: "表示と絞り込み" })
     .getByPlaceholder("番号 / ゲスト / 席");
-  await search.fill("RC UI Guest");
-  await page.locator('button[aria-label$="の詳細を開く"]').first().click();
+  await search.fill(uiReservationPublicCode);
+  await page.getByRole("button", {
+    name: `${uiReservationPublicCode}の詳細を開く`,
+    exact: true,
+  }).click();
   const inspector = page.locator('aside[aria-label="予約インスペクター"]:visible');
   await inspector.waitFor();
   await inspector.getByRole("button", { name: "予約編集" }).click();
@@ -906,8 +937,9 @@ async function runUiReservationCreateAndEdit(page, plan) {
   await wizard.getByRole("button", { name: "競合確認して更新" }).click();
   await assertUiOperationSucceeded(editResponsePromise, "ui_reservation_edit");
   await editDialog.waitFor({ state: "detached" });
-  await search.fill("RC UI Guest Edited");
-  await page.getByText("RC UI Guest Edited", { exact: true }).first().waitFor();
+  await search.fill(uiReservationPublicCode);
+  await page.getByText(uiReservationPublicCode, { exact: true }).first().waitFor();
+  return uiReservationPublicCode;
 }
 
 function waitForUiOperationResponse(page) {
@@ -924,6 +956,7 @@ async function assertUiOperationSucceeded(responsePromise, stage) {
     response.ok() && payload?.ok === true,
     `${stage}_failed:${response.status()}:${safeCommandFailureCode(payload)}`,
   );
+  return payload;
 }
 
 function tokyoLocalInput(timestamp) {

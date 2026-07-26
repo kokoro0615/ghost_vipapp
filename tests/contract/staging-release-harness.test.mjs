@@ -132,6 +132,7 @@ test("release regression source covers required business and cleanup boundaries"
     "lifecycle_script_fingerprint_mismatch",
     "safeCommandFailureCode",
     "assertUiOperationSucceeded",
+    "ui_created_public_code_missing",
     "ui_reservation_plan_missing",
     "ui_create_list_navigation_failed",
     "serverless metric writes quiesce",
