@@ -1,6 +1,6 @@
 # Gate A exact-run cleanup manifest
 
-Status: `PARTIAL_CLEANUP_HOLD_NEW_EXACT_APPROVAL`
+Status: `GATE_A_PASS`
 Observed: 2026-07-27 04:32:48 JST
 Cleanup target: Supabase staging `rsvrtaavofflkvtfzsfh` only
 Exact Trial run: `trial-20260726-adaa919e0001`
@@ -155,6 +155,22 @@ Residual freeze:
 - official active `VIP-1`–`VIP-8` unchanged; T/TRIAL seats/sections 0;
 - sent provider 0.
 
-Gate A remains HOLD for new exact residual-cleanup approval covering the one
-orphan audit row, one run-scoped admin row and two controls. Only then may the
-baseline restore and independent clean verifier be completed.
+At this point Gate A remained HOLD for new exact residual-cleanup approval
+covering the one orphan audit row, one run-scoped admin row and two controls.
+
+## Exact residual cleanup completion
+
+Owner separately approved the residual orphan audit 1, run-scoped admin 1 and
+controls 2. The immediate preflight revalidated the READY maintenance
+deployment `dpl_6zRMGjhUo7HLwAcuWAKRMVKxZg7C`, all residual counts, exact
+orphan shape, baseline SHA, official 8, T/TRIAL 0 and sent provider 0.
+
+The dedicated executor deleted the orphan audit and admin in the approved
+order, restored and verified the exact 28-table baseline SHA
+`08abb1dee60ee7d74f281f058b70fd253e374cfc40066a7eeaf359f840306e40`,
+then deleted baseline 1 and run 1. A separate after-cleanup verifier returned
+28 lineage tables 0, all three control counts 0, orphan 0, T/TRIAL resources
+0, official active `VIP-1`–`VIP-8`, and provider delivery 0.
+
+Gate A is PASS as of 2026-07-27 04:54 JST. Fresh PR-5 may now start from the
+official-eight staging baseline.
