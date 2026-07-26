@@ -1,10 +1,17 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { access } from "node:fs/promises";
+import { access, mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 
 import { chromium } from "playwright-core";
+import {
+  buildQaSummary,
+  QA_ALLOWED_MEDIA_SELECTORS,
+  QA_MAJOR_SURFACE_SELECTORS,
+  QA_VIEWPORTS,
+  safeArtifactName,
+} from "./light-ui-qa-manifest.mjs";
 
 const root = process.cwd();
 const port = Number(process.env.A11Y_PORT ?? 3312);
@@ -12,6 +19,10 @@ const origin = `http://127.0.0.1:${port}`;
 const chromePath = process.env.CHROME_PATH ?? "/usr/bin/google-chrome";
 const axePath = path.join(root, "node_modules/axe-core/axe.min.js");
 const nextBin = path.join(root, "node_modules/next/dist/bin/next");
+const artifactDirectory = path.resolve(
+  process.env.GHOST_VIP_QA_ARTIFACT_DIR
+    ?? "/tmp/ghost-vip-light-ui-qa",
+);
 
 let server;
 let serverOutput = "";
@@ -42,13 +53,9 @@ async function main() {
       headless: true,
     });
 
+    await mkdir(artifactDirectory, { recursive: true, mode: 0o700 });
     const results = [];
-    for (const viewport of [
-      { width: 320, height: 720 },
-      { width: 1024, height: 768 },
-      { width: 1194, height: 834 },
-      { width: 1366, height: 1024 },
-    ]) {
+    for (const viewport of QA_VIEWPORTS) {
       const context = await browser.newContext({
         viewport,
         httpCredentials: {
@@ -57,107 +64,18 @@ async function main() {
         },
         reducedMotion: "reduce",
       });
-      const page = await context.newPage();
-      await installSyntheticRoutes(page);
-
-      for (const view of ["list", "floor", "chart"]) {
-        await page.goto(`${origin}/?view=${view}&date=2026-07-26`, {
-          waitUntil: "domcontentloaded",
-        });
-        await page.locator("#vip-workspace-main").waitFor();
-        results.push(await auditPage(page, `${viewport.width}x${viewport.height}:${view}`));
-      }
-
-      await page.goto(`${origin}/?view=floor&date=2026-07-26`, {
-        waitUntil: "domcontentloaded",
-      });
-      await page.getByRole("button", { name: /新規オペレーション/u }).click();
-      await page.getByRole("dialog", { name: "新規オペレーション" }).waitFor();
-      results.push(await auditPage(page, `${viewport.width}x${viewport.height}:operations`));
-
-      await page.getByRole("tab", { name: /8段階予約/u }).click();
-      await page.getByLabel(/予約作成 1\/8/u).waitFor();
-      results.push(await auditPage(page, `${viewport.width}x${viewport.height}:reservation-create`));
-
-      await page.goto(`${origin}/?view=floor&date=2026-07-26`, {
-        waitUntil: "domcontentloaded",
-      });
-      await page.getByRole("button", { name: "メニュー", exact: true }).click();
-      await page.getByRole("button", { name: /Waitlist/u }).click();
-      await page.getByRole("dialog", { name: "Waitlist" }).waitFor();
-      results.push(await auditPage(page, `${viewport.width}x${viewport.height}:waitlist`));
-
-      await page.goto(`${origin}/?view=floor&date=2026-07-26`, {
-        waitUntil: "domcontentloaded",
-      });
-      await page.getByRole("button", { name: "メニュー", exact: true }).click();
-      await page.getByRole("button", { name: /担当卓/u }).click();
-      await page.getByRole("dialog", { name: "スタッフ担当卓" }).waitFor();
-      results.push(await auditPage(page, `${viewport.width}x${viewport.height}:staff`));
-
-      await page.goto(`${origin}/?view=list&date=2026-07-26`, {
-        waitUntil: "domcontentloaded",
-      });
-      await page.getByRole("button", { name: /の詳細を開く/u }).click();
-      if (viewport.width < 768) {
-        await page.getByRole("dialog", { name: "予約詳細" }).waitFor();
-      }
-      const editDiagnostics = await page.locator("body").evaluate((body) => ({
-        text: body.querySelector('[role="dialog"][aria-label="予約詳細"]')?.textContent,
-        editButtons: [...body.querySelectorAll("button")].filter((node) => node.textContent?.includes("予約編集")).map((node) => ({
-          disabled: node.disabled,
-          visible: Boolean(node.getClientRects().length),
-        })),
-      }));
-      if (!editDiagnostics.editButtons.length) {
-        throw new Error(`reservation edit control missing: ${JSON.stringify(editDiagnostics)}`);
-      }
-      const editButton = viewport.width < 768
-        ? page.locator('[role="dialog"][aria-label="予約詳細"] button').filter({ hasText: "予約編集" })
-        : page.locator('[data-instance="desktop"] button').filter({ hasText: "予約編集" });
-      if (await editButton.isDisabled()) {
-        throw new Error(`reservation edit stayed disabled: ${JSON.stringify(await page.locator("body").evaluate((body) => ({
-          status: body.querySelector('[role="status"]')?.textContent,
-          alerts: [...body.querySelectorAll('[role="alert"]')].map((node) => node.textContent),
-          editButtons: [...body.querySelectorAll("button")].filter((node) => node.textContent?.includes("予約編集")).map((node) => ({
-            disabled: node.disabled,
-            visible: Boolean(node.getClientRects().length),
-          })),
-        })))}`);
-      }
-      await editButton.click();
-      await page.getByRole("dialog", { name: "予約編集" }).waitFor();
-      results.push(await auditPage(page, `${viewport.width}x${viewport.height}:reservation-edit`));
-
-      await page.goto(`${origin}/?view=list&date=2026-07-26&detail=guest`, {
-        waitUntil: "domcontentloaded",
-      });
-      await page.getByRole("button", { name: /の詳細を開く/u }).click();
-      if (viewport.width < 768) {
-        await page.getByRole("dialog", { name: "予約詳細" }).waitFor();
-      }
-      await page.getByRole("button", { name: "顧客詳細を開く" }).click();
-      await page.getByRole("dialog", { name: "顧客詳細と紐付け" }).waitFor();
-      results.push(await auditPage(page, `${viewport.width}x${viewport.height}:customer-detail`));
-
-      await page.goto(`${origin}/?view=floor&date=2026-07-26`, {
-        waitUntil: "domcontentloaded",
-      });
-      await page.getByRole("button", { name: "メニュー", exact: true }).click();
-      await page.getByRole("button", { name: /SLO/u }).click();
-      await page.getByRole("dialog", { name: "運用SLO / Alert" }).waitFor();
-      results.push(await auditPage(page, `${viewport.width}x${viewport.height}:observability`));
+      results.push(...await auditViewport(context, viewport));
       await context.close();
     }
-
-    console.log(JSON.stringify({
-      ok: true,
-      auditedViews: results.length,
-      viewports: 4,
-      axeViolations: 0,
-      horizontalOverflow: 0,
-      undersizedImportantControls: 0,
-    }));
+    const summary = buildQaSummary(results, artifactDirectory);
+    assert.deepEqual(summary.missingStates, [], "required UI QA states missing");
+    assert.deepEqual(summary.missingViewports, [], "required UI QA viewports missing");
+    await writeFile(
+      path.join(artifactDirectory, "qa-summary.json"),
+      `${JSON.stringify({ ...summary, results }, null, 2)}\n`,
+      { mode: 0o600 },
+    );
+    console.log(JSON.stringify(summary));
   } finally {
     if (browser) await browser.close();
     server.kill("SIGTERM");
@@ -165,6 +83,186 @@ async function main() {
       new Promise((resolve) => server.once("exit", resolve)),
       new Promise((resolve) => setTimeout(resolve, 2_000)),
     ]);
+  }
+}
+
+async function auditViewport(context, viewport) {
+  const results = [];
+  const capture = async (page, state) => {
+    results.push(await auditPage(page, { state, viewport }));
+  };
+
+  const loginPage = await newQaPage(context, { authenticated: false });
+  await loginPage.goto(origin, { waitUntil: "domcontentloaded" });
+  await loginPage.getByLabel("Owner専用PIN").waitFor();
+  await capture(loginPage, "login");
+  await loginPage.close();
+
+  const page = await newQaPage(context);
+  for (const view of ["list", "floor", "chart"]) {
+    await goToWorkspace(page, view);
+    await capture(page, view);
+  }
+
+  await goToWorkspace(page, "list");
+  await capture(page, "queue");
+  await openReservationDetail(page, viewport);
+  await capture(page, "inspector");
+
+  await goToWorkspace(page, "floor");
+  await page.getByRole("button", { name: "メニュー", exact: true }).click();
+  await page.getByRole("dialog", { name: "メニュー" }).waitFor();
+  await capture(page, "menu");
+
+  await goToWorkspace(page, "floor");
+  await page.getByRole("button", { name: /新規オペレーション/u }).click();
+  const operationDialog = page.getByRole("dialog", { name: "新規オペレーション" });
+  await operationDialog.waitFor();
+  await capture(page, "walk-in");
+  await page.getByRole("tab", { name: /受付ブロック/u }).click();
+  await capture(page, "block");
+  await page.getByRole("tab", { name: /8段階予約/u }).click();
+  for (let step = 1; step <= 8; step += 1) {
+    await page.getByLabel(new RegExp(`予約作成 ${step}/8`, "u")).waitFor();
+    await capture(page, `reservation-create-${step}`);
+    if (step < 8) await page.getByRole("button", { name: /次へ/u }).click();
+  }
+  await page.keyboard.press("Escape");
+
+  await goToWorkspace(page, "list");
+  await openReservationDetail(page, viewport);
+  await page.getByRole("button", { name: "予約編集", exact: true }).click();
+  await page.getByRole("dialog", { name: "予約編集" }).waitFor();
+  await capture(page, "reservation-edit");
+  await page.keyboard.press("Escape");
+
+  for (const [buttonLabel, dialogLabel, state] of [
+    ["チェックイン", "チェックイン", "command-check-in"],
+    ["到着時刻", "到着時刻を記録", "command-arrival-time"],
+    ["接客状態", "接客状態を変更", "command-service-status"],
+    ["席割当", "卓割当を変更", "command-assignment"],
+    ["メモ", "スタッフメモ", "command-note"],
+  ]) {
+    await goToWorkspace(page, "list");
+    await openReservationDetail(page, viewport);
+    await page.getByRole("button", { name: buttonLabel, exact: true }).click();
+    await page.getByRole("dialog", { name: dialogLabel, exact: true }).waitFor();
+    await capture(page, state);
+    await page.keyboard.press("Escape");
+  }
+
+  await page.close();
+  const extensionPage = await newQaPage(context, {
+    boardPayload: {
+      ...board,
+      reservations: board.reservations.map((reservation) => ({
+        ...reservation,
+        lifecycleStatus: "checked_in",
+      })),
+    },
+  });
+  await goToWorkspace(extensionPage, "list");
+  await openReservationDetail(extensionPage, viewport);
+  await extensionPage.getByRole("button", { name: "利用延長", exact: true }).click();
+  await extensionPage.getByRole("dialog", { name: "利用時間を延長", exact: true }).waitFor();
+  await capture(extensionPage, "command-seat-extension");
+  await extensionPage.close();
+
+  const menuPage = await newQaPage(context);
+  for (const [buttonName, dialogName, state] of [
+    [/Waitlist/u, "Waitlist", "waitlist"],
+    [/担当卓/u, "スタッフ担当卓", "staff"],
+    [/SLO/u, "運用SLO / Alert", "slo"],
+  ]) {
+    await goToWorkspace(menuPage, "floor");
+    await menuPage.getByRole("button", { name: "メニュー", exact: true }).click();
+    await menuPage.getByRole("button", { name: buttonName }).click();
+    await menuPage.getByRole("dialog", { name: dialogName }).waitFor();
+    await capture(menuPage, state);
+    await menuPage.keyboard.press("Escape");
+  }
+
+  await goToWorkspace(menuPage, "list", "guest");
+  await openReservationDetail(menuPage, viewport);
+  await menuPage.getByRole("button", { name: "顧客詳細を開く" }).click();
+  await menuPage.getByRole("dialog", { name: "顧客詳細と紐付け" }).waitFor();
+  await capture(menuPage, "customer");
+  await menuPage.close();
+
+  for (const scenario of [
+    { state: "loading", boardDelayMs: 5_000, waitFor: '[aria-label="VIP Floorを読み込んでいます"]' },
+    { state: "empty", boardPayload: emptyBoard, waitFor: "text=この営業日の予約はありません" },
+    { state: "error", boardStatus: 503, waitFor: "text=予約状態を読み込めません" },
+    { state: "read-only", boardPayload: readOnlyBoard, waitFor: 'main[data-state="read_only"]' },
+    { state: "stale", eventMode: "unavailable", waitFor: 'main[data-state="stale"]' },
+    { state: "reconnecting", eventMode: "gap", delaySecondBoardMs: 5_000, waitFor: 'main[data-state="reconnecting"]' },
+  ]) {
+    const scenarioPage = await newQaPage(context, scenario);
+    await scenarioPage.goto(`${origin}/?view=list&date=2026-07-26`, { waitUntil: "domcontentloaded" });
+    await scenarioPage.locator(scenario.waitFor).waitFor();
+    await capture(scenarioPage, scenario.state);
+    await scenarioPage.close();
+  }
+
+  const offlinePage = await newQaPage(context);
+  await goToWorkspace(offlinePage, "list");
+  await offlinePage.evaluate(() => window.dispatchEvent(new Event("offline")));
+  await offlinePage.locator('main[data-state="stale"]').waitFor();
+  await capture(offlinePage, "offline");
+  await offlinePage.close();
+
+  const conflictPage = await newQaPage(context, { commandStatus: 409 });
+  await goToWorkspace(conflictPage, "list");
+  await openReservationDetail(conflictPage, viewport);
+  await conflictPage.getByRole("button", { name: "メモ", exact: true }).click();
+  await conflictPage.getByLabel("現場共有メモ").fill("Synthetic conflict check");
+  await conflictPage.getByRole("button", { name: /確認へ/u }).click();
+  await conflictPage.getByRole("button", { name: /GHOSTへ反映/u }).click();
+  await conflictPage.getByRole("alert").filter({ hasText: "version_conflict" }).waitFor();
+  await capture(conflictPage, "conflict");
+  await conflictPage.close();
+
+  return results;
+}
+
+async function newQaPage(context, scenario = {}) {
+  const page = await context.newPage();
+  page.qaConsoleErrors = [];
+  page.qaServerErrors = [];
+  page.qaHttpErrors = [];
+  page.on("console", (message) => {
+    if (message.type() === "error") page.qaConsoleErrors.push(message.text());
+  });
+  page.on("response", (response) => {
+    if (response.status() >= 400) page.qaHttpErrors.push({
+      status: response.status(),
+      url: new URL(response.url()).pathname,
+    });
+    if (response.status() >= 500) page.qaServerErrors.push({
+      status: response.status(),
+      url: new URL(response.url()).pathname,
+    });
+  });
+  await installSyntheticRoutes(page, scenario);
+  return page;
+}
+
+async function goToWorkspace(page, view, detail = null) {
+  const detailQuery = detail ? `&detail=${encodeURIComponent(detail)}` : "";
+  await page.goto(`${origin}/?view=${view}&date=2026-07-26${detailQuery}`, {
+    waitUntil: "domcontentloaded",
+  });
+  await page.locator("#vip-workspace-main").waitFor();
+}
+
+async function openReservationDetail(page, viewport) {
+  const details = page.getByRole("button", { name: /の詳細を開く/u }).first();
+  await details.waitFor();
+  await details.click();
+  if (viewport.width < 768) {
+    await page.getByRole("dialog", { name: "予約詳細" }).waitFor();
+  } else {
+    await page.locator('[data-instance="desktop"]').waitFor();
   }
 }
 
@@ -189,18 +287,51 @@ async function waitForServer() {
   throw new Error(`a11y_server_timeout:${serverOutput}`);
 }
 
-async function installSyntheticRoutes(page) {
-  await page.addInitScript(() => {
+async function installSyntheticRoutes(page, scenario = {}) {
+  await page.addInitScript(({ eventMode }) => {
     window.EventSource = class SyntheticEventSource {
-      addEventListener() {}
-      removeEventListener() {}
-      close() {}
+      listeners = new Map();
+      timer = null;
+      constructor() {
+        if (!eventMode) return;
+        this.timer = window.setTimeout(() => {
+          if (eventMode === "unavailable") this.emit("unavailable", {});
+          if (eventMode === "gap") {
+            this.emit("revision", {
+              data: JSON.stringify({ businessDate: "2026-07-26", revision: 45 }),
+            });
+          }
+        }, 350);
+      }
+      addEventListener(name, listener) {
+        const listeners = this.listeners.get(name) ?? [];
+        listeners.push(listener);
+        this.listeners.set(name, listeners);
+      }
+      removeEventListener(name, listener) {
+        this.listeners.set(name, (this.listeners.get(name) ?? []).filter((item) => item !== listener));
+      }
+      emit(name, event) {
+        for (const listener of this.listeners.get(name) ?? []) listener(event);
+      }
+      close() {
+        if (this.timer) window.clearTimeout(this.timer);
+      }
     };
-  });
-  await page.route("**/api/admin/session", (route) => route.fulfill({
-    status: 200,
+  }, { eventMode: scenario.eventMode ?? null });
+  await page.route("**/api/admin/session/pin", (route) => route.fulfill({
+    status: scenario.authenticated === false ? 401 : 200,
     contentType: "application/json",
-    body: JSON.stringify({ ok: true, role: "owner", displayName: "Owner" }),
+    body: JSON.stringify(scenario.authenticated === false
+      ? { ok: false, error: "invalid_pin" }
+      : { ok: true, role: "owner", displayName: "Owner" }),
+  }));
+  await page.route("**/api/admin/session", (route) => route.fulfill({
+    status: scenario.authenticated === false ? 401 : 200,
+    contentType: "application/json",
+    body: JSON.stringify(scenario.authenticated === false
+      ? { ok: false, error: "unauthenticated" }
+      : { ok: true, role: scenario.role ?? "owner", displayName: scenario.role === "viewer" ? "Viewer" : "Owner" }),
   }));
   await page.route("**/api/admin/vip-floor/options?**", (route) => route.fulfill({
     status: 200,
@@ -222,19 +353,49 @@ async function installSyntheticRoutes(page) {
     contentType: "application/json",
     body: JSON.stringify(customerDetail),
   }));
-  await page.route("**/api/admin/vip-floor/observability?**", (route) => route.fulfill({
+  await page.route("**/api/admin/vip-floor/observability**", (route) => route.fulfill({
     status: 200,
     contentType: "application/json",
     body: JSON.stringify(observability),
   }));
-  await page.route("**/api/admin/vip-floor?**", (route) => route.fulfill({
-    status: 200,
+  await page.route("**/api/admin/vip-floor/commands", (route) => route.fulfill({
+    status: scenario.commandStatus ?? 200,
     contentType: "application/json",
-    body: JSON.stringify(board),
+    body: JSON.stringify(scenario.commandStatus === 409
+      ? {
+          ok: false,
+          code: "version_conflict",
+          error: "version_conflict",
+          message: "別端末の更新を検知しました。",
+          recovery: "最新状態を再読込してから明示的に再試行してください。",
+        }
+      : {
+          ok: true,
+          message: "Synthetic command accepted",
+          boardRevision: 43,
+          entityVersion: 5,
+          auditLogId: "synthetic-audit",
+        }),
   }));
+  let boardRequests = 0;
+  await page.route("**/api/admin/vip-floor?**", async (route) => {
+    boardRequests += 1;
+    const delayMs = boardRequests > 1
+      ? scenario.delaySecondBoardMs ?? 0
+      : scenario.boardDelayMs ?? 0;
+    if (delayMs) await new Promise((resolve) => setTimeout(resolve, delayMs));
+    await route.fulfill({
+      status: scenario.boardStatus ?? 200,
+      contentType: "application/json",
+      body: JSON.stringify(scenario.boardStatus && scenario.boardStatus >= 400
+        ? { ok: false, error: "synthetic_board_failure" }
+        : scenario.boardPayload ?? board),
+    });
+  });
 }
 
-async function auditPage(page, label) {
+async function auditPage(page, { state, viewport }) {
+  const label = `${viewport.width}x${viewport.height}:${state}`;
   await page.addScriptTag({ path: axePath });
   const report = await page.evaluate(async () =>
     window.axe.run(document, {
@@ -257,7 +418,49 @@ async function auditPage(page, label) {
     `axe violations in ${label}`,
   );
 
-  const layout = await page.evaluate(() => {
+  const layout = await page.evaluate(({ majorSurfaceSelectors, allowedMediaSelectors }) => {
+    function parseRgb(value) {
+      const match = /^rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)(?:\s*[,/]\s*([\d.]+))?\s*\)$/u.exec(value);
+      if (!match) return null;
+      return {
+        r: Number(match[1]) / 255,
+        g: Number(match[2]) / 255,
+        b: Number(match[3]) / 255,
+        a: match[4] === undefined ? 1 : Number(match[4]),
+      };
+    }
+    function linear(channel) {
+      return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+    }
+    function luminance(color) {
+      return 0.2126 * linear(color.r) + 0.7152 * linear(color.g) + 0.0722 * linear(color.b);
+    }
+    function hueAndSaturation(color) {
+      const max = Math.max(color.r, color.g, color.b);
+      const min = Math.min(color.r, color.g, color.b);
+      const delta = max - min;
+      const lightness = (max + min) / 2;
+      if (delta === 0) return { hue: 0, saturation: 0, lightness };
+      const saturation = delta / (1 - Math.abs(2 * lightness - 1));
+      const hueBase = max === color.r
+        ? ((color.g - color.b) / delta) % 6
+        : max === color.g
+          ? (color.b - color.r) / delta + 2
+          : (color.r - color.g) / delta + 4;
+      return { hue: (hueBase * 60 + 360) % 360, saturation, lightness };
+    }
+    function visible(element) {
+      const style = getComputedStyle(element);
+      const rect = element.getBoundingClientRect();
+      return style.visibility !== "hidden"
+        && style.display !== "none"
+        && rect.width > 0
+        && rect.height > 0;
+    }
+    function mediaAllowed(element, style) {
+      return allowedMediaSelectors.some((selector) => element.matches(selector))
+        || style.backgroundImage.includes("url(");
+    }
     const controls = [...document.querySelectorAll("button, input, select, textarea")]
       .filter((element) => {
         const style = getComputedStyle(element);
@@ -266,27 +469,150 @@ async function auditPage(page, label) {
           && style.display !== "none"
           && rect.width > 0
           && rect.height > 0
-          && !element.disabled
-          && element.getAttribute("type") !== "checkbox";
+          && !element.disabled;
       })
       .map((element) => {
         const rect = element.getBoundingClientRect();
+        const type = element.getAttribute("type");
+        const labelElement = ["checkbox", "radio"].includes(type ?? "")
+          ? element.closest("label")
+          : null;
+        const touchRect = labelElement?.getBoundingClientRect() ?? rect;
         return {
-          label: element.getAttribute("aria-label") || element.textContent?.trim() || element.tagName,
-          width: rect.width,
-          height: rect.height,
+          label: element.getAttribute("aria-label")
+            || labelElement?.textContent?.trim()
+            || element.textContent?.trim()
+            || element.tagName,
+          width: touchRect.width,
+          height: touchRect.height,
         };
       })
       .filter((control) => control.width < 44 || control.height < 44);
+    const majorSurfaceFailures = [];
+    for (const selector of majorSurfaceSelectors) {
+      for (const element of document.querySelectorAll(selector)) {
+        if (!visible(element)) continue;
+        const style = getComputedStyle(element);
+        if (mediaAllowed(element, style)) continue;
+        const color = parseRgb(style.backgroundColor);
+        if (!color || color.a < 0.9) continue;
+        const rect = element.getBoundingClientRect();
+        if (rect.width * rect.height < 8_000) continue;
+        if (luminance(color) < 0.68) {
+          majorSurfaceFailures.push({
+            selector,
+            className: typeof element.className === "string" ? element.className : "",
+            backgroundColor: style.backgroundColor,
+            luminance: luminance(color),
+          });
+        }
+      }
+    }
+    const purpleChrome = [];
+    const colorProperties = [
+      "backgroundColor",
+      "borderTopColor",
+      "borderRightColor",
+      "borderBottomColor",
+      "borderLeftColor",
+      "color",
+      "outlineColor",
+    ];
+    for (const element of document.querySelectorAll("body *")) {
+      if (!visible(element)) continue;
+      const style = getComputedStyle(element);
+      if (mediaAllowed(element, style)) continue;
+      for (const property of colorProperties) {
+        const color = parseRgb(style[property]);
+        if (!color || color.a < 0.3) continue;
+        const hsl = hueAndSaturation(color);
+        if (
+          hsl.hue >= 255
+          && hsl.hue <= 325
+          && hsl.saturation >= 0.18
+          && hsl.lightness >= 0.06
+          && hsl.lightness <= 0.92
+        ) {
+          purpleChrome.push({
+            tag: element.tagName,
+            className: typeof element.className === "string" ? element.className : "",
+            property,
+            value: style[property],
+          });
+          break;
+        }
+      }
+    }
+    const colorOnlyStatuses = [...document.querySelectorAll("[data-tone], [data-state], [data-cue]")]
+      .filter(visible)
+      .filter((element) => {
+        const accessibleText = [
+          element.getAttribute("aria-label"),
+          element.getAttribute("title"),
+          element.textContent,
+        ].filter(Boolean).join(" ").trim();
+        return accessibleText.length === 0;
+      })
+      .map((element) => ({
+        tag: element.tagName,
+        className: typeof element.className === "string" ? element.className : "",
+      }));
     return {
       documentWidth: document.documentElement.scrollWidth,
       viewportWidth: window.innerWidth,
       undersizedControls: controls,
+      colorScheme: {
+        root: getComputedStyle(document.documentElement).colorScheme,
+        body: getComputedStyle(document.body).colorScheme,
+      },
+      majorSurfaceFailures,
+      purpleChrome,
+      colorOnlyStatuses,
     };
+  }, {
+    majorSurfaceSelectors: QA_MAJOR_SURFACE_SELECTORS,
+    allowedMediaSelectors: QA_ALLOWED_MEDIA_SELECTORS,
   });
   assert.equal(layout.documentWidth, layout.viewportWidth, `horizontal overflow in ${label}`);
   assert.deepEqual(layout.undersizedControls, [], `undersized controls in ${label}`);
-  return { label };
+  assert.match(layout.colorScheme.root, /light/u, `root color-scheme must be light in ${label}`);
+  assert.match(layout.colorScheme.body, /light/u, `body color-scheme must be light in ${label}`);
+  assert.deepEqual(layout.majorSurfaceFailures, [], `dark major surfaces in ${label}`);
+  assert.deepEqual(layout.purpleChrome, [], `old purple chrome in ${label}`);
+  assert.deepEqual(layout.colorOnlyStatuses, [], `color-only status in ${label}`);
+  const unexpectedConsoleErrors = page.qaConsoleErrors.filter((entry) =>
+    !(
+      (state === "login" && /status of 401 \(Unauthorized\)/u.test(entry))
+      || (state === "error" && /status of 503 \(Service Unavailable\)/u.test(entry))
+      || (state === "conflict" && /status of 409 \(Conflict\)/u.test(entry))
+    ));
+  assert.deepEqual(
+    unexpectedConsoleErrors,
+    [],
+    `console errors in ${label}; HTTP ${JSON.stringify(page.qaHttpErrors)}`,
+  );
+  const unexpected5xx = page.qaServerErrors.filter((entry) =>
+    !(state === "error" && entry.status === 503 && entry.url === "/api/admin/vip-floor"));
+  assert.deepEqual(unexpected5xx, [], `unexpected server 5xx in ${label}`);
+  const viewportKey = `${viewport.width}x${viewport.height}`;
+  const screenshotPath = path.join(
+    artifactDirectory,
+    viewportKey,
+    `${safeArtifactName(state)}.jpg`,
+  );
+  await mkdir(path.dirname(screenshotPath), { recursive: true, mode: 0o700 });
+  await page.screenshot({
+    path: screenshotPath,
+    type: "jpeg",
+    quality: 78,
+    fullPage: true,
+    animations: "disabled",
+  });
+  return {
+    state,
+    viewport: viewportKey,
+    screenshot: path.relative(artifactDirectory, screenshotPath),
+  };
 }
 
 const tableIds = Array.from(
@@ -318,7 +644,7 @@ const board = {
     id,
     version: 3,
     publicResourceCode: `VIP-${index + 1}`,
-    displayCode: `T${index + 1}`,
+    displayCode: `VIP-${index + 1}`,
     name: `VIP TABLE ${index + 1}`,
     sectionId: "",
     capacityMin: 1,
@@ -388,6 +714,33 @@ const board = {
     adminMutationEnabled: true,
     webhookProcessingEnabled: true,
     publicBookingEnabled: true,
+  },
+};
+
+const emptyBoard = {
+  ...board,
+  reservations: [],
+  assignments: [],
+  unassignedReservationIds: [],
+  notes: [],
+  tables: board.tables.map((table) => ({ ...table, reservationIds: [] })),
+  totals: {
+    ...board.totals,
+    reservationCount: 0,
+    activeReservationCount: 0,
+    assignmentCount: 0,
+    unassignedReservationCount: 0,
+    noteCount: 0,
+    guestCount: 0,
+    serviceStatusCounts: {},
+  },
+};
+
+const readOnlyBoard = {
+  ...board,
+  operations: {
+    ...board.operations,
+    adminMutationEnabled: false,
   },
 };
 

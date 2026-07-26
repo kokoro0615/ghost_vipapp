@@ -1,0 +1,68 @@
+{
+  "schemaVersion": "ghost.vip-manager.release-lock.v1",
+  "createdAt": "2026-07-27T02:17:26+09:00",
+  "status": "HOLD_FRESH_OWNER_GATES",
+  "executionPrompt": {
+    "path": "/home/kokoro/projects/clients/ghost_vipapp/docs/GHOST_VIP_MANAGER_TRIAL_EXIT_PRODUCTION_LIGHT_UI_EXECUTION_PROMPT.md",
+    "sha256": "80e73f4834a61e04a61b2ed1a99b361c34b1ef2e6f7f43d1f46399970a906925"
+  },
+  "sources": {
+    "vipApp": {
+      "repository": "https://github.com/kokoro0615/ghost_vipapp.git",
+      "releaseBranch": "codex/vip-manager-production-light-ui-20260727",
+      "releaseHead": "4112cbe5d8dd1b377f61d26b2835f514c11f28d1",
+      "releaseTree": "5fb0f05ad12a227c679bf8f84a60e3a6d9bbdecb",
+      "deployedCodeCommit": "2e41ebde4926b7faac96c8de2a5c09dcc66e0f1d",
+      "deployedCodeTree": "90ba4fd0dbd96722108e8c7b37b94db9f8f35a74",
+      "releaseHeadDeltaFromDeployedCode": [
+        "docs/evidence/GHOST_VIP_MANAGER_TRIAL_RELEASE_2026-07-26.md"
+      ],
+      "isolatedWorktree": "/home/kokoro/projects/clients/ghost/.worktrees/vip-manager-production-light-ui"
+    },
+    "website": {
+      "repository": "https://github.com/kokoro0615/ghost.git",
+      "releaseBranch": "codex/vip-manager-production-backend-20260727",
+      "releaseHead": "41dd0f9956127256239d9f364978dc9fd56db331",
+      "releaseTree": "a52c0970afc1cfc3bae5c1b298c831ad9689e637",
+      "isolatedWorktree": "/home/kokoro/projects/clients/ghost/.worktrees/vip-manager-production-backend"
+    }
+  },
+  "deployments": {
+    "fixedVipUrl": "https://ghost-vipapp.vercel.app/",
+    "currentVipDeployment": "dpl_3kwpgwP3H3wQ7CnEwoHU7ZbdYxBR",
+    "currentVipTarget": "production",
+    "currentVipState": "READY",
+    "websiteStagingDeployment": "dpl_CowRobEHY49Aye2xyc9geWGNh5J9",
+    "websiteStagingTarget": "staging",
+    "websiteStagingState": "READY",
+    "websiteProductionUrl": "https://ghost-ruby-one.vercel.app",
+    "websiteProductionDeployment": "dpl_5RaU3Mpz8KanMeEnfcZK5b9NGFSP",
+    "websiteProductionState": "READY",
+    "vipRollbackDeployment": "dpl_EaWM11t7saE1CLYgpvgBkQt7jPEi",
+    "vipRollbackState": "READY"
+  },
+  "dataPlanes": {
+    "stagingRef": "rsvrtaavofflkvtfzsfh",
+    "productionRef": "cpfsrwctjymhmwvsbwdi",
+    "linkedRefAtFreeze": "cpfsrwctjymhmwvsbwdi",
+    "productionMigrationHead": "20260604090000",
+    "productionPendingAllowlistStart": "20260714090000",
+    "productionPendingAllowlistEnd": "20260726175000",
+    "productionPendingCount": 24,
+    "productionExcludedTrialMigrations": [
+      "20260726180000",
+      "20260726181000"
+    ],
+    "trialRunId": "trial-20260726-adaa919e0001"
+  },
+  "releaseLock": {
+    "dirtyOrdinaryWorktreesAreBuildSources": false,
+    "databaseMutationAuthorized": false,
+    "stagingCleanupAuthorized": false,
+    "productionMigrationAuthorized": false,
+    "productionAliasPromotionAuthorized": false,
+    "productionMutationEnablementAuthorized": false,
+    "externalProviderDeliveryAuthorized": false,
+    "requiredNextApproval": "Gate A staging cleanup after exact full manifest"
+  }
+}

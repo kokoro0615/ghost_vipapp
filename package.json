@@ -15,7 +15,10 @@
     "smoke:production": "node scripts/prod-e2e.mjs",
     "e2e:staging:mutation": "node scripts/staging-mutation-e2e.mjs",
     "test:a11y": "node scripts/a11y-visual.mjs",
-    "ci": "npm run lint && npm run typecheck && npm run test && npm run build && npm run test:a11y"
+    "test:maintenance": "node scripts/maintenance-anchor-runtime.mjs",
+    "verify:backup-restore": "node scripts/verify-backup-restore-manifest.mjs",
+    "verify:deployment-release": "node scripts/verify-deployment-release-manifest.mjs",
+    "ci": "npm run lint && npm run typecheck && npm run test && npm run build && npm run test:maintenance && npm run test:a11y"
   },
   "engines": {
     "node": ">=24"

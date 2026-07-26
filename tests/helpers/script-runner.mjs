@@ -1,8 +1,8 @@
 import { spawn } from "node:child_process";
 
-export function runNodeScript(script, env) {
+export function runNodeScript(script, env, args = []) {
   return new Promise((resolve) => {
-    const child = spawn(process.execPath, [script], {
+    const child = spawn(process.execPath, [script, ...args], {
       cwd: process.cwd(),
       env: { ...process.env, ...env },
       stdio: ["ignore", "pipe", "pipe"],
