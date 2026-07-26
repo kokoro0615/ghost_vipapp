@@ -19,7 +19,7 @@ export default function ReservationListView({ reservations, selectedReservationI
     <section className={styles.listView} aria-labelledby="list-view-title" data-density={density}>
       <div className={styles.viewHeading}>
         <div>
-          <h2 id="list-view-title">RESERVATION LEDGER</h2>
+          <h2 id="list-view-title">予約台帳</h2>
           <p>{reservations.length}件を時刻順で表示。固定列から例外へ素早く移動できます。</p>
         </div>
         <button type="button" className={styles.secondaryButton} onClick={() => onDensity(density === "compact" ? "comfortable" : "compact")}>

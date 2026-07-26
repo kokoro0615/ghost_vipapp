@@ -2,8 +2,21 @@ import { randomUUID } from "node:crypto";
 
 import { NextResponse } from "next/server";
 
+import { normalizeVipAdminRole, type VipAdminRole } from "@/lib/adminPermissions";
+
 const SESSION_COOKIE = "ghost_vipapp_admin_session";
 const BACKEND_ORIGIN = (process.env.GHOST_ADMIN_API_ORIGIN ?? "https://ghost-ruby-one.vercel.app").replace(/\/$/u, "");
+
+export type AdminSessionPayload = {
+  ok?: boolean;
+  role?: string;
+  displayName?: string | null;
+};
+
+export type AdminSessionActor = {
+  role: VipAdminRole;
+  displayName: string | null;
+};
 
 export function readAdminToken(request: Request) {
   const value = request.headers.get("cookie")?.split(";").map((item) => item.trim()).find((item) => item.startsWith(`${SESSION_COOKIE}=`));
@@ -33,4 +46,27 @@ export async function ghostAdminFetch(path: string, init: RequestInit = {}, toke
 
 export function copyJson(response: Response) {
   return response.json().catch(() => ({}));
+}
+
+export async function readAdminSession(token: string) {
+  const response = await ghostAdminFetch("/api/admin/session", {}, token);
+  const payload = (await copyJson(response)) as AdminSessionPayload;
+  const role = normalizeVipAdminRole(payload.role);
+  if (!response.ok || payload?.ok !== true || !role) {
+    return {
+      ok: false as const,
+      status: response.status,
+      payload,
+    };
+  }
+
+  return {
+    ok: true as const,
+    status: response.status,
+    payload,
+    actor: {
+      role,
+      displayName: typeof payload.displayName === "string" ? payload.displayName : null,
+    } as AdminSessionActor,
+  };
 }

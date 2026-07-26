@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { clearAdminToken, copyJson, ghostAdminFetch, readAdminToken } from "@/lib/server/ghostAdminProxy";
+import { normalizeVipAdminRole } from "@/lib/adminPermissions";
 
 export const runtime = "nodejs";
 
@@ -9,8 +10,18 @@ export async function GET(request: Request) {
   if (!token) return NextResponse.json({ ok: false, error: "missing_admin_session" }, { status: 401 });
   const response = await ghostAdminFetch("/api/admin/session", {}, token);
   const payload = await copyJson(response);
-  if (response.status === 401) { const local = NextResponse.json(payload, { status: 401 }); clearAdminToken(local); return local; }
-  return NextResponse.json(payload, { status: response.status });
+  if (response.status === 401 || payload?.ok !== true) {
+    const local = NextResponse.json(payload, { status: response.status || 401 });
+    clearAdminToken(local);
+    return local;
+  }
+  const role = normalizeVipAdminRole(payload?.role);
+  if (!role) {
+    const local = NextResponse.json({ ok: false, error: "invalid_admin_session" }, { status: 401 });
+    clearAdminToken(local);
+    return local;
+  }
+  return NextResponse.json({ ok: true, role, displayName: payload?.displayName ?? null }, { status: response.status });
 }
 
 export async function DELETE(request: Request) {

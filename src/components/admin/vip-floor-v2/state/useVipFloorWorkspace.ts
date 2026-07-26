@@ -7,13 +7,14 @@ import {
   createEmptyVipBoard,
   type LegacyVipBoard,
 } from "@/lib/vipFloorLegacy";
+import { canExecuteVipCommand, type VipAdminRole } from "@/lib/adminPermissions";
 
 import type { LiveCommandDraft } from "../contract/uiTypes";
 import { createInitialState, workspaceReducer } from "./reducer";
 
 type Session = {
   ok: boolean;
-  role?: string;
+  role?: VipAdminRole;
   displayName?: string | null;
 };
 
@@ -248,6 +249,19 @@ export function useVipFloorWorkspace() {
     }
     dispatch({ type: "pending", pending: true });
     try {
+      if (!auth.session || !canExecuteVipCommand(auth.session.role ?? null, draft.kind)) {
+        dispatch({
+          type: "commandOutcome",
+          outcome: {
+            ok: false,
+            code: "INSUFFICIENT_ROLE",
+            message: "この操作を実行する権限がありません。",
+            recovery: "別の担当者アカウントでログインしてください。",
+          },
+        });
+        return;
+      }
+
       const response = await fetch("/api/admin/vip-floor/commands", {
         method: "POST",
         headers: {
@@ -282,7 +296,11 @@ export function useVipFloorWorkspace() {
         note: "スタッフメモ",
         service_status: "接客状態",
       };
-      const message = `${labels[draft.kind]}を保存しました`;
+      const auditLogId = typeof payload.auditLogId === "string" ? payload.auditLogId : null;
+      const action = typeof payload.action === "string" ? payload.action : labels[draft.kind];
+      const message = auditLogId
+        ? `${labels[draft.kind]}を保存しました（監査ID ${auditLogId}）`
+        : `${labels[draft.kind]}を保存しました`;
       dispatch({ type: "commandOutcome", outcome: { ok: true, message } });
       dispatch({
         type: "history",
@@ -290,8 +308,8 @@ export function useVipFloorWorkspace() {
           id: crypto.randomUUID(),
           at: new Date().toISOString(),
           actor: auth.session?.displayName ?? auth.session?.role ?? "staff",
-          label: labels[draft.kind],
-          detail: `${draft.reservationId} / 監査ログへ記録`,
+          label: action,
+          detail: `${draft.reservationId} ${auditLogId ? `/ 監査ID ${auditLogId}` : ""}`,
         },
       });
       await loadBoard(businessDate);

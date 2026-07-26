@@ -57,8 +57,8 @@ export default function TimelineView({ board, reservations, selectedReservationI
     <section className={styles.timelineView} aria-labelledby="timeline-view-title">
       <div className={styles.viewHeading}>
         <div>
-          <h2 id="timeline-view-title">TABLE × TIME</h2>
-          <p>15分単位の滞在、turnover、block、競合を空間で確認します。</p>
+          <h2 id="timeline-view-title">卓 × 時間</h2>
+          <p>15分単位の滞在、入替、ブロック、競合を空間で確認します。</p>
         </div>
         <div className={styles.zoomControl} role="group" aria-label="時間軸ズーム">
           <button type="button" onClick={() => onZoom(zoom === 60 ? 30 : 15)} aria-label="時間軸を拡大"><Plus size={15} /></button>
@@ -78,7 +78,7 @@ export default function TimelineView({ board, reservations, selectedReservationI
                 <div className={styles.timelineTableLabel}>
                   <strong>{table.displayCode}</strong>
                   <span>{table.capacityMax}名</span>
-                  {table.operationalLocked ? <small>LOCK</small> : null}
+                  {table.operationalLocked ? <small>ロック</small> : null}
                 </div>
                 <div className={styles.timelineTrack}>
                   {items.map((reservation) => {
@@ -103,7 +103,7 @@ export default function TimelineView({ board, reservations, selectedReservationI
                     );
                   })}
                   {board.blocks.filter((block) => block.targets.tableIds.includes(table.id)).map((block) => (
-                    <span key={block.id} className={styles.timelineBlock} style={positionStyle(block.startAt, block.endAt, board.businessDay.operatingStartAt, board.businessDay.operatingEndAt)}>BLOCK</span>
+                  <span key={block.id} className={styles.timelineBlock} style={positionStyle(block.startAt, block.endAt, board.businessDay.operatingStartAt, board.businessDay.operatingEndAt)}>ブロック</span>
                   ))}
                   <span className={styles.nowLine} style={nowStyle} aria-label="現在時刻" />
                 </div>

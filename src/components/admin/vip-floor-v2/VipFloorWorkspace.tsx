@@ -30,6 +30,7 @@ import { Inspector } from "./inspector/Inspector";
 import { ExceptionRail } from "./shell/ExceptionRail";
 import { useVipFloorWorkspace } from "./state/useVipFloorWorkspace";
 import styles from "./VipFloorWorkspace.module.css";
+import { canExecuteVipCommand } from "@/lib/adminPermissions";
 
 const TimelineView = dynamic(() => import("./timeline/TimelineView"), {
   loading: () => <WorkspaceSkeleton label="時間軸を準備中" />,
@@ -39,9 +40,9 @@ const ReservationListView = dynamic(() => import("./list/ReservationListView"), 
 });
 
 const viewOptions: Array<{ key: WorkspaceView; label: string; icon: typeof LayoutGrid }> = [
-  { key: "floor", label: "Floor", icon: LayoutGrid },
-  { key: "timeline", label: "Timeline", icon: ChartNoAxesGantt },
-  { key: "list", label: "List", icon: ClipboardList },
+  { key: "floor", label: "フロア", icon: LayoutGrid },
+  { key: "timeline", label: "時間軸", icon: ChartNoAxesGantt },
+  { key: "list", label: "一覧", icon: ClipboardList },
 ];
 
 export default function VipFloorWorkspace() {
@@ -72,6 +73,21 @@ export default function VipFloorWorkspace() {
   }), [allReservations, deferredQuery, state.board.tables, state.sectionId, state.statusFilter]);
   const queueGroups = useMemo(() => buildQueueGroups(reservations), [reservations]);
   const selectedReservation = allReservations.find((item) => item.id === state.selectedReservationId) ?? null;
+  const canMutate = auth.status === "authenticated"
+    && !!auth.session?.role
+    && (
+      canExecuteVipCommand(auth.session.role, "check_in")
+      || canExecuteVipCommand(auth.session.role, "assignment")
+      || canExecuteVipCommand(auth.session.role, "arrival_time")
+      || canExecuteVipCommand(auth.session.role, "note")
+      || canExecuteVipCommand(auth.session.role, "seat_extension")
+      || canExecuteVipCommand(auth.session.role, "service_status")
+    );
+  const canCommand = (kind: CommandKind) => canMutate
+    && auth.status === "authenticated"
+    && !!auth.session?.role
+    && canExecuteVipCommand(auth.session.role, kind);
+
   const readOnly = offline
     || state.globalState === "read_only"
     || !state.board.operations.adminMutationEnabled;
@@ -81,7 +97,7 @@ export default function VipFloorWorkspace() {
   }
 
   function openCommand(kind: CommandKind) {
-    if (!selectedReservation) return;
+    if (!selectedReservation || readOnly || !canCommand(kind)) return;
     dispatch({ type: "openCommand", kind });
   }
 
@@ -131,7 +147,7 @@ export default function VipFloorWorkspace() {
           <button
             key={key}
             type="button"
-            aria-label={`${label} view`}
+            aria-label={`${label}を表示`}
             title={label}
             data-active={state.view === key || undefined}
             onClick={() => dispatch({ type: "view", view: key })}
@@ -148,7 +164,7 @@ export default function VipFloorWorkspace() {
           aria-label="選択予約の操作を開く"
           title="予約操作"
           onClick={() => openCommand("service_status")}
-          disabled={readOnly || !selectedReservation}
+          disabled={readOnly || !selectedReservation || !canCommand("service_status")}
         >
           <Command size={19} />
         </button>
@@ -176,7 +192,7 @@ export default function VipFloorWorkspace() {
         </label>
         <div className={styles.ribbonControl} aria-label="営業枠">
           <Radio size={15} />
-          <span>Service</span>
+          <span>営業枠</span>
           <strong>MAIN / 21:00–05:00</strong>
         </div>
         <div className={styles.operatorIdentity}>
@@ -206,7 +222,7 @@ export default function VipFloorWorkspace() {
         </div>
       </header>
 
-      <section className={styles.mobileSummary} aria-label="本日のVIP予約概要">
+      <section className={styles.mobileSummary} aria-label="本日のVIP予約サマリー">
         <div><span>本日のVIP予約</span><strong>{state.board.totals.reservationCount}</strong></div>
         <div data-alert={state.board.totals.unassignedReservationCount > 0 || undefined}>
           <span>例外 / 未割当</span>
@@ -231,7 +247,7 @@ export default function VipFloorWorkspace() {
       <section className={styles.primaryArea} id="vip-workspace-main">
         <div className={styles.workspaceToolbar} role="toolbar" aria-label="表示と絞り込み">
           <div className={styles.mobileMenuMark}><Menu size={17} /><span>VIP FLOOR</span></div>
-          <div className={styles.viewSwitcher} role="tablist" aria-label="作業view">
+          <div className={styles.viewSwitcher} role="tablist" aria-label="作業表示">
             {viewOptions.map(({ key, label, icon: Icon }) => (
               <button
                 key={key}
@@ -255,16 +271,16 @@ export default function VipFloorWorkspace() {
             />
           </label>
           <label className={styles.toolbarSelect}>
-            <span>Section</span>
+            <span>セクション</span>
             <select value={state.sectionId} onChange={(event) => dispatch({ type: "section", sectionId: event.target.value })}>
-              <option value="all">ALL</option>
+              <option value="all">全て</option>
               {state.board.sections.map((section) => <option value={section.id} key={section.id}>{section.name}</option>)}
             </select>
           </label>
           <label className={styles.toolbarSelect}>
-            <span>Status</span>
+            <span>ステータス</span>
             <select value={state.statusFilter} onChange={(event) => dispatch({ type: "statusFilter", status: event.target.value })}>
-              <option value="all">ALL</option>
+              <option value="all">全て</option>
               <option value="attention">要確認</option>
               <option value="expected">来店予定</option>
               <option value="late">遅延</option>
@@ -277,7 +293,7 @@ export default function VipFloorWorkspace() {
             type="button"
             className={styles.paneButton}
             onClick={() => dispatch({ type: "queueCollapsed", collapsed: !state.queueCollapsed })}
-            aria-label="queue paneを切替"
+            aria-label="キューパネルを切替"
           >
             <PanelLeftClose size={16} />
           </button>
@@ -285,7 +301,7 @@ export default function VipFloorWorkspace() {
             type="button"
             className={styles.paneButton}
             onClick={() => dispatch({ type: "inspectorCollapsed", collapsed: !state.inspectorCollapsed })}
-            aria-label="inspector paneを切替"
+            aria-label="インスペクターパネルを切替"
           >
             <PanelRightClose size={16} />
           </button>
@@ -300,7 +316,7 @@ export default function VipFloorWorkspace() {
         ) : null}
 
         <div className={styles.liveMessage} aria-live="polite">
-          <span data-pending={state.pending || undefined}>{state.pending ? "処理中" : "LIVE"}</span>
+          <span data-pending={state.pending || undefined}>{state.pending ? "処理中" : "更新中"}</span>
           <p>{state.message}</p>
           <strong className="tabular-nums">REV {state.board.boardRevision}</strong>
         </div>
@@ -352,12 +368,13 @@ export default function VipFloorWorkspace() {
           collapsed={state.inspectorCollapsed}
           instance="desktop"
           readOnly={readOnly}
+          canCommand={canCommand}
           onCollapse={(collapsed) => dispatch({ type: "inspectorCollapsed", collapsed })}
           onCommand={openCommand}
         />
       </div>
 
-      <div className={styles.mobileDock} aria-label="mobile primary actions">
+      <div className={styles.mobileDock} aria-label="主要アクション">
         <button
           type="button"
           onClick={() => dispatch({ type: "mobileInspector", open: true })}
@@ -369,14 +386,14 @@ export default function VipFloorWorkspace() {
           type="button"
           className={styles.dockPrimary}
           onClick={() => openCommand("check_in")}
-          disabled={readOnly || !selectedReservation}
+          disabled={readOnly || !selectedReservation || !canCommand("check_in")}
         >
-          <ShieldCheck size={18} />Check in
+          <ShieldCheck size={18} />チェックイン
         </button>
         <button
           type="button"
           onClick={() => openCommand("assignment")}
-          disabled={readOnly || !selectedReservation}
+          disabled={readOnly || !selectedReservation || !canCommand("assignment")}
         >
           <Command size={18} />卓割当
         </button>
@@ -403,6 +420,7 @@ export default function VipFloorWorkspace() {
           history={state.history}
           instance="mobile"
           readOnly={readOnly}
+          canCommand={canCommand}
           onCommand={openCommand}
         />
       </div>
