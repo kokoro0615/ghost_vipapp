@@ -504,7 +504,7 @@ async function main() {
         "cleanup-vip-manager-trial.mjs",
         lifecycleArgs(config, "cleanup", false),
         config,
-      );
+      ).catch(() => undefined);
       await delay(5_000);
       await runRequiredLifecycle(
         config.cleanupScript,
@@ -822,6 +822,11 @@ async function runUiRegression(config, reservationId, uiReservationPlan) {
     await search.fill(uiReservationPublicCode);
     const queue = page.getByLabel("例外と到着queue");
     if (await queue.getAttribute("data-collapsed") !== null) {
+      const inspectorClose = page.getByRole("button", { name: "インスペクターを閉じる" });
+      if (await inspectorClose.count()) {
+        await inspectorClose.click();
+        await inspectorClose.waitFor({ state: "hidden" });
+      }
       const queueToggle = page.getByRole("button", { name: "キューパネルを切替" });
       assert(await queueToggle.count() === 1, "ui_queue_toggle_missing");
       assert(await queueToggle.isVisible(), "ui_queue_toggle_not_visible");
