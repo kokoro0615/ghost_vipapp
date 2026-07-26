@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarClock, ChevronLeft, ChevronRight, ClipboardList, MapPin, NotebookPen, ShieldCheck, UserRound, UsersRound } from "lucide-react";
+import { CalendarClock, ChevronLeft, ChevronRight, ClipboardList, MapPin, NotebookPen, Pencil, ShieldCheck, UserRound, UsersRound } from "lucide-react";
 
 import type { VipFloorBoardV2 } from "@/lib/vipFloorV2Contract";
 
@@ -39,6 +39,8 @@ type Props = {
   onTabChange: (tab: InspectorTab) => void;
   onCollapse?: (value: boolean) => void;
   onCommand: (kind: CommandKind) => void;
+  onEdit: () => void;
+  onCustomerDetails: () => void;
 };
 
 export function Inspector({
@@ -54,6 +56,8 @@ export function Inspector({
   onTabChange,
   onCollapse,
   onCommand,
+  onEdit,
+  onCustomerDetails,
 }: Props) {
   const table = board.tables.find((item) => item.id === selectedTableId) ?? null;
   const meta = getStatusMeta(reservation?.serviceStatus);
@@ -120,13 +124,20 @@ export function Inspector({
               <div><dt><ShieldCheck size={14} /> 版</dt><dd>v{reservation.version}</dd></div>
               <div><dt><ClipboardList size={14} /> 例外</dt><dd>{reservation.exceptionLabel ?? "なし"}</dd></div>
             </dl> : null}
-            {activeTab === "guest" ? <div className={styles.detailStack}><p className={styles.maskedName}><UserRound size={17} />{reservation.guestLabel}</p><p>この端末では業務に必要なマスク済み表示名のみ扱います。</p><small>電話・メール・個人情報のエクスポートは対象外です。</small></div> : null}
+            {activeTab === "guest" ? <div className={styles.detailStack}><p className={styles.maskedName}><UserRound size={17} />{reservation.guestLabel}</p><p>Ownerは暗号化profileを必要時だけ復号できます。</p><small>閲覧、属性変更、解除・再紐付けはすべて監査対象です。</small><button type="button" className={styles.secondaryButton} onClick={onCustomerDetails} disabled={readOnly}>顧客詳細を開く</button></div> : null}
             {activeTab === "service" ? <div className={styles.detailStack}><p><StatusIcon size={16} /> {meta.label}</p><p>元データ: {reservation.sourceLabel}</p><p>席ロック: {table?.operationalLocked ? table.lockReason : "なし"}</p><p>フラグ: {visibleFlags.join(", ") || "なし"}</p></div> : null}
             {activeTab === "notes" ? <div className={styles.noteList}>{notes.length ? notes.map((note) => <article key={note.id}><strong><NotebookPen size={14} />{note.pinned ? "固定メモ" : "メモ"}</strong><p>{note.body}</p><small>v{note.version} / {note.kind}</small></article>) : <p>メモはありません。</p>}</div> : null}
             {activeTab === "history" ? <ol className={styles.historyList}>{history.map((item) => <li key={item.id}><span>{new Intl.DateTimeFormat("ja-JP", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Tokyo" }).format(new Date(item.at))}</span><div><strong>{item.label}</strong><p>{item.detail}</p><small>{item.actor}</small></div></li>)}</ol> : null}
           </div>
 
           <div className={styles.commandGrid} aria-label="予約操作">
+            <button
+              type="button"
+              onClick={onEdit}
+              disabled={readOnly || reservation.sourceChannel === "walk_in"}
+            >
+              <Pencil size={14} />予約編集
+            </button>
             {commandButtons.map((command) => {
               const unavailableForState =
                 (command.kind === "check_in" && reservation.lifecycleStatus === "checked_in")

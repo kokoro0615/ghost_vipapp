@@ -15,6 +15,7 @@ import type {
   OperationDraft,
   OperationOptions,
   StaffWorkspaceData,
+  UiReservation,
 } from "../contract/uiTypes";
 import { ReservationWizard } from "./ReservationWizard";
 import styles from "../VipFloorWorkspace.module.css";
@@ -28,6 +29,7 @@ type Props = {
   options: OperationOptions | null;
   selectedTableId: string | null;
   staffData: StaffWorkspaceData | null;
+  editReservation?: UiReservation | null;
   onClose: () => void;
   onRun: (draft: OperationDraft) => Promise<boolean>;
 };
@@ -39,6 +41,7 @@ export function OperationCenter({
   options,
   selectedTableId,
   staffData,
+  editReservation = null,
   onClose,
   onRun,
 }: Props) {
@@ -172,14 +175,14 @@ export function OperationCenter({
         <header className={styles.commandHeader}>
           <div>
             <span>GHOST ARRIVAL CONTROL</span>
-            <h2 id="operation-title">新規オペレーション</h2>
+            <h2 id="operation-title">{editReservation ? "予約編集" : "新規オペレーション"}</h2>
           </div>
           <button type="button" onClick={onClose} aria-label="新規作成を閉じる">
             <X size={19} />
           </button>
         </header>
 
-        <div className={styles.operationTabs} role="tablist" aria-label="作成種別">
+        {!editReservation ? <div className={styles.operationTabs} role="tablist" aria-label="作成種別">
           <button
             type="button"
             role="tab"
@@ -207,14 +210,15 @@ export function OperationCenter({
           >
             <CalendarPlus size={16} />8段階予約
           </button>
-        </div>
+        </div> : null}
 
-        {kind === "reservation_create" && options ? (
+        {(kind === "reservation_create" || editReservation) && options ? (
           <ReservationWizard
             board={board}
             options={options}
             staffData={staffData}
             selectedTableId={selectedTableId}
+            reservation={editReservation}
             pending={pending}
             onRun={onRun}
             onDone={onClose}

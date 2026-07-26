@@ -130,12 +130,33 @@ export type ReservationCreateDraft = {
   };
 };
 
+export type ReservationUpdateDraft = {
+  kind: "reservation_update";
+  payload: {
+    reservationId: string;
+    expectedVersion: number;
+    offeringId: string;
+    scheduledStartAt: string;
+    scheduledEndAt: string;
+    guestCount: number;
+    tableIds: string[];
+    expectedTableVersions: Array<{ tableId: string; expectedVersion: number }>;
+    guestLabel: string | null;
+    operatorNote: string | null;
+    sourceChannel: "admin_hold" | "online";
+    serviceStatus: VipServiceStatus;
+    bookingStaffMemberId: string | null;
+    notificationPreference: "none" | "email";
+  };
+};
+
 export type OperationDraft =
   | WalkInDraft
   | BlockCreateDraft
   | BlockUpdateDraft
   | BlockCancelDraft
-  | ReservationCreateDraft;
+  | ReservationCreateDraft
+  | ReservationUpdateDraft;
 
 export type WaitlistStatus = "waiting" | "called" | "expired" | "seated" | "cancelled";
 
@@ -245,11 +266,17 @@ export type UiReservation = {
   guestCount: number;
   tableIds: string[];
   tableCodes: string[];
+  sourceChannel: "online" | "admin_hold" | "walk_in";
   sourceLabel: string;
   exceptionLabel: string | null;
   flags: string[];
   version: number;
   customerMasked: boolean;
+  customerId: string | null;
+  bookingOfferingId: string | null;
+  bookingStaffMemberId: string | null;
+  notificationPreference: "none" | "email";
+  operatorNote: string | null;
 };
 
 export type HistoryEntry = {
@@ -258,6 +285,43 @@ export type HistoryEntry = {
   actor: string;
   label: string;
   detail: string;
+};
+
+export type CustomerDetail = {
+  id: string;
+  profilePresent: boolean;
+  profileVersion: number | null;
+  languageCode: string | null;
+  displayName: string | null;
+  nameKana: string | null;
+  phone: string | null;
+  email: string | null;
+  allergies: string | null;
+  preferences: string | null;
+  attributes: {
+    nationalityCode: string | null;
+    birthDate: string | null;
+    anniversaryDate: string | null;
+    vipRank: string | null;
+  } | null;
+  aggregates: Record<string, unknown>;
+  reservationHistory: Array<{
+    reservationId: string;
+    publicCode: string;
+    businessDate: string | null;
+    scheduledStartAt: string;
+    guestCount: number;
+    lifecycleStatus: string;
+    serviceStatus: string | null;
+  }>;
+  linkHistory: Array<{
+    eventId: string;
+    reservationId: string;
+    linked: boolean;
+    unlinked: boolean;
+    resolutionMethod: string;
+    createdAt: string;
+  }>;
 };
 
 export type WorkspaceState = {

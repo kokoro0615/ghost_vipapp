@@ -94,6 +94,59 @@ async function main() {
       await page.getByRole("button", { name: /担当卓/u }).click();
       await page.getByRole("dialog", { name: "スタッフ担当卓" }).waitFor();
       results.push(await auditPage(page, `${viewport.width}x${viewport.height}:staff`));
+
+      await page.goto(`${origin}/?view=list&date=2026-07-26`, {
+        waitUntil: "domcontentloaded",
+      });
+      await page.getByRole("button", { name: /の詳細を開く/u }).click();
+      if (viewport.width < 768) {
+        await page.getByRole("dialog", { name: "予約詳細" }).waitFor();
+      }
+      const editDiagnostics = await page.locator("body").evaluate((body) => ({
+        text: body.querySelector('[role="dialog"][aria-label="予約詳細"]')?.textContent,
+        editButtons: [...body.querySelectorAll("button")].filter((node) => node.textContent?.includes("予約編集")).map((node) => ({
+          disabled: node.disabled,
+          visible: Boolean(node.getClientRects().length),
+        })),
+      }));
+      if (!editDiagnostics.editButtons.length) {
+        throw new Error(`reservation edit control missing: ${JSON.stringify(editDiagnostics)}`);
+      }
+      const editButton = viewport.width < 768
+        ? page.locator('[role="dialog"][aria-label="予約詳細"] button').filter({ hasText: "予約編集" })
+        : page.locator('[data-instance="desktop"] button').filter({ hasText: "予約編集" });
+      if (await editButton.isDisabled()) {
+        throw new Error(`reservation edit stayed disabled: ${JSON.stringify(await page.locator("body").evaluate((body) => ({
+          status: body.querySelector('[role="status"]')?.textContent,
+          alerts: [...body.querySelectorAll('[role="alert"]')].map((node) => node.textContent),
+          editButtons: [...body.querySelectorAll("button")].filter((node) => node.textContent?.includes("予約編集")).map((node) => ({
+            disabled: node.disabled,
+            visible: Boolean(node.getClientRects().length),
+          })),
+        })))}`);
+      }
+      await editButton.click();
+      await page.getByRole("dialog", { name: "予約編集" }).waitFor();
+      results.push(await auditPage(page, `${viewport.width}x${viewport.height}:reservation-edit`));
+
+      await page.goto(`${origin}/?view=list&date=2026-07-26&detail=guest`, {
+        waitUntil: "domcontentloaded",
+      });
+      await page.getByRole("button", { name: /の詳細を開く/u }).click();
+      if (viewport.width < 768) {
+        await page.getByRole("dialog", { name: "予約詳細" }).waitFor();
+      }
+      await page.getByRole("button", { name: "顧客詳細を開く" }).click();
+      await page.getByRole("dialog", { name: "顧客詳細と紐付け" }).waitFor();
+      results.push(await auditPage(page, `${viewport.width}x${viewport.height}:customer-detail`));
+
+      await page.goto(`${origin}/?view=floor&date=2026-07-26`, {
+        waitUntil: "domcontentloaded",
+      });
+      await page.getByRole("button", { name: "メニュー", exact: true }).click();
+      await page.getByRole("button", { name: /SLO/u }).click();
+      await page.getByRole("dialog", { name: "運用SLO / Alert" }).waitFor();
+      results.push(await auditPage(page, `${viewport.width}x${viewport.height}:observability`));
       await context.close();
     }
 
@@ -163,6 +216,16 @@ async function installSyntheticRoutes(page) {
     status: 200,
     contentType: "application/json",
     body: JSON.stringify(staff),
+  }));
+  await page.route("**/api/admin/vip-floor/customers/**", (route) => route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify(customerDetail),
+  }));
+  await page.route("**/api/admin/vip-floor/observability?**", (route) => route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify(observability),
   }));
   await page.route("**/api/admin/vip-floor?**", (route) => route.fulfill({
     status: 200,
@@ -292,10 +355,18 @@ const board = {
     guestCount: { total: 4, adults: null, children: null },
     assignmentIds: ["synthetic-assignment"],
     tableIds: [tableIds[0]],
-    customer: { displayNameMasked: "GUEST ••••", masked: true },
+    customer: {
+      customerId: "70000000-0000-4000-8000-000000000001",
+      displayLabel: "GUEST ••••",
+      masked: false,
+    },
     payment: null,
     notes: [],
     flags: [],
+    bookingOfferingId: "30000000-0000-4000-8000-000000000001",
+    bookingStaffMemberId: "50000000-0000-4000-8000-000000000002",
+    notificationPreference: "none",
+    operatorNote: "Synthetic floor note",
     updatedAt: "2026-07-26T13:00:00.000Z",
   }],
   assignments: [],
@@ -381,6 +452,74 @@ const staff = {
     createdAt: "2026-07-26T12:30:00.000Z",
     updatedAt: "2026-07-26T12:30:00.000Z",
   }],
+};
+
+const customerDetail = {
+  ok: true,
+  schemaVersion: "vip-customer.v2",
+  generatedAt: "2026-07-26T13:15:00.000Z",
+  accessAuditRecorded: true,
+  customer: {
+    id: "70000000-0000-4000-8000-000000000001",
+    profilePresent: true,
+    profileVersion: 2,
+    languageCode: "ja",
+    displayName: "SYNTHETIC GUEST",
+    nameKana: null,
+    phone: "+81000000000",
+    email: "synthetic@example.invalid",
+    allergies: null,
+    preferences: null,
+    attributes: {
+      nationalityCode: "JP",
+      birthDate: null,
+      anniversaryDate: null,
+      vipRank: "BLACK",
+    },
+    aggregates: { reservationCount: 1 },
+    reservationHistory: [{
+      reservationId: board.reservations[0].id,
+      publicCode: board.reservations[0].publicCode,
+      businessDate: "2026-07-26",
+      scheduledStartAt: board.reservations[0].scheduledStartAt,
+      guestCount: 4,
+      lifecycleStatus: "confirmed",
+      serviceStatus: "expected",
+    }],
+    linkHistory: [{
+      eventId: "71000000-0000-4000-8000-000000000001",
+      reservationId: board.reservations[0].id,
+      linked: true,
+      unlinked: false,
+      resolutionMethod: "phone_exact",
+      createdAt: "2026-07-26T13:00:00.000Z",
+    }],
+  },
+};
+
+const observability = {
+  ok: true,
+  schemaVersion: "vip-manager-slo.v1",
+  generatedAt: "2026-07-26T13:15:00.000Z",
+  windowMinutes: 60,
+  metrics: {
+    commandCount: 120,
+    commandErrorCount: 0,
+    commandErrorRate: 0,
+    commandP95Ms: 180,
+    boardReadP95Ms: 220,
+    outboxDeadCount: 0,
+    realtimeGapCount: 1,
+    realtimeUnavailableCount: 0,
+  },
+  targets: {
+    commandErrorRateMax: 0.01,
+    commandP95MsMax: 1000,
+    boardReadP95MsMax: 1000,
+    outboxDeadCountMax: 0,
+    realtimeGapCountMax: 3,
+  },
+  alerts: {},
 };
 
 await main();

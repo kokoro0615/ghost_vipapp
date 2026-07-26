@@ -15,7 +15,7 @@ const BUSINESS_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/u;
 const FIXED_REASON = "管理画面操作";
 
 type OperationBody = {
-  kind?: "walk_in" | "block_create" | "block_update" | "block_cancel" | "reservation_create";
+  kind?: "walk_in" | "block_create" | "block_update" | "block_cancel" | "reservation_create" | "reservation_update";
   payload?: Record<string, unknown>;
 };
 
@@ -116,6 +116,63 @@ export async function POST(request: Request) {
     );
     return NextResponse.json({
       ...createResult,
+      notification: {
+        requested: true,
+        queued: notificationResponse.ok,
+        status: notificationResponse.status,
+      },
+    });
+  }
+
+  if (body.kind === "reservation_update") {
+    const payload = parseReservationUpdate(body.payload);
+    if (!payload.ok) {
+      return NextResponse.json({ ok: false, error: payload.error }, { status: 400 });
+    }
+    const updateResponse = await ghostAdminFetch(
+      `/api/admin/v2/reservations/${encodeURIComponent(payload.value.reservationId)}`,
+      {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          "idempotency-key": idempotencyKey,
+        },
+        body: JSON.stringify({ ...payload.value.command, reason: FIXED_REASON }),
+      },
+      token,
+    );
+    const updateResult = await copyJson(updateResponse) as Record<string, unknown>;
+    if (!updateResponse.ok) {
+      return NextResponse.json(updateResult, { status: updateResponse.status });
+    }
+    if (payload.value.command.notificationPreference !== "email") {
+      return NextResponse.json({ ...updateResult, notification: { requested: false } });
+    }
+    const entityVersion = readInteger(updateResult.entityVersion, 1, Number.MAX_SAFE_INTEGER);
+    if (entityVersion === null) {
+      return NextResponse.json({
+        ...updateResult,
+        notification: { requested: true, queued: false, error: "update_result_missing_version" },
+      });
+    }
+    const notificationResponse = await ghostAdminFetch(
+      `/api/admin/v2/reservations/${encodeURIComponent(payload.value.reservationId)}/notifications/email`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "idempotency-key": `${idempotencyKey}:email`,
+        },
+        body: JSON.stringify({
+          expectedVersion: entityVersion,
+          template: "reservation_changed",
+          reason: FIXED_REASON,
+        }),
+      },
+      token,
+    );
+    return NextResponse.json({
+      ...updateResult,
       notification: {
         requested: true,
         queued: notificationResponse.ok,
@@ -310,6 +367,70 @@ function parseReservationCreate(payload: Record<string, unknown>) {
       bookingStaffMemberId,
       notificationPreference,
       capacityOverride: false,
+    },
+  };
+}
+
+function parseReservationUpdate(payload: Record<string, unknown>) {
+  const reservationId = readUuid(payload.reservationId);
+  const expectedVersion = readInteger(payload.expectedVersion, 1, Number.MAX_SAFE_INTEGER);
+  const offeringId = readUuid(payload.offeringId);
+  const scheduledStartAt = readIso(payload.scheduledStartAt);
+  const scheduledEndAt = readIso(payload.scheduledEndAt);
+  const guestCount = readInteger(payload.guestCount, 1, 99);
+  const tableIds = readUuidArray(payload.tableIds, 1, 8);
+  const versions = readTableVersions(payload.expectedTableVersions, tableIds);
+  const guestLabel = readNullableString(payload.guestLabel, 80);
+  const operatorNote = readNullableString(payload.operatorNote, 500);
+  const sourceChannel = payload.sourceChannel === "admin_hold" || payload.sourceChannel === "online"
+    ? payload.sourceChannel
+    : null;
+  const serviceStatuses = [
+    "expected", "late", "no_contact", "arrived", "partial_arrival", "seated",
+    "bottle_pending", "bottle_served", "bill_requested", "paid", "resetting",
+    "completed", "no_show",
+  ];
+  const serviceStatus = serviceStatuses.includes(String(payload.serviceStatus))
+    ? String(payload.serviceStatus)
+    : null;
+  const bookingStaffMemberId = payload.bookingStaffMemberId === null
+    ? null
+    : readUuid(payload.bookingStaffMemberId);
+  const notificationPreference = payload.notificationPreference === "none"
+    || payload.notificationPreference === "email"
+    ? payload.notificationPreference
+    : null;
+  if (
+    !reservationId || expectedVersion === null || !offeringId
+    || !scheduledStartAt || !scheduledEndAt
+    || Date.parse(scheduledStartAt) >= Date.parse(scheduledEndAt)
+    || guestCount === null || !tableIds || !versions
+    || guestLabel === undefined || operatorNote === undefined
+    || !sourceChannel || !serviceStatus || !notificationPreference
+    || (payload.bookingStaffMemberId !== null && !bookingStaffMemberId)
+  ) {
+    return { ok: false as const, error: "invalid_reservation_update" };
+  }
+  return {
+    ok: true as const,
+    value: {
+      reservationId,
+      command: {
+        expectedVersion,
+        offeringId,
+        scheduledStartAt,
+        scheduledEndAt,
+        guestCount,
+        tableIds,
+        expectedTableVersions: versions,
+        guestLabel,
+        operatorNote,
+        sourceChannel,
+        serviceStatus,
+        bookingStaffMemberId,
+        notificationPreference,
+        capacityOverride: false,
+      },
     },
   };
 }

@@ -1,0 +1,254 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { Link2, Save, Unlink, UserRound, X } from "lucide-react";
+
+import type { CustomerDetail, UiReservation } from "../contract/uiTypes";
+import styles from "../VipFloorWorkspace.module.css";
+
+type Props = {
+  open: boolean;
+  eventDayId: string;
+  reservation: UiReservation | null;
+  pending: boolean;
+  onClose: () => void;
+  onChanged: () => Promise<void>;
+};
+
+export function CustomerPanel({
+  open,
+  eventDayId,
+  reservation,
+  pending,
+  onClose,
+  onChanged,
+}: Props) {
+  const [detail, setDetail] = useState<CustomerDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState("");
+  const [targetCustomerId, setTargetCustomerId] = useState("");
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open || !reservation?.customerId) return;
+    let cancelled = false;
+    fetch(`/api/admin/vip-floor/customers/${encodeURIComponent(reservation.customerId)}`, {
+      cache: "no-store",
+    })
+      .then(async (response) => {
+        const payload = await response.json().catch(() => ({})) as Record<string, unknown>;
+        if (!response.ok || payload.ok !== true || !payload.customer) {
+          throw new Error("customer_read_failed");
+        }
+        if (!cancelled) {
+          setDetail(payload.customer as CustomerDetail);
+          setLoading(false);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setMessage("顧客詳細を取得できませんでした。");
+          setLoading(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, reservation?.customerId]);
+
+  useEffect(() => {
+    if (!open) return;
+    const frame = window.requestAnimationFrame(() =>
+      panelRef.current?.querySelector<HTMLElement>("button, input")?.focus(),
+    );
+    return () => window.cancelAnimationFrame(frame);
+  }, [open]);
+
+  if (!open || !reservation) return null;
+  const activeReservation = reservation;
+
+  async function saveAttributes(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!activeReservation.customerId || !detail?.profileVersion) return;
+    const form = new FormData(event.currentTarget);
+    const response = await fetch(
+      `/api/admin/vip-floor/customers/${encodeURIComponent(activeReservation.customerId)}`,
+      {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          "idempotency-key": crypto.randomUUID(),
+        },
+        body: JSON.stringify({
+          expectedVersion: detail.profileVersion,
+          eventDayId,
+          reservationId: activeReservation.id,
+          nationalityCode: nullable(form.get("nationalityCode")),
+          birthDate: nullable(form.get("birthDate")),
+          anniversaryDate: nullable(form.get("anniversaryDate")),
+          vipRank: nullable(form.get("vipRank")),
+        }),
+      },
+    );
+    if (!response.ok) {
+      setMessage(response.status === 409
+        ? "顧客profileが更新されています。閉じて再読込してください。"
+        : "顧客属性を保存できませんでした。");
+      return;
+    }
+    setMessage("顧客属性を保存しました。");
+    const next = await fetch(
+      `/api/admin/vip-floor/customers/${encodeURIComponent(activeReservation.customerId)}`,
+      { cache: "no-store" },
+    );
+    const payload = await next.json().catch(() => ({})) as Record<string, unknown>;
+    if (next.ok && payload.customer) setDetail(payload.customer as CustomerDetail);
+  }
+
+  async function relink(customerId: string | null) {
+    const response = await fetch(
+      `/api/admin/vip-floor/reservations/${encodeURIComponent(activeReservation.id)}/customer-link`,
+      {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          "idempotency-key": crypto.randomUUID(),
+        },
+        body: JSON.stringify({
+          expectedVersion: activeReservation.version,
+          customerId,
+        }),
+      },
+    );
+    if (!response.ok) {
+      setMessage(response.status === 409
+        ? "予約が更新されています。台帳を再読込してください。"
+        : "顧客リンクを更新できませんでした。");
+      return;
+    }
+    await onChanged();
+    onClose();
+  }
+
+  return (
+    <div className={styles.dialogBackdrop} role="presentation">
+      <div
+        ref={panelRef}
+        className={styles.customerDialog}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="customer-panel-title"
+        onKeyDown={(event) => {
+          if (event.key === "Escape") onClose();
+        }}
+      >
+        <header className={styles.commandHeader}>
+          <div>
+            <span>OWNER · ENCRYPTED CUSTOMER</span>
+            <h2 id="customer-panel-title">顧客詳細と紐付け</h2>
+          </div>
+          <button type="button" onClick={onClose} aria-label="顧客詳細を閉じる">
+            <X size={19} />
+          </button>
+        </header>
+
+        <div className={styles.customerBody}>
+          {loading ? <p aria-busy="true">暗号化profileを復号しています…</p> : null}
+          {detail ? (
+            <>
+              <section className={styles.customerIdentity}>
+                <UserRound size={20} />
+                <div>
+                  <strong>{detail.displayName || reservation.guestLabel}</strong>
+                  <span>{detail.phone || "電話なし"} · {detail.email || "Eメールなし"}</span>
+                </div>
+                <small>PROFILE v{detail.profileVersion ?? "—"}</small>
+              </section>
+
+              <form className={styles.customerAttributeForm} onSubmit={saveAttributes}>
+                <fieldset disabled={pending || !detail.profileVersion}>
+                  <legend>顧客属性</legend>
+                  <div className={styles.formColumns}>
+                    <label>国籍コード<input name="nationalityCode" maxLength={2} defaultValue={detail.attributes?.nationalityCode ?? ""} placeholder="JP" /></label>
+                    <label>VIP Rank<input name="vipRank" maxLength={32} defaultValue={detail.attributes?.vipRank ?? ""} /></label>
+                    <label>生年月日<input name="birthDate" type="date" defaultValue={detail.attributes?.birthDate ?? ""} /></label>
+                    <label>記念日<input name="anniversaryDate" type="date" defaultValue={detail.attributes?.anniversaryDate ?? ""} /></label>
+                  </div>
+                  <button type="submit" className={styles.primaryButton}><Save size={15} />属性を保存</button>
+                </fieldset>
+              </form>
+
+              <section className={styles.customerHistory}>
+                <h3>予約履歴</h3>
+                <ol>
+                  {detail.reservationHistory.map((item) => (
+                    <li key={item.reservationId}>
+                      <strong>{item.publicCode}</strong>
+                      <span>{item.businessDate ?? "日付不明"} · {item.guestCount}名</span>
+                      <small>{item.lifecycleStatus} / {item.serviceStatus ?? "状態なし"}</small>
+                    </li>
+                  ))}
+                </ol>
+                <h3>紐付け履歴</h3>
+                <ol>
+                  {detail.linkHistory.map((item) => (
+                    <li key={item.eventId}>
+                      <strong>{item.unlinked ? "解除" : "紐付け"}</strong>
+                      <span>{item.resolutionMethod}</span>
+                      <small>{new Intl.DateTimeFormat("ja-JP", {
+                        dateStyle: "short",
+                        timeStyle: "short",
+                        timeZone: "Asia/Tokyo",
+                      }).format(new Date(item.createdAt))}</small>
+                    </li>
+                  ))}
+                </ol>
+              </section>
+            </>
+          ) : reservation.customerId ? null : (
+            <p>この予約には顧客profileが紐付いていません。</p>
+          )}
+
+          <section className={styles.customerLinkControl}>
+            <h3>手動解除・再紐付け</h3>
+            <p>誤集約を戻す操作です。予約versionと監査履歴を更新します。</p>
+            <div>
+              <input
+                value={targetCustomerId}
+                onChange={(event) => setTargetCustomerId(event.target.value.trim())}
+                placeholder="顧客 UUID"
+                aria-label="再紐付け先の顧客ID"
+              />
+              <button
+                type="button"
+                className={styles.secondaryButton}
+                disabled={!isUuid(targetCustomerId)}
+                onClick={() => void relink(targetCustomerId)}
+              >
+                <Link2 size={15} />再紐付け
+              </button>
+              <button
+                type="button"
+                className={styles.dangerButton}
+                disabled={!reservation.customerId}
+                onClick={() => void relink(null)}
+              >
+                <Unlink size={15} />解除
+              </button>
+            </div>
+          </section>
+          <p role="status" className={styles.wizardHint}>{message}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function nullable(value: FormDataEntryValue | null) {
+  const text = typeof value === "string" ? value.trim() : "";
+  return text || null;
+}
+
+function isUuid(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(value);
+}

@@ -175,6 +175,10 @@ export type VipFloorReservationV2 = {
   payment: Record<string, unknown> | null;
   notes: Record<string, unknown>[];
   flags: string[];
+  bookingOfferingId?: string | null;
+  bookingStaffMemberId?: string | null;
+  notificationPreference?: "none" | "email";
+  operatorNote?: string | null;
   updatedAt: string;
 };
 

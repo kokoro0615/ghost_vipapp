@@ -230,7 +230,7 @@
 .primaryButton { border-color: var(--accent); background: var(--accent); color: #120c16 !important; font-weight: 700; }
 .primaryButton:hover { border-color: var(--accent-hover); background: var(--accent-hover); }
 .secondaryButton { background: var(--lacquer-2); color: var(--ivory); }
-.dangerButton { border-color: var(--danger); background: var(--danger); color: #fff; font-weight: 700; }
+.workspace .dangerButton { border-color: var(--danger); background: var(--danger); color: #160f18; font-weight: 800; }
 .primaryButton:active, .secondaryButton:active, .dangerButton:active { transform: translateY(1px); }
 
 .floorView, .timelineView, .listView { display: flex; height: 100%; min-width: 0; min-height: 0; flex-direction: column; }
@@ -422,6 +422,46 @@
 .wizardStatement p,
 .wizardHint { color: var(--muted); font-size: 10px; }
 .wizardWarning { color: var(--danger); font-size: 10px; font-weight: 700; }
+
+.customerDialog { display: flex; width: min(760px, calc(100vw - 24px)); max-height: min(860px, calc(100dvh - 24px)); flex-direction: column; overflow: hidden; border: 1px solid var(--metal); border-radius: 4px; background: var(--lacquer-1); box-shadow: var(--shadow); }
+.customerBody { min-height: 0; padding: 14px; overflow-y: auto; }
+.customerIdentity { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 12px; border: 1px solid var(--line); border-left: 3px solid var(--metal); background: var(--lacquer-2); }
+.customerIdentity div { display: flex; min-width: 0; flex-direction: column; gap: 3px; }
+.customerIdentity strong, .customerIdentity span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.customerIdentity span, .customerIdentity small { color: var(--muted); font-size: 10px; }
+.customerAttributeForm { margin-top: 12px; }
+.customerAttributeForm fieldset { display: flex; flex-direction: column; gap: 10px; padding: 12px; border: 1px solid var(--line); }
+.customerAttributeForm legend { padding: 0 6px; color: var(--metal); font-size: 11px; font-weight: 800; letter-spacing: 0.08em; }
+.customerAttributeForm label { display: flex; flex-direction: column; gap: 5px; color: var(--muted); font-size: 10px; }
+.customerAttributeForm input, .customerLinkControl input { min-height: 44px; border: 1px solid var(--line-soft); border-radius: 3px; background: var(--lacquer-0); color: var(--ivory); padding: 0 10px; }
+.customerHistory { display: grid; margin-top: 12px; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 12px; }
+.customerHistory h3 { margin: 0; color: var(--metal); font-size: 11px; letter-spacing: 0.08em; }
+.customerHistory ol { max-height: 220px; margin: 0; padding: 0; overflow-y: auto; border: 1px solid var(--line); list-style: none; }
+.customerHistory li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 8px; padding: 8px 10px; border-bottom: 1px solid var(--line-soft); }
+.customerHistory li span { color: var(--muted); font-size: 10px; }
+.customerHistory li small { grid-column: 1 / -1; color: var(--text-tertiary); font-size: 9px; }
+.customerLinkControl { margin-top: 12px; padding: 12px; border: 1px solid var(--danger); background: var(--danger-tint); }
+.customerLinkControl h3, .customerLinkControl p { margin: 0 0 7px; }
+.customerLinkControl p { color: var(--muted); font-size: 10px; }
+.customerLinkControl div { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 7px; }
+
+.observabilityDialog { display: flex; width: min(700px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); flex-direction: column; overflow: hidden; border: 1px solid var(--metal); border-radius: 4px; background: var(--lacquer-1); box-shadow: var(--shadow); }
+.observabilityBody { min-height: 0; padding: 14px; overflow-y: auto; }
+.sloStatus { display: grid; min-height: 64px; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--success); border-left-width: 4px; background: var(--success-tint); }
+.sloStatus[data-alert] { border-color: var(--danger); background: var(--danger-tint); }
+.sloStatus div { display: flex; flex-direction: column; gap: 3px; }
+.sloStatus span { color: var(--muted); font-size: 10px; }
+.sloGrid { display: grid; margin: 12px 0; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); }
+.sloGrid div { min-height: 82px; padding: 10px; background: var(--lacquer-2); }
+.sloGrid dt { color: var(--muted); font-size: 9px; letter-spacing: 0.06em; text-transform: uppercase; }
+.sloGrid dd { margin: 8px 0 0; font-family: var(--font-operator); font-size: 22px; font-weight: 800; }
+.sloGrid dd small { margin-left: 3px; color: var(--muted); font-size: 9px; }
+.alertRail { border: 1px solid var(--line); }
+.alertRail h3 { margin: 0; padding: 8px 10px; border-bottom: 1px solid var(--line); color: var(--metal); font-size: 10px; letter-spacing: 0.08em; }
+.alertRail p { display: flex; min-height: 44px; align-items: center; gap: 7px; margin: 0; padding: 7px 10px; border-bottom: 1px solid var(--line-soft); color: var(--muted); }
+.alertRail p strong { margin-left: auto; text-transform: uppercase; }
+.alertRail p[data-severity="critical"] { color: var(--danger); }
+.alertRail p[data-severity="warning"] { color: var(--warning); }
 .wizardConfirm { display: grid; gap: 12px; }
 .wizardConfirm > header { display: flex; align-items: center; gap: 9px; color: var(--metal); }
 .wizardConfirm > header div { display: flex; flex-direction: column; }
@@ -581,6 +621,11 @@
 }
 
 @media (max-width: 767px) {
+  .customerDialog { width: 100vw; height: 100dvh; max-height: 100dvh; border: 0; border-radius: 0; }
+  .observabilityDialog { width: 100vw; height: 100dvh; max-height: 100dvh; border: 0; border-radius: 0; }
+  .customerHistory { grid-template-columns: 1fr; }
+  .customerLinkControl div { grid-template-columns: 1fr; }
+  .sloGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .workspace { display: flex; min-height: 100dvh; height: 100dvh; flex-direction: column; overflow: hidden; font-size: 13px; }
   .navRail, .exceptionRail, .desktopInspector { display: none; }
   .serviceRibbon { position: relative; z-index: 12; display: grid; min-height: 58px; grid-template-columns: minmax(0, 1fr) 122px; flex: 0 0 auto; border-bottom: 1px solid var(--line); }

@@ -6,7 +6,7 @@ import type { QueueGroup, UiReservation } from "./uiTypes";
 function readGuestLabel(reservation: VipFloorReservationV2) {
   const customer = reservation.customer;
   if (!customer) return "ゲスト情報なし";
-  const value = customer.displayNameMasked ?? customer.guestLabel;
+  const value = customer.displayLabel ?? customer.displayNameMasked ?? customer.guestLabel;
   return typeof value === "string" && value.trim() ? value : "マスク済みゲスト";
 }
 
@@ -49,11 +49,19 @@ export function toUiReservations(board: VipFloorBoardV2): UiReservation[] {
         guestCount: reservation.guestCount.total,
         tableIds: reservation.tableIds,
         tableCodes: reservation.tableIds.map((id) => tableCodeById.get(id) ?? "未割当"),
+        sourceChannel: reservation.sourceChannel,
         sourceLabel: reservation.sourceChannel === "walk_in" ? "店頭" : reservation.sourceChannel === "admin_hold" ? "管理枠" : "オンライン",
         exceptionLabel,
         flags: reservation.flags,
         version: reservation.version,
         customerMasked: reservation.customer?.masked !== false,
+        customerId: typeof reservation.customer?.customerId === "string"
+          ? reservation.customer.customerId
+          : null,
+        bookingOfferingId: reservation.bookingOfferingId ?? null,
+        bookingStaffMemberId: reservation.bookingStaffMemberId ?? null,
+        notificationPreference: reservation.notificationPreference ?? "none",
+        operatorNote: reservation.operatorNote ?? null,
       } satisfies UiReservation;
     })
     .sort((a, b) => a.startAt.localeCompare(b.startAt));

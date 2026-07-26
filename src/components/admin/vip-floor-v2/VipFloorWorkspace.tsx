@@ -5,6 +5,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { type FormEvent, useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
+  Activity,
   BellRing,
   CalendarPlus,
   CalendarDays,
@@ -19,17 +20,18 @@ import {
   RefreshCw,
   Search,
   ShieldCheck,
-  UsersRound,
   WifiOff,
   X,
 } from "lucide-react";
 
 import { CommandCenter } from "./commands/CommandCenter";
+import { CustomerPanel } from "./customers/CustomerPanel";
 import { buildQueueGroups, matchesReservation, toUiReservations } from "./contract/viewModel";
 import type { CommandKind, WorkspaceView } from "./contract/uiTypes";
 import FloorView from "./floor/FloorView";
 import { Inspector, INSPECTOR_TABS, type InspectorTab } from "./inspector/Inspector";
 import { OperationCenter } from "./operations/OperationCenter";
+import { ObservabilityPanel } from "./observability/ObservabilityPanel";
 import { ExceptionRail } from "./shell/ExceptionRail";
 import { useVipFloorWorkspace } from "./state/useVipFloorWorkspace";
 import { StaffPanel } from "./staff/StaffPanel";
@@ -88,12 +90,15 @@ export default function VipFloorWorkspace() {
   const [pin, setPin] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
   const [operationOpen, setOperationOpen] = useState(false);
+  const [editingReservationId, setEditingReservationId] = useState<string | null>(null);
   const [operationOptions, setOperationOptions] = useState<OperationOptions | null>(null);
   const [waitlistOpen, setWaitlistOpen] = useState(false);
   const [waitlistEntries, setWaitlistEntries] = useState<WaitlistEntry[]>([]);
   const [staffOpen, setStaffOpen] = useState(false);
   const [staffData, setStaffData] = useState<StaffWorkspaceData | null>(null);
   const [staffFilter, setStaffFilter] = useState("");
+  const [customerOpen, setCustomerOpen] = useState(false);
+  const [observabilityOpen, setObservabilityOpen] = useState(false);
   const inspectorTab = parseInspectorTab(searchParams.get("detail"));
   const deferredQuery = useDeferredValue(state.query);
   const allReservations = useMemo(() => toUiReservations(state.board), [state.board]);
@@ -165,6 +170,7 @@ export default function VipFloorWorkspace() {
 
   function selectReservation(id: string) {
     dispatch({ type: "selectReservation", reservationId: id });
+    dispatch({ type: "inspectorCollapsed", collapsed: false });
   }
 
   function openCommand(kind: CommandKind) {
@@ -174,6 +180,15 @@ export default function VipFloorWorkspace() {
 
   async function openOperation() {
     if (readOnly || !isOwner) return;
+    setEditingReservationId(null);
+    setOperationOpen(true);
+    setOperationOptions(await loadOperationOptions());
+  }
+
+  async function openReservationEdit() {
+    if (readOnly || !isOwner || !selectedReservation) return;
+    dispatch({ type: "mobileInspector", open: false });
+    setEditingReservationId(selectedReservation.id);
     setOperationOpen(true);
     setOperationOptions(await loadOperationOptions());
   }
@@ -453,6 +468,11 @@ export default function VipFloorWorkspace() {
           onTabChange={changeInspectorTab}
           onCollapse={(collapsed) => dispatch({ type: "inspectorCollapsed", collapsed })}
           onCommand={openCommand}
+          onEdit={() => void openReservationEdit()}
+          onCustomerDetails={() => {
+            dispatch({ type: "mobileInspector", open: false });
+            setCustomerOpen(true);
+          }}
         />
       </div>
 
@@ -472,7 +492,12 @@ export default function VipFloorWorkspace() {
             <button type="button" onClick={() => void openWaitlist()}>
               <BellRing size={18} /><span>Waitlist</span><small>呼出・30分期限</small>
             </button>
-            <span aria-disabled="true"><UsersRound size={18} /><span>顧客</span><small>準備中</small></span>
+            <button type="button" onClick={() => {
+              setMenuOpen(false);
+              setObservabilityOpen(true);
+            }}>
+              <Activity size={18} /><span>SLO</span><small>Metric / Alert</small>
+            </button>
             <button type="button" onClick={() => void openStaff()}>
               <ShieldCheck size={18} /><span>担当卓</span><small>スタッフMaster</small>
             </button>
@@ -533,6 +558,11 @@ export default function VipFloorWorkspace() {
           canCommand={canCommand}
           onTabChange={changeInspectorTab}
           onCommand={openCommand}
+          onEdit={() => void openReservationEdit()}
+          onCustomerDetails={() => {
+            dispatch({ type: "mobileInspector", open: false });
+            setCustomerOpen(true);
+          }}
         />
       </div>
 
@@ -557,8 +587,12 @@ export default function VipFloorWorkspace() {
         options={operationOptions}
         selectedTableId={state.selectedTableId}
         staffData={staffData}
+        editReservation={
+          allReservations.find((item) => item.id === editingReservationId) ?? null
+        }
         onClose={() => {
           setOperationOpen(false);
+          setEditingReservationId(null);
           setOperationOptions(null);
         }}
         onRun={runOperation}
@@ -582,6 +616,23 @@ export default function VipFloorWorkspace() {
         onClose={() => setStaffOpen(false)}
         onRefresh={refreshStaff}
         onAction={runStaffAction}
+      />
+
+      <CustomerPanel
+        key={`${selectedReservation?.id ?? "none"}:${customerOpen ? "open" : "closed"}`}
+        open={customerOpen}
+        eventDayId={state.board.businessDay.id}
+        reservation={selectedReservation}
+        pending={state.pending}
+        onClose={() => setCustomerOpen(false)}
+        onChanged={async () => {
+          await loadBoard();
+        }}
+      />
+
+      <ObservabilityPanel
+        open={observabilityOpen}
+        onClose={() => setObservabilityOpen(false)}
       />
     </main>
   );

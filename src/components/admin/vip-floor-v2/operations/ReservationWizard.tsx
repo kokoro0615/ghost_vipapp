@@ -9,6 +9,7 @@ import type {
   OperationDraft,
   OperationOptions,
   StaffWorkspaceData,
+  UiReservation,
 } from "../contract/uiTypes";
 import styles from "../VipFloorWorkspace.module.css";
 
@@ -37,6 +38,7 @@ type Props = {
   options: OperationOptions;
   staffData: StaffWorkspaceData | null;
   selectedTableId: string | null;
+  reservation?: UiReservation | null;
   pending: boolean;
   onRun: (draft: OperationDraft) => Promise<boolean>;
   onDone: () => void;
@@ -47,32 +49,41 @@ export function ReservationWizard({
   options,
   staffData,
   selectedTableId,
+  reservation = null,
   pending,
   onRun,
   onDone,
 }: Props) {
-  const defaults = useMemo(() => scheduleDefaults(board), [board]);
+  const defaults = useMemo(
+    () => reservation
+      ? {
+          start: localInput(reservation.startAt),
+          end: localInput(reservation.endAt),
+        }
+      : scheduleDefaults(board),
+    [board, reservation],
+  );
   const [step, setStep] = useState(0);
   const [draft, setDraft] = useState<Draft>(() => ({
     startAt: defaults.start,
     endAt: defaults.end,
-    offeringId: options.offerings[0]?.id ?? "",
-    guestCount: 2,
-    tableIds: selectedTableId ? [selectedTableId] : [],
-    displayName: "",
+    offeringId: reservation?.bookingOfferingId ?? options.offerings[0]?.id ?? "",
+    guestCount: reservation?.guestCount ?? 2,
+    tableIds: reservation?.tableIds ?? (selectedTableId ? [selectedTableId] : []),
+    displayName: reservation?.guestLabel ?? "",
     phone: "",
     email: "",
     languageCode: "ja",
-    guestLabel: "",
-    operatorNote: "",
-    sourceChannel: "admin_hold",
-    serviceStatus: "expected",
-    bookingStaffMemberId: "",
-    notificationPreference: "none",
+    guestLabel: reservation?.guestLabel ?? "",
+    operatorNote: reservation?.operatorNote ?? "",
+    sourceChannel: reservation?.sourceChannel === "online" ? "online" : "admin_hold",
+    serviceStatus: (reservation?.serviceStatus ?? "expected") as VipServiceStatus,
+    bookingStaffMemberId: reservation?.bookingStaffMemberId ?? "",
+    notificationPreference: reservation?.notificationPreference ?? "none",
   }));
   const selectedTables = board.tables.filter((table) => draft.tableIds.includes(table.id));
   const capacity = selectedTables.reduce((sum, table) => sum + table.capacityMax, 0);
-  const canContinue = stepValid(step, draft);
+  const canContinue = stepValid(step, draft, Boolean(reservation));
 
   function patch(next: Partial<Draft>) {
     setDraft((current) => ({ ...current, ...next }));
@@ -80,9 +91,7 @@ export function ReservationWizard({
 
   async function save() {
     if (!canContinue) return;
-    const saved = await onRun({
-      kind: "reservation_create",
-      payload: {
+    const shared = {
         eventDayId: options.businessDay.id,
         offeringId: draft.offeringId,
         scheduledStartAt: toTokyoTimestamp(draft.startAt),
@@ -104,14 +113,37 @@ export function ReservationWizard({
         serviceStatus: draft.serviceStatus,
         bookingStaffMemberId: nullable(draft.bookingStaffMemberId),
         notificationPreference: draft.notificationPreference,
-      },
-    });
+    };
+    const saved = await onRun(reservation
+      ? {
+          kind: "reservation_update",
+          payload: {
+            reservationId: reservation.id,
+            expectedVersion: reservation.version,
+            offeringId: shared.offeringId,
+            scheduledStartAt: shared.scheduledStartAt,
+            scheduledEndAt: shared.scheduledEndAt,
+            guestCount: shared.guestCount,
+            tableIds: shared.tableIds,
+            expectedTableVersions: shared.expectedTableVersions,
+            guestLabel: shared.guestLabel,
+            operatorNote: shared.operatorNote,
+            sourceChannel: shared.sourceChannel,
+            serviceStatus: shared.serviceStatus,
+            bookingStaffMemberId: shared.bookingStaffMemberId,
+            notificationPreference: shared.notificationPreference,
+          },
+        }
+      : {
+          kind: "reservation_create",
+          payload: shared,
+        });
     if (saved) onDone();
   }
 
   return (
-    <section className={styles.reservationWizard} aria-label={`予約作成 ${step + 1}/8 ${STEPS[step]}`}>
-      <ol className={styles.wizardRail} aria-label="予約作成ステップ">
+    <section className={styles.reservationWizard} aria-label={`予約${reservation ? "編集" : "作成"} ${step + 1}/8 ${STEPS[step]}`}>
+      <ol className={styles.wizardRail} aria-label={`予約${reservation ? "編集" : "作成"}ステップ`}>
         {STEPS.map((label, index) => (
           <li key={label} data-current={index === step || undefined} data-complete={index < step || undefined}>
             <span>{index + 1}</span><small>{label}</small>
@@ -179,13 +211,23 @@ export function ReservationWizard({
         {step === 4 ? (
           <fieldset>
             <legend>顧客（暗号化・Owner限定）</legend>
-            <label>氏名<input value={draft.displayName} maxLength={120} autoComplete="off" onChange={(event) => patch({ displayName: event.target.value })} /></label>
-            <div className={styles.formColumns}>
-              <label>電話<input type="tel" value={draft.phone} maxLength={40} autoComplete="off" onChange={(event) => patch({ phone: event.target.value })} /></label>
-              <label>Eメール<input type="email" value={draft.email} maxLength={254} autoComplete="off" onChange={(event) => patch({ email: event.target.value })} /></label>
-            </div>
-            <label>言語<select value={draft.languageCode} onChange={(event) => patch({ languageCode: event.target.value })}><option value="ja">日本語</option><option value="en">English</option><option value="zh">中文</option><option value="ko">한국어</option></select></label>
-            <p className={styles.wizardHint}>電話の完全一致を優先し、電話がない場合だけEメールで自動集約します。</p>
+            {reservation ? (
+              <div className={styles.wizardStatement}>
+                <span>CUSTOMER LINK</span>
+                <strong>{reservation.guestLabel}</strong>
+                <p>{reservation.customerId ? "現在の暗号化顧客リンクを保持します。" : "顧客未紐付けのまま更新します。"}</p>
+              </div>
+            ) : (
+              <>
+                <label>氏名<input value={draft.displayName} maxLength={120} autoComplete="off" onChange={(event) => patch({ displayName: event.target.value })} /></label>
+                <div className={styles.formColumns}>
+                  <label>電話<input type="tel" value={draft.phone} maxLength={40} autoComplete="off" onChange={(event) => patch({ phone: event.target.value })} /></label>
+                  <label>Eメール<input type="email" value={draft.email} maxLength={254} autoComplete="off" onChange={(event) => patch({ email: event.target.value })} /></label>
+                </div>
+                <label>言語<select value={draft.languageCode} onChange={(event) => patch({ languageCode: event.target.value })}><option value="ja">日本語</option><option value="en">English</option><option value="zh">中文</option><option value="ko">한국어</option></select></label>
+                <p className={styles.wizardHint}>電話の完全一致を優先し、電話がない場合だけEメールで自動集約します。</p>
+              </>
+            )}
           </fieldset>
         ) : null}
         {step === 5 ? (
@@ -221,14 +263,14 @@ export function ReservationWizard({
               <div><dt>営業日</dt><dd>{board.businessDay.businessDate}</dd></div>
               <div><dt>時刻</dt><dd>{draft.startAt.slice(11)}–{draft.endAt.slice(11)}</dd></div>
               <div><dt>人数 / 卓</dt><dd>{draft.guestCount}名 / {selectedTables.map((table) => table.displayCode).join("・")}</dd></div>
-              <div><dt>顧客</dt><dd>{draft.displayName || "匿名"}</dd></div>
+              <div><dt>顧客</dt><dd>{(reservation?.guestLabel ?? draft.displayName) || "匿名"}</dd></div>
             </dl>
             <fieldset>
               <legend>顧客通知</legend>
               <label className={styles.choiceRow}><input type="radio" name="notify" checked={draft.notificationPreference === "none"} onChange={() => patch({ notificationPreference: "none" })} />送信しない</label>
               <label className={styles.choiceRow}><input type="radio" name="notify" checked={draft.notificationPreference === "email"} onChange={() => patch({ notificationPreference: "email" })} /><Mail size={15} />Eメール送信</label>
             </fieldset>
-            {draft.notificationPreference === "email" && !draft.email ? <p className={styles.wizardWarning}>Eメール送信には顧客Eメールが必要です。</p> : null}
+            {draft.notificationPreference === "email" && !reservation && !draft.email ? <p className={styles.wizardWarning}>Eメール送信には顧客Eメールが必要です。</p> : null}
           </div>
         ) : null}
       </div>
@@ -243,7 +285,7 @@ export function ReservationWizard({
           </button>
         ) : (
           <button type="button" className={styles.primaryButton} disabled={!canContinue || pending} onClick={() => void save()}>
-            <Check size={16} />競合確認して作成
+            <Check size={16} />競合確認して{reservation ? "更新" : "作成"}
           </button>
         )}
       </footer>
@@ -251,11 +293,13 @@ export function ReservationWizard({
   );
 }
 
-function stepValid(step: number, draft: Draft) {
+function stepValid(step: number, draft: Draft, editing: boolean) {
   if (step === 1) return Boolean(draft.startAt && draft.endAt && draft.startAt < draft.endAt);
   if (step === 2) return Boolean(draft.offeringId && draft.guestCount >= 1);
   if (step === 3) return draft.tableIds.length > 0;
-  if (step === 7) return draft.notificationPreference !== "email" || Boolean(draft.email);
+  if (step === 7) {
+    return draft.notificationPreference !== "email" || editing || Boolean(draft.email);
+  }
   return true;
 }
 

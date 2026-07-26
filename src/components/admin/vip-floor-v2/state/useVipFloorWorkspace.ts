@@ -221,6 +221,10 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
     );
 
     const markStreamUnavailable = () => {
+      void reportRealtimeMetric({
+        event: "realtime_unavailable",
+        businessDate,
+      });
       dispatch({
         type: "globalState",
         state: "stale",
@@ -249,6 +253,11 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
         });
         if (decision === "ignore") return;
         if (decision === "gap_refresh") {
+          void reportRealtimeMetric({
+            event: "realtime_gap",
+            businessDate,
+            gapSize: Math.max(0, payload.revision - revisionAtConnect - 1),
+          });
           dispatch({
             type: "globalState",
             state: "reconnecting",
@@ -520,6 +529,7 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
       const labels: Record<OperationDraft["kind"], string> = {
         walk_in: "Walk-inを登録しました",
         reservation_create: "予約を作成しました",
+        reservation_update: "予約を更新しました",
         block_create: "受付ブロックを保存しました",
         block_update: "受付ブロックを更新しました",
         block_cancel: "受付ブロックを解除しました",
@@ -757,4 +767,21 @@ function isVipFloorBoardV2(
     && payload.capabilities !== null
     && typeof payload.operations === "object"
     && payload.operations !== null;
+}
+
+async function reportRealtimeMetric(input: {
+  event: "realtime_gap" | "realtime_unavailable";
+  businessDate: string;
+  gapSize?: number;
+}) {
+  try {
+    await fetch("/api/admin/vip-floor/observability", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(input),
+      keepalive: true,
+    });
+  } catch {
+    // Metrics must not affect reconnect or board recovery.
+  }
 }
