@@ -15,7 +15,8 @@
 | T-003 | partial | CI、PII scan、staging rollback fixtureはPASS。live deployed fixture未完 |
 | T-004 | partial | production mutation scriptを禁止しread-only smokeへ分離。認証付き実行は秘密の監査経路待ち |
 | T-005〜T-013 | partial | Owner API guard、version/idempotency/audit、8卓/複数卓/延長/6 command、confirmed-onlyを実装・fixture検証。全legacy helper統一とlive HTTP E2Eが残る |
-| T-014〜T-015 | pending | customer confirmation sync、email outbox |
+| T-014 | partial | public v7/v8 holdから暗号化customer profileへdefault-off同期、audit/revision/idempotency fixture PASS。電話→Eメール自動dedupeとlive E2Eが残る |
+| T-015 | partial | Owner-only email outbox、最大3回、60/300秒backoff、dead/再claim拒否 fixture PASS。provider環境とlive deliveryが残る |
 | T-016〜T-017 | done | 4ナビ、URL state、List/Floor/Chart/Inspector、canonical v2 hydration |
 | T-018〜T-024 | pending | create/edit、Walk-in、Waitlist、block、staff、customer、realtime |
 | T-025 | partial | 4幅visual、overflow、44px、roving keyboardはPASS。axe/Safariが残る |

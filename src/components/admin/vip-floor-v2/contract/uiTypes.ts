@@ -35,6 +35,56 @@ export type LiveCommandDraft = {
   };
 };
 
+export type OperationOptions = {
+  ok: true;
+  businessDay: {
+    id: string;
+    businessDate: string;
+    operatingStartAt: string;
+    operatingEndAt: string;
+  };
+  offerings: Array<{
+    id: string;
+    name: string;
+    minGuests: number;
+    maxGuests: number;
+    minSpendYen: number;
+  }>;
+};
+
+export type WalkInDraft = {
+  kind: "walk_in";
+  payload: {
+    eventDayId: string;
+    offeringId: string;
+    scheduledStartAt: string;
+    scheduledEndAt: string;
+    guestCount: number;
+    tableIds: string[];
+    guestLabel: string | null;
+    operatorNote: string | null;
+    expectedTableVersions: Array<{ tableId: string; expectedVersion: number }>;
+  };
+};
+
+export type BlockCreateDraft = {
+  kind: "block_create";
+  payload: {
+    eventDayId: string;
+    businessDate: string;
+    scope: "online_only" | "all_operations";
+    blockKind: "manual" | "maintenance" | "owner_hold" | "event";
+    startAt: string;
+    endAt: string;
+    memo: string | null;
+    seatResourceIds: string[];
+    venueWide: boolean;
+    repeatDays: number;
+  };
+};
+
+export type OperationDraft = WalkInDraft | BlockCreateDraft;
+
 export type CommandOutcome =
   | { ok: true; message: string }
   | { ok: false; code: string; message: string; recovery: string };

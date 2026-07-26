@@ -13,7 +13,11 @@ import {
   type VipFloorBoardV2,
 } from "@/lib/vipFloorV2Contract";
 
-import type { LiveCommandDraft } from "../contract/uiTypes";
+import type {
+  LiveCommandDraft,
+  OperationDraft,
+  OperationOptions,
+} from "../contract/uiTypes";
 import { createInitialState, workspaceReducer } from "./reducer";
 
 type Session = {
@@ -28,12 +32,13 @@ type AuthState =
   | { status: "authenticated"; session: Session };
 
 function currentBusinessDate() {
+  const businessClock = new Date(Date.now() - 5 * 60 * 60 * 1000);
   return new Intl.DateTimeFormat("sv-SE", {
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
     timeZone: "Asia/Tokyo",
-  }).format(new Date());
+  }).format(businessClock);
 }
 
 function readErrorMessage(status: number, payload: Record<string, unknown>) {
@@ -331,10 +336,121 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
     }
   }, [auth.session, businessDate, loadBoard, offline]);
 
+  const loadOperationOptions = useCallback(async () => {
+    if (offline || auth.session?.role !== "owner") return null;
+
+    try {
+      const response = await fetch(
+        `/api/admin/vip-floor/options?date=${encodeURIComponent(businessDate)}`,
+        { cache: "no-store" },
+      );
+      const payload = await response.json().catch(() => ({})) as Record<string, unknown>;
+
+      if (!response.ok || payload.ok !== true) {
+        dispatch({
+          type: "commandOutcome",
+          outcome: {
+            ok: false,
+            code: String(payload.error ?? response.status),
+            message: readErrorMessage(response.status, payload),
+            recovery: "営業日を再読込し、Owner sessionを確認してください。",
+          },
+        });
+        return null;
+      }
+
+      return payload as OperationOptions;
+    } catch {
+      dispatch({
+        type: "commandOutcome",
+        outcome: {
+          ok: false,
+          code: "NETWORK_ERROR",
+          message: "作成候補を取得できませんでした。",
+          recovery: "通信状態を確認して再試行してください。",
+        },
+      });
+      return null;
+    }
+  }, [auth.session?.role, businessDate, offline]);
+
+  const runOperation = useCallback(async (draft: OperationDraft) => {
+    if (offline || auth.session?.role !== "owner") {
+      dispatch({
+        type: "commandOutcome",
+        outcome: {
+          ok: false,
+          code: offline ? "OFFLINE" : "INSUFFICIENT_ROLE",
+          message: offline
+            ? "オフライン中は作成できません。"
+            : "この操作はOwner専用です。",
+          recovery: offline
+            ? "接続復帰後に台帳を再読込してください。"
+            : "Owner専用PINでログインしてください。",
+        },
+      });
+      return false;
+    }
+
+    dispatch({ type: "pending", pending: true });
+
+    try {
+      const response = await fetch("/api/admin/vip-floor/operations", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "idempotency-key": crypto.randomUUID(),
+        },
+        body: JSON.stringify(draft),
+      });
+      const payload = await response.json().catch(() => ({})) as Record<string, unknown>;
+
+      if (!response.ok) {
+        dispatch({
+          type: "commandOutcome",
+          outcome: {
+            ok: false,
+            code: String(payload.error ?? response.status),
+            message: readErrorMessage(response.status, payload),
+            recovery: Number(payload.completedCount ?? 0) > 0
+              ? "繰返しの一部だけ保存済みです。台帳を再読込して対象日を確認してください。"
+              : "入力、卓の空き、ブロック競合を確認して再試行してください。",
+          },
+        });
+        await loadBoard(businessDate);
+        return false;
+      }
+
+      const label = draft.kind === "walk_in" ? "Walk-inを登録しました" : "受付ブロックを保存しました";
+      const createdCount = typeof payload.createdCount === "number"
+        ? `（${payload.createdCount}日分）`
+        : "";
+      dispatch({
+        type: "commandOutcome",
+        outcome: { ok: true, message: `${label}${createdCount}` },
+      });
+      await loadBoard(businessDate);
+      return true;
+    } catch {
+      dispatch({
+        type: "commandOutcome",
+        outcome: {
+          ok: false,
+          code: "NETWORK_ERROR",
+          message: "保存結果を確認できませんでした。",
+          recovery: "再送せず、まず台帳を再読込して反映状態を確認してください。",
+        },
+      });
+      return false;
+    }
+  }, [auth.session?.role, businessDate, loadBoard, offline]);
+
   return {
     state,
     dispatch,
     runCommand,
+    runOperation,
+    loadOperationOptions,
     auth,
     businessDate,
     offline,

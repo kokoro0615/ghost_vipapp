@@ -370,6 +370,11 @@
 .commandHeader button { display: grid; width: 44px; height: 44px; place-items: center; border: 1px solid var(--line); border-radius: 3px; background: var(--lacquer-1); }
 .stepRail { display: flex; min-height: 34px; align-items: center; justify-content: center; gap: 9px; border-bottom: 1px solid var(--line-soft); color: var(--muted); font-size: 10px; }
 .stepRail span[data-current] { color: var(--metal-strong); font-weight: 700; }
+.operationTabs { display: grid; min-height: 54px; grid-template-columns: repeat(3, minmax(0, 1fr)); border-bottom: 1px solid var(--line); background: var(--line-soft); gap: 1px; }
+.operationTabs > button, .operationTabs > span { display: flex; min-height: 54px; align-items: center; justify-content: center; gap: 6px; border: 0; background: var(--lacquer-2); color: var(--muted); font-size: 11px; }
+.operationTabs > button[data-active] { background: var(--accent-tint); color: var(--metal-strong); box-shadow: inset 0 -2px var(--metal); }
+.operationTabs > span { flex-wrap: wrap; opacity: 0.68; }
+.operationTabs small { flex-basis: 100%; margin-top: -8px; text-align: center; font-size: 8px; }
 .commandForm { min-height: 0; overflow-y: auto; padding: 12px; }
 .commandContext { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 10px; padding: 8px 10px; border-left: 2px solid var(--metal); background: var(--lacquer-2); }
 .commandContext strong { color: var(--metal-strong); font-size: 16px; }

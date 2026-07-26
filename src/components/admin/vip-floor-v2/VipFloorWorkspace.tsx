@@ -28,10 +28,12 @@ import { buildQueueGroups, matchesReservation, toUiReservations } from "./contra
 import type { CommandKind, WorkspaceView } from "./contract/uiTypes";
 import FloorView from "./floor/FloorView";
 import { Inspector, INSPECTOR_TABS, type InspectorTab } from "./inspector/Inspector";
+import { OperationCenter } from "./operations/OperationCenter";
 import { ExceptionRail } from "./shell/ExceptionRail";
 import { useVipFloorWorkspace } from "./state/useVipFloorWorkspace";
 import styles from "./VipFloorWorkspace.module.css";
 import { canExecuteVipCommand } from "@/lib/adminPermissions";
+import type { OperationOptions } from "./contract/uiTypes";
 
 const ChartView = dynamic(() => import("./chart/ChartView"), {
   loading: () => <WorkspaceSkeleton label="Chartを準備中" />,
@@ -64,6 +66,8 @@ export default function VipFloorWorkspace() {
     state,
     dispatch,
     runCommand,
+    runOperation,
+    loadOperationOptions,
     auth,
     businessDate,
     offline,
@@ -74,6 +78,8 @@ export default function VipFloorWorkspace() {
   } = useVipFloorWorkspace(initialBusinessDate);
   const [pin, setPin] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
+  const [operationOpen, setOperationOpen] = useState(false);
+  const [operationOptions, setOperationOptions] = useState<OperationOptions | null>(null);
   const inspectorTab = parseInspectorTab(searchParams.get("detail"));
   const deferredQuery = useDeferredValue(state.query);
   const allReservations = useMemo(() => toUiReservations(state.board), [state.board]);
@@ -139,6 +145,12 @@ export default function VipFloorWorkspace() {
   function openCommand(kind: CommandKind) {
     if (!selectedReservation || readOnly || !canCommand(kind)) return;
     dispatch({ type: "openCommand", kind });
+  }
+
+  async function openOperation() {
+    if (readOnly || !isOwner) return;
+    setOperationOpen(true);
+    setOperationOptions(await loadOperationOptions());
   }
 
   async function submitPin(event: FormEvent<HTMLFormElement>) {
@@ -400,8 +412,13 @@ export default function VipFloorWorkspace() {
       ) : null}
 
       <nav className={styles.bottomNav} aria-label="主要ナビゲーション">
-        <button type="button" disabled aria-label={`新規予約（${isOwner ? "作成API準備中" : "Owner専用"}）`}>
-          <CalendarPlus size={19} /><span>新規予約</span><small>{isOwner ? "準備中" : "Ownerのみ"}</small>
+        <button
+          type="button"
+          disabled={readOnly || !isOwner}
+          aria-label={`新規オペレーション（${isOwner ? "Walk-inまたは受付ブロック" : "Owner専用"}）`}
+          onClick={() => void openOperation()}
+        >
+          <CalendarPlus size={19} /><span>新規 / Walk-in</span><small>{isOwner ? "即時来店・ブロック" : "Ownerのみ"}</small>
         </button>
         <button type="button" aria-current={state.view === "list" ? "page" : undefined} data-active={state.view === "list" || undefined} onClick={() => switchView("list")}>
           <ClipboardList size={19} /><span>List</span>
@@ -459,6 +476,19 @@ export default function VipFloorWorkspace() {
         onClose={() => dispatch({ type: "closeCommand" })}
         onStep={(step) => dispatch({ type: "commandStep", step })}
         onRun={(draft) => void runCommand(draft)}
+      />
+
+      <OperationCenter
+        open={operationOpen}
+        pending={state.pending}
+        board={state.board}
+        options={operationOptions}
+        selectedTableId={state.selectedTableId}
+        onClose={() => {
+          setOperationOpen(false);
+          setOperationOptions(null);
+        }}
+        onRun={runOperation}
       />
     </main>
   );

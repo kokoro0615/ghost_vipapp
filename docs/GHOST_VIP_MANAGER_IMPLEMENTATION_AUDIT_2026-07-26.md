@@ -19,18 +19,19 @@
   `8dfecb401c235ca9fd97ca8d20b096de72518055`へ固定した。
 - VIP AppのW0 checkpointを
   `codex/vip-manager-g0-5-20260726` /
-  `b7347e2e1295bf8cc364d3cad63c512b49612802`へ固定した。
+  `b83ac3c99c85c5cbeb2141211ef9015ff6c7f617`へ固定した。
 - GHOST本番sourceを
   `96771cb6fe315ea3e5b72d148b5881776721781d`へ照合した。
 - versioned canonical branch
   `codex/vip-manager-contract-v2-20260726` /
-  `b1b1a3185cdbffa7855d8b55315d1f9a37daa55b`を作成し、旧
+  `1984d3b04b1e7b58290d78bfc0bd076dad9263e2`を作成し、旧
   `vipapp-command` routeを廃止した。
-- staging Supabaseとlocal migration setを33/33で一致させ、
-  `20260726150000_ghost_vip_manager_arrival_time_v9.sql`まで適用した。
+- staging Supabaseとlocal migration setを36/36で一致させ、
+  `20260726161500_ghost_vip_manager_audit_contract_v10.sql`まで適用した。
   production DB mutationは0、dual-writeは`false`のままである。
 - staging transaction fixtureはarrival 5、mutation 28、helper 41、
-  read 10 checkをすべてPASSし、全て`ROLLBACK`した。
+  read 10、email outbox 6、customer sync 4 checkをすべてPASSし、
+  全て`ROLLBACK`した。
 
 ### 契約・権限・UIの更新
 
@@ -41,6 +42,12 @@
   除外する。
 - API応答境界でconfirmed-only filteringを行い、hold/expired予約と
   関連assignment、table参照、note、集計値を除外する。
+- 公開holdはdefault-off flag配下で電話/Eメールを暗号化し、
+  customer profile、audit、board revisionへ同期する。reservation/customer
+  不一致とcontact materialのaudit混入をstaging fixtureで拒否した。
+- email outboxはOwner-only enqueue、recipient-free storage、最大3回、
+  60/300秒backoff、dead終端、手動/cron worker境界を実装した。現projectに
+  provider環境がないためlive deliveryは未検証である。
 - canonical `vip-floor.v2`をlegacy `seats` adapterへ誤投入するcrashを修正し、
   v2/legacy分岐をcontract testへ固定した。
 - UIはTableCheck型4 bottom navigation、List/Floor/Chart/Inspector、
@@ -59,7 +66,7 @@
 | G0.5 Source lineage | PASS | 両deployment source、versioned contract、migration lineageを追跡可能 |
 | G1 Contract | PARTIAL | v2 board/6 command/version/idempotency/audit、staging SQL fixtureはPASS。新規予約等の契約は未完成 |
 | G2 Security | PARTIAL | API Owner-only、PII mask、arrival RPC Owner guard。全legacy DB helper統一とlive HTTP証拠が残る |
-| G3 Booking bridge | PARTIAL | confirmed-only API境界はPASS。customer sync/outbox/2秒E2Eが残る |
+| G3 Booking bridge | PARTIAL | confirmed-only、暗号化customer sync、outbox lifecycleはstaging PASS。自動dedupe、provider delivery、2秒live E2Eが残る |
 | G4 UI parity | PARTIAL | 主要3 view+Inspector、4幅、keyboard/touch/visualはPASS。新規予約8段階とaxe/Safariが残る |
 | G5 Operations | FAIL | Walk-in、Waitlist、block、staff assignmentが未実装 |
 | G6 Resilience | FAIL | realtime gap recovery、永続metric/alertが未実装 |
