@@ -13,7 +13,7 @@ const commandLabels: Record<CommandKind, string> = {
   check_in: "チェックイン",
   arrival_time: "到着時刻を記録",
   assignment: "卓割当を変更",
-  seat_extension: "利用時間を30分延長",
+  seat_extension: "利用時間を延長",
   note: "スタッフメモ",
 };
 
@@ -75,9 +75,9 @@ export function CommandCenter({
     if (kind === "assignment") return "GHOST予約台帳の卓割当を置き換え、全端末の表示へ反映します。";
     if (kind === "check_in") return "来店を確定し、着席開始と利用期限をGHOST予約台帳へ記録します。";
     if (kind === "arrival_time") return "入力した到着時刻を予約へ記録します。未来時刻は保存できません。";
-    if (kind === "seat_extension") return "現在の利用期限を30分延長します。チェックイン済み予約だけが対象です。";
+    if (kind === "seat_extension") return "現在の利用期限を15分単位、最大120分まで延長します。";
     if (kind === "note") return "500文字以内の現場共有メモを監査付きで保存します。";
-    return "接客状態を更新し、Floor・Timeline・Listへ反映します。";
+    return "接客状態を更新し、Floor・Chart・Listへ反映します。";
   }, [kind]);
 
   useEffect(() => {
@@ -118,12 +118,10 @@ export function CommandCenter({
   }
 
   function buildDraft(formData: FormData): LiveCommandDraft {
-    const reason = String(formData.get("reason") ?? "ghost_vipapp_operator").trim()
-      || "ghost_vipapp_operator";
     const base = {
       kind,
       reservationId: source!.id,
-      expectedUpdatedAt: source!.updatedAt,
+      expectedVersion: source!.version,
     };
 
     switch (kind) {
@@ -132,7 +130,6 @@ export function CommandCenter({
           ...base,
           kind,
           payload: {
-            reason,
             occurredAt: new Date().toISOString(),
             serviceStatus: String(formData.get("serviceStatus")) as VipServiceStatus,
           },
@@ -141,31 +138,36 @@ export function CommandCenter({
         return {
           ...base,
           kind,
-          payload: { reason, occurredAt: new Date().toISOString() },
+          payload: { occurredAt: new Date().toISOString() },
         };
       case "arrival_time":
         return {
           ...base,
           kind,
-          payload: { reason, occurredAt: toTokyoTimestamp(formData.get("occurredAt")) },
+          payload: { occurredAt: toTokyoTimestamp(formData.get("occurredAt")) },
         };
       case "assignment":
         return {
           ...base,
           kind,
-          payload: { reason, tableIds: [String(formData.get("tableId") ?? "")].filter(Boolean) },
+          payload: {
+            tableIds: formData
+              .getAll("tableIds")
+              .map(String)
+              .filter(Boolean),
+          },
         };
       case "seat_extension":
         return {
           ...base,
           kind,
-          payload: { reason, extendMinutes: 30 },
+          payload: { extendMinutes: Number(formData.get("extendMinutes")) },
         };
       case "note":
         return {
           ...base,
           kind,
-          payload: { reason, note: String(formData.get("note") ?? "").trim() },
+          payload: { note: String(formData.get("note") ?? "").trim() },
         };
     }
   }
@@ -196,7 +198,7 @@ export function CommandCenter({
         onKeyDown={trapFocus}
       >
         <header className={styles.commandHeader}>
-          <div><span>GHOST LIVE COMMAND</span><h2 id="command-title">{commandLabels[kind]}</h2></div>
+          <div><span>GHOST 実行コマンド</span><h2 id="command-title">{commandLabels[kind]}</h2></div>
           <button type="button" onClick={onClose} aria-label="操作画面を閉じる"><X size={19} /></button>
         </header>
         <div className={styles.stepRail} aria-label="操作ステップ">
@@ -210,7 +212,7 @@ export function CommandCenter({
             <strong>{reservation.publicCode}</strong>
             <span>{reservation.guestLabel} / {reservation.startLabel} / 更新版 {reservation.version}</span>
           </div>
-          <fieldset disabled={pending} inert={step === 2 ? true : undefined}>
+          <fieldset disabled={pending}>
             <legend>{commandLabels[kind]}</legend>
 
             {kind === "service_status" ? (
@@ -248,17 +250,23 @@ export function CommandCenter({
             ) : null}
 
             {kind === "assignment" ? (
-              <label>
-                割当卓
-                <select name="tableId" defaultValue={selectedTableId ?? reservation.tableIds[0] ?? ""} required>
-                  <option value="">卓を選択</option>
-                  {board.tables.filter((table) => table.publicResourceCode).map((table) => (
-                    <option value={table.publicResourceCode ?? ""} key={table.id}>
-                      {table.displayCode} · {table.name} · {table.capacityMax}名
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <div className={styles.assignmentOptions} role="group" aria-labelledby="assignment-options-label">
+                <span id="assignment-options-label">割当卓（複数選択可）</span>
+                {board.tables.map((table) => (
+                  <label key={table.id}>
+                    <input
+                      type="checkbox"
+                      name="tableIds"
+                      value={table.id}
+                      defaultChecked={
+                        reservation.tableIds.includes(table.id)
+                        || selectedTableId === table.id
+                      }
+                    />
+                    <span>{table.displayCode} · {table.name} · {table.capacityMax}名</span>
+                  </label>
+                ))}
+              </div>
             ) : null}
 
             {kind === "note" ? (
@@ -275,16 +283,21 @@ export function CommandCenter({
             ) : null}
 
             {kind === "seat_extension" ? (
-              <p className={styles.helperText}>現在の利用期限から30分延長します。</p>
+              <label>
+                延長時間
+                <select name="extendMinutes" defaultValue="60">
+                  {[15, 30, 45, 60, 75, 90, 105, 120].map((minutes) => (
+                    <option key={minutes} value={minutes}>
+                      {minutes}分{minutes === 60 ? "（推奨）" : ""}
+                    </option>
+                  ))}
+                </select>
+              </label>
             ) : null}
             {kind === "check_in" ? (
               <p className={styles.helperText}>現在時刻でチェックインし、120分の利用期限を開始します。</p>
             ) : null}
 
-            <label>
-              操作理由
-              <textarea name="reason" defaultValue="VIPフロア担当による現場操作" maxLength={200} required />
-            </label>
           </fieldset>
 
           {step === 2 ? (

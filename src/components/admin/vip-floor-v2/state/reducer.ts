@@ -15,7 +15,6 @@ export type WorkspaceAction =
   | { type: "view"; view: WorkspaceView }
   | { type: "selectReservation"; reservationId: string | null }
   | { type: "selectTable"; tableId: string | null; reservationId?: string | null }
-  | { type: "section"; sectionId: string }
   | { type: "query"; query: string }
   | { type: "statusFilter"; status: string }
   | { type: "density"; density: WorkspaceState["density"] }
@@ -38,7 +37,6 @@ export function createInitialState(board: VipFloorBoardV2): WorkspaceState {
     view: "list",
     selectedReservationId: null,
     selectedTableId: null,
-    sectionId: "all",
     query: "",
     statusFilter: "all",
     density: "compact",
@@ -88,7 +86,6 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
     }
     case "selectTable":
       return { ...state, selectedTableId: action.tableId, selectedReservationId: action.reservationId ?? null };
-    case "section": return { ...state, sectionId: action.sectionId };
     case "query": return { ...state, query: action.query };
     case "statusFilter": return { ...state, statusFilter: action.status };
     case "density": return { ...state, density: action.density };

@@ -1,13 +1,13 @@
-import { timingSafeEqual } from "node:crypto";
-
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
 function safeEqual(left: string, right: string) {
-  const leftBuffer = Buffer.from(left);
-  const rightBuffer = Buffer.from(right);
-
-  return leftBuffer.length === rightBuffer.length && timingSafeEqual(leftBuffer, rightBuffer);
+  if (left.length !== right.length) return false;
+  let mismatch = 0;
+  for (let index = 0; index < left.length; index += 1) {
+    mismatch |= left.charCodeAt(index) ^ right.charCodeAt(index);
+  }
+  return mismatch === 0;
 }
 
 function parseBasicAuthorization(value: string | null) {
@@ -52,4 +52,3 @@ export function proxy(request: NextRequest) {
 export const config = {
   matcher: ["/((?!_next/static|_next/image|media/|icon.svg).*)"],
 };
-

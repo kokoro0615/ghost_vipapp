@@ -7,13 +7,14 @@ import {
   createEmptyVipBoard,
   type LegacyVipBoard,
 } from "@/lib/vipFloorLegacy";
+import { canExecuteVipCommand, type VipAdminRole } from "@/lib/adminPermissions";
 
 import type { LiveCommandDraft } from "../contract/uiTypes";
 import { createInitialState, workspaceReducer } from "./reducer";
 
 type Session = {
   ok: boolean;
-  role?: string;
+  role?: VipAdminRole;
   displayName?: string | null;
 };
 
@@ -41,8 +42,8 @@ function readErrorMessage(status: number, payload: Record<string, unknown>) {
     : "保存できませんでした。通信状態を確認して再試行してください。";
 }
 
-export function useVipFloorWorkspace() {
-  const initialDate = currentBusinessDate();
+export function useVipFloorWorkspace(initialBusinessDate?: string) {
+  const [initialDate] = useState(() => initialBusinessDate ?? currentBusinessDate());
   const [state, dispatch] = useReducer(workspaceReducer, createEmptyVipBoard(initialDate), createInitialState);
   const [auth, setAuth] = useState<AuthState>({ status: "checking", session: null });
   const [businessDate, setBusinessDateState] = useState(initialDate);
@@ -147,7 +148,6 @@ export function useVipFloorWorkspace() {
 
   useEffect(() => {
     const desktop = window.matchMedia("(min-width: 768px)");
-    if (desktop.matches) dispatch({ type: "view", view: "floor" });
     if (window.matchMedia("(max-width: 1279px)").matches && desktop.matches) {
       dispatch({ type: "queueCollapsed", collapsed: true });
       dispatch({ type: "inspectorCollapsed", collapsed: true });
@@ -248,6 +248,19 @@ export function useVipFloorWorkspace() {
     }
     dispatch({ type: "pending", pending: true });
     try {
+      if (!auth.session || !canExecuteVipCommand(auth.session.role ?? null, draft.kind)) {
+        dispatch({
+          type: "commandOutcome",
+          outcome: {
+            ok: false,
+            code: "INSUFFICIENT_ROLE",
+            message: "この操作を実行する権限がありません。",
+            recovery: "Owner専用PINでログインしてください。",
+          },
+        });
+        return;
+      }
+
       const response = await fetch("/api/admin/vip-floor/commands", {
         method: "POST",
         headers: {
@@ -277,12 +290,16 @@ export function useVipFloorWorkspace() {
       const labels: Record<LiveCommandDraft["kind"], string> = {
         check_in: "チェックイン",
         arrival_time: "到着時刻",
-        seat_extension: "30分延長",
+        seat_extension: "利用延長",
         assignment: "卓割当",
         note: "スタッフメモ",
         service_status: "接客状態",
       };
-      const message = `${labels[draft.kind]}を保存しました`;
+      const auditLogId = typeof payload.auditLogId === "string" ? payload.auditLogId : null;
+      const action = typeof payload.action === "string" ? payload.action : labels[draft.kind];
+      const message = auditLogId
+        ? `${labels[draft.kind]}を保存しました（監査ID ${auditLogId}）`
+        : `${labels[draft.kind]}を保存しました`;
       dispatch({ type: "commandOutcome", outcome: { ok: true, message } });
       dispatch({
         type: "history",
@@ -290,8 +307,8 @@ export function useVipFloorWorkspace() {
           id: crypto.randomUUID(),
           at: new Date().toISOString(),
           actor: auth.session?.displayName ?? auth.session?.role ?? "staff",
-          label: labels[draft.kind],
-          detail: `${draft.reservationId} / 監査ログへ記録`,
+          label: action,
+          detail: `${draft.reservationId} ${auditLogId ? `/ 監査ID ${auditLogId}` : ""}`,
         },
       });
       await loadBoard(businessDate);

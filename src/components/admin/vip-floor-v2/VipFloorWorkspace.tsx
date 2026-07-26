@@ -1,13 +1,14 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { type FormEvent, useDeferredValue, useMemo, useState } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
+import { type FormEvent, useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
+  CalendarPlus,
   CalendarDays,
   ChartNoAxesGantt,
   ClipboardList,
-  Command,
   LayoutGrid,
   LogOut,
   Menu,
@@ -26,25 +27,39 @@ import { CommandCenter } from "./commands/CommandCenter";
 import { buildQueueGroups, matchesReservation, toUiReservations } from "./contract/viewModel";
 import type { CommandKind, WorkspaceView } from "./contract/uiTypes";
 import FloorView from "./floor/FloorView";
-import { Inspector } from "./inspector/Inspector";
+import { Inspector, INSPECTOR_TABS, type InspectorTab } from "./inspector/Inspector";
 import { ExceptionRail } from "./shell/ExceptionRail";
 import { useVipFloorWorkspace } from "./state/useVipFloorWorkspace";
 import styles from "./VipFloorWorkspace.module.css";
+import { canExecuteVipCommand } from "@/lib/adminPermissions";
 
-const TimelineView = dynamic(() => import("./timeline/TimelineView"), {
-  loading: () => <WorkspaceSkeleton label="時間軸を準備中" />,
+const ChartView = dynamic(() => import("./chart/ChartView"), {
+  loading: () => <WorkspaceSkeleton label="Chartを準備中" />,
 });
 const ReservationListView = dynamic(() => import("./list/ReservationListView"), {
   loading: () => <WorkspaceSkeleton label="予約一覧を準備中" />,
 });
 
-const viewOptions: Array<{ key: WorkspaceView; label: string; icon: typeof LayoutGrid }> = [
-  { key: "floor", label: "Floor", icon: LayoutGrid },
-  { key: "timeline", label: "Timeline", icon: ChartNoAxesGantt },
-  { key: "list", label: "List", icon: ClipboardList },
-];
+const ROUTE_VIEWS = new Set(["floor", "list", "chart"]);
+const STATUS_FILTERS = new Set(["all", "attention", "expected", "late", "arrived", "seated", "bill_requested"]);
+const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/u;
+
+function parseWorkspaceView(value: string | null): WorkspaceView {
+  if (!value || !ROUTE_VIEWS.has(value)) return "list";
+  if (value === "floor" || value === "list") return value;
+  return "timeline";
+}
+
+function parseInspectorTab(value: string | null): InspectorTab {
+  return INSPECTOR_TABS.some((tab) => tab.key === value) ? value as InspectorTab : "overview";
+}
 
 export default function VipFloorWorkspace() {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const initialBusinessDate = DATE_PATTERN.test(searchParams.get("date") ?? "")
+    ? searchParams.get("date") ?? undefined
+    : undefined;
   const {
     state,
     dispatch,
@@ -56,32 +71,73 @@ export default function VipFloorWorkspace() {
     logout,
     loadBoard,
     setBusinessDate,
-  } = useVipFloorWorkspace();
+  } = useVipFloorWorkspace(initialBusinessDate);
   const [pin, setPin] = useState("");
+  const [menuOpen, setMenuOpen] = useState(false);
+  const inspectorTab = parseInspectorTab(searchParams.get("detail"));
   const deferredQuery = useDeferredValue(state.query);
   const allReservations = useMemo(() => toUiReservations(state.board), [state.board]);
   const reservations = useMemo(() => allReservations.filter((item) => {
     const statusMatch = state.statusFilter === "all"
       || item.serviceStatus === state.statusFilter
       || (state.statusFilter === "attention" && Boolean(item.exceptionLabel));
-    const sectionMatch = state.sectionId === "all"
-      || item.tableIds.some((tableId) =>
-        state.board.tables.find((table) => table.id === tableId)?.sectionId === state.sectionId)
-      || item.tableIds.length === 0;
-    return statusMatch && sectionMatch && matchesReservation(item, deferredQuery);
-  }), [allReservations, deferredQuery, state.board.tables, state.sectionId, state.statusFilter]);
+    return statusMatch && matchesReservation(item, deferredQuery);
+  }), [allReservations, deferredQuery, state.statusFilter]);
   const queueGroups = useMemo(() => buildQueueGroups(reservations), [reservations]);
   const selectedReservation = allReservations.find((item) => item.id === state.selectedReservationId) ?? null;
+  const isOwner = auth.status === "authenticated" && auth.session.role === "owner";
+  const canMutate = isOwner;
+  const canCommand = (kind: CommandKind) => canMutate
+    && auth.status === "authenticated"
+    && !!auth.session?.role
+    && canExecuteVipCommand(auth.session.role, kind);
+
   const readOnly = offline
     || state.globalState === "read_only"
-    || !state.board.operations.adminMutationEnabled;
+    || !state.board.operations.adminMutationEnabled
+    || !canMutate;
+
+  const updateRoute = useCallback((updates: Record<string, string | null>) => {
+    const params = new URLSearchParams(searchParams.toString());
+    Object.entries(updates).forEach(([key, value]) => {
+      if (value) params.set(key, value);
+      else params.delete(key);
+    });
+    const query = params.toString();
+    window.history.replaceState(null, "", query ? `${pathname}?${query}` : pathname);
+  }, [pathname, searchParams]);
+
+  useEffect(() => {
+    const nextView = parseWorkspaceView(searchParams.get("view"));
+    if (state.view !== nextView) dispatch({ type: "view", view: nextView });
+
+    const nextQuery = searchParams.get("q") ?? "";
+    if (state.query !== nextQuery) dispatch({ type: "query", query: nextQuery });
+
+    const status = searchParams.get("filter");
+    const nextStatus = status && STATUS_FILTERS.has(status) ? status : "all";
+    if (state.statusFilter !== nextStatus) dispatch({ type: "statusFilter", status: nextStatus });
+
+    const date = searchParams.get("date");
+    if (date && DATE_PATTERN.test(date) && date !== businessDate) setBusinessDate(date);
+  }, [businessDate, dispatch, searchParams, setBusinessDate, state.query, state.statusFilter, state.view]);
+
+  function switchView(view: WorkspaceView) {
+    dispatch({ type: "view", view });
+    setMenuOpen(false);
+    updateRoute({ view: view === "timeline" ? "chart" : view });
+  }
+
+  function changeInspectorTab(tab: InspectorTab) {
+    updateRoute({ detail: tab === "overview" ? null : tab });
+  }
 
   function selectReservation(id: string) {
     dispatch({ type: "selectReservation", reservationId: id });
   }
 
   function openCommand(kind: CommandKind) {
-    if (!selectedReservation) return;
+    if (!selectedReservation || readOnly || !canCommand(kind)) return;
     dispatch({ type: "openCommand", kind });
   }
 
@@ -96,11 +152,11 @@ export default function VipFloorWorkspace() {
       <main className={styles.loginShell}>
         <form className={styles.loginPanel} onSubmit={submitPin}>
           <div className={styles.loginMark}><span>G</span></div>
-          <p className={styles.loginEyebrow}>GHOST OSAKA · VIP FLOOR</p>
+          <p className={styles.loginEyebrow}>GHOST OSAKA · OWNER ACCESS</p>
           <h1>現場オペレーション</h1>
           <p className={styles.loginMessage} role="status">{state.message}</p>
           <label>
-            スタッフPIN
+            Owner専用PIN
             <input
               value={pin}
               onChange={(event) => setPin(event.target.value.replace(/\D/gu, "").slice(0, 8))}
@@ -112,7 +168,7 @@ export default function VipFloorWorkspace() {
               aria-describedby="pin-security"
             />
           </label>
-          <p id="pin-security" className={styles.loginHint}>個人PINは端末へ保存されません。</p>
+          <p id="pin-security" className={styles.loginHint}>Owner PINは端末へ保存されません。</p>
           <button type="submit" disabled={state.pending || pin.length < 4}>
             <ShieldCheck size={17} />
             {state.pending || auth.status === "checking" ? "確認中…" : "ログイン"}
@@ -125,38 +181,6 @@ export default function VipFloorWorkspace() {
   return (
     <main className={styles.workspace} data-state={state.globalState}>
       <a href="#vip-workspace-main" className={styles.skipLink}>メイン作業領域へ</a>
-      <nav className={styles.navRail} aria-label="VIP Floor主要操作">
-        <div className={styles.ghostMark} aria-label="GHOST Osaka"><span>G</span></div>
-        {viewOptions.map(({ key, label, icon: Icon }) => (
-          <button
-            key={key}
-            type="button"
-            aria-label={`${label} view`}
-            title={label}
-            data-active={state.view === key || undefined}
-            onClick={() => dispatch({ type: "view", view: key })}
-          >
-            <Icon size={19} />
-          </button>
-        ))}
-        <span className={styles.navDivider} />
-        <button type="button" aria-label="予約を再読込" title="再読込" onClick={() => void loadBoard()} disabled={state.pending}>
-          <RefreshCw size={19} />
-        </button>
-        <button
-          type="button"
-          aria-label="選択予約の操作を開く"
-          title="予約操作"
-          onClick={() => openCommand("service_status")}
-          disabled={readOnly || !selectedReservation}
-        >
-          <Command size={19} />
-        </button>
-        <span className={styles.navSpacer} />
-        <button type="button" aria-label="ログアウト" title="ログアウト" onClick={() => void logout()}>
-          <LogOut size={18} />
-        </button>
-      </nav>
 
       <header className={styles.serviceRibbon}>
         <div className={styles.venueIdentity}>
@@ -170,17 +194,20 @@ export default function VipFloorWorkspace() {
             type="date"
             value={businessDate}
             onChange={(event) => {
-              if (event.target.value) setBusinessDate(event.target.value);
+              if (event.target.value) {
+                setBusinessDate(event.target.value);
+                updateRoute({ date: event.target.value });
+              }
             }}
           />
         </label>
         <div className={styles.ribbonControl} aria-label="営業枠">
           <Radio size={15} />
-          <span>Service</span>
-          <strong>MAIN / 21:00–05:00</strong>
+          <span>営業枠</span>
+          <strong>22:00–05:00</strong>
         </div>
         <div className={styles.operatorIdentity}>
-          <span>{auth.session.displayName ?? auth.session.role ?? "staff"}</span>
+          <span>{auth.session.displayName ?? "Owner"} · {isOwner ? "Owner" : "閲覧のみ"}</span>
           <button type="button" onClick={() => void logout()}><LogOut size={14} />ログアウト</button>
         </div>
         <div className={styles.syncStatus} data-state={state.globalState}>
@@ -206,7 +233,7 @@ export default function VipFloorWorkspace() {
         </div>
       </header>
 
-      <section className={styles.mobileSummary} aria-label="本日のVIP予約概要">
+      <section className={styles.mobileSummary} aria-label="本日のVIP予約サマリー">
         <div><span>本日のVIP予約</span><strong>{state.board.totals.reservationCount}</strong></div>
         <div data-alert={state.board.totals.unassignedReservationCount > 0 || undefined}>
           <span>例外 / 未割当</span>
@@ -230,41 +257,32 @@ export default function VipFloorWorkspace() {
 
       <section className={styles.primaryArea} id="vip-workspace-main">
         <div className={styles.workspaceToolbar} role="toolbar" aria-label="表示と絞り込み">
-          <div className={styles.mobileMenuMark}><Menu size={17} /><span>VIP FLOOR</span></div>
-          <div className={styles.viewSwitcher} role="tablist" aria-label="作業view">
-            {viewOptions.map(({ key, label, icon: Icon }) => (
-              <button
-                key={key}
-                type="button"
-                role="tab"
-                aria-selected={state.view === key}
-                data-active={state.view === key || undefined}
-                onClick={() => dispatch({ type: "view", view: key })}
-              >
-                <Icon size={15} />{label}
-              </button>
-            ))}
+          <div className={styles.currentViewMark}>
+            {state.view === "list" ? <ClipboardList size={16} /> : state.view === "floor" ? <LayoutGrid size={16} /> : <ChartNoAxesGantt size={16} />}
+            <span>{state.view === "list" ? "List" : state.view === "floor" ? "Floor" : "Chart"}</span>
           </div>
           <label className={styles.toolbarSearch}>
             <Search size={14} />
             <span className="sr-only">予約検索</span>
             <input
               value={state.query}
-              onChange={(event) => dispatch({ type: "query", query: event.target.value })}
+              onChange={(event) => {
+                dispatch({ type: "query", query: event.target.value });
+                updateRoute({ q: event.target.value || null });
+              }}
               placeholder="番号 / ゲスト / 席"
             />
           </label>
           <label className={styles.toolbarSelect}>
-            <span>Section</span>
-            <select value={state.sectionId} onChange={(event) => dispatch({ type: "section", sectionId: event.target.value })}>
-              <option value="all">ALL</option>
-              {state.board.sections.map((section) => <option value={section.id} key={section.id}>{section.name}</option>)}
-            </select>
-          </label>
-          <label className={styles.toolbarSelect}>
-            <span>Status</span>
-            <select value={state.statusFilter} onChange={(event) => dispatch({ type: "statusFilter", status: event.target.value })}>
-              <option value="all">ALL</option>
+            <span>ステータス</span>
+            <select
+              value={state.statusFilter}
+              onChange={(event) => {
+                dispatch({ type: "statusFilter", status: event.target.value });
+                updateRoute({ filter: event.target.value === "all" ? null : event.target.value });
+              }}
+            >
+              <option value="all">全て</option>
               <option value="attention">要確認</option>
               <option value="expected">来店予定</option>
               <option value="late">遅延</option>
@@ -277,7 +295,7 @@ export default function VipFloorWorkspace() {
             type="button"
             className={styles.paneButton}
             onClick={() => dispatch({ type: "queueCollapsed", collapsed: !state.queueCollapsed })}
-            aria-label="queue paneを切替"
+            aria-label="キューパネルを切替"
           >
             <PanelLeftClose size={16} />
           </button>
@@ -285,22 +303,22 @@ export default function VipFloorWorkspace() {
             type="button"
             className={styles.paneButton}
             onClick={() => dispatch({ type: "inspectorCollapsed", collapsed: !state.inspectorCollapsed })}
-            aria-label="inspector paneを切替"
+            aria-label="インスペクターパネルを切替"
           >
             <PanelRightClose size={16} />
           </button>
         </div>
 
-        {["stale", "read_only"].includes(state.globalState) ? (
+        {["stale", "read_only"].includes(state.globalState) || !isOwner ? (
           <div className={styles.stateBanner} role="status" data-tone="warning">
             {offline ? <WifiOff size={16} /> : <AlertTriangle size={16} />}
-            <strong>{offline ? "オフライン" : "閲覧のみ"}</strong>
-            <span>{state.stateDescription}</span>
+            <strong>{offline ? "オフライン" : !isOwner ? "Owner専用・閲覧のみ" : "閲覧のみ"}</strong>
+            <span>{!isOwner ? "更新操作と個人情報の閲覧はOwnerだけが実行できます。" : state.stateDescription}</span>
           </div>
         ) : null}
 
         <div className={styles.liveMessage} aria-live="polite">
-          <span data-pending={state.pending || undefined}>{state.pending ? "処理中" : "LIVE"}</span>
+          <span data-pending={state.pending || undefined}>{state.pending ? "処理中" : "更新中"}</span>
           <p>{state.message}</p>
           <strong className="tabular-nums">REV {state.board.boardRevision}</strong>
         </div>
@@ -315,17 +333,15 @@ export default function VipFloorWorkspace() {
               reservations={reservations}
               selectedReservationId={state.selectedReservationId}
               selectedTableId={state.selectedTableId}
-              sectionId={state.sectionId}
               onSelectTable={(tableId, reservationId) => dispatch({ type: "selectTable", tableId, reservationId })}
               onOpenAssignment={() => openCommand("assignment")}
             />
           ) : null}
           {!["loading", "error", "empty"].includes(state.globalState) && state.view === "timeline" ? (
-            <TimelineView
+            <ChartView
               board={state.board}
               reservations={reservations}
               selectedReservationId={state.selectedReservationId}
-              sectionId={state.sectionId}
               zoom={state.timelineZoom}
               onZoom={(zoom) => dispatch({ type: "zoom", zoom })}
               onSelect={selectReservation}
@@ -352,35 +368,56 @@ export default function VipFloorWorkspace() {
           collapsed={state.inspectorCollapsed}
           instance="desktop"
           readOnly={readOnly}
+          activeTab={inspectorTab}
+          canCommand={canCommand}
+          onTabChange={changeInspectorTab}
           onCollapse={(collapsed) => dispatch({ type: "inspectorCollapsed", collapsed })}
           onCommand={openCommand}
         />
       </div>
 
-      <div className={styles.mobileDock} aria-label="mobile primary actions">
-        <button
-          type="button"
-          onClick={() => dispatch({ type: "mobileInspector", open: true })}
-          disabled={!selectedReservation && !state.selectedTableId}
-        >
-          <UsersRound size={18} />詳細
+      {menuOpen ? (
+        <section className={styles.shellMenu} aria-label="メニュー">
+          <header>
+            <div><span>GHOST OSAKA</span><strong>メニュー</strong></div>
+            <button type="button" onClick={() => setMenuOpen(false)} aria-label="メニューを閉じる"><X size={18} /></button>
+          </header>
+          <div className={styles.shellMenuGrid}>
+            <button type="button" data-active={state.view === "timeline" || undefined} onClick={() => switchView("timeline")}>
+              <ChartNoAxesGantt size={18} /><span>Chart</span><small>時間軸</small>
+            </button>
+            <button type="button" onClick={() => void loadBoard()} disabled={state.pending}>
+              <RefreshCw size={18} /><span>再読込</span><small>台帳同期</small>
+            </button>
+            <span aria-disabled="true"><Radio size={18} /><span>オンライン</span><small>準備中</small></span>
+            <span aria-disabled="true"><UsersRound size={18} /><span>顧客</span><small>準備中</small></span>
+            <span aria-disabled="true"><ShieldCheck size={18} /><span>設定</span><small>準備中</small></span>
+            <button type="button" onClick={() => void logout()}>
+              <LogOut size={18} /><span>ログアウト</span><small>Owner session</small>
+            </button>
+          </div>
+        </section>
+      ) : null}
+
+      <nav className={styles.bottomNav} aria-label="主要ナビゲーション">
+        <button type="button" disabled aria-label={`新規予約（${isOwner ? "作成API準備中" : "Owner専用"}）`}>
+          <CalendarPlus size={19} /><span>新規予約</span><small>{isOwner ? "準備中" : "Ownerのみ"}</small>
+        </button>
+        <button type="button" aria-current={state.view === "list" ? "page" : undefined} data-active={state.view === "list" || undefined} onClick={() => switchView("list")}>
+          <ClipboardList size={19} /><span>List</span>
+        </button>
+        <button type="button" aria-current={state.view === "floor" ? "page" : undefined} data-active={state.view === "floor" || undefined} onClick={() => switchView("floor")}>
+          <LayoutGrid size={19} /><span>Floor</span>
         </button>
         <button
           type="button"
-          className={styles.dockPrimary}
-          onClick={() => openCommand("check_in")}
-          disabled={readOnly || !selectedReservation}
+          aria-expanded={menuOpen}
+          data-active={menuOpen || state.view === "timeline" || undefined}
+          onClick={() => setMenuOpen((open) => !open)}
         >
-          <ShieldCheck size={18} />Check in
+          <Menu size={19} /><span>メニュー</span>
         </button>
-        <button
-          type="button"
-          onClick={() => openCommand("assignment")}
-          disabled={readOnly || !selectedReservation}
-        >
-          <Command size={18} />卓割当
-        </button>
-      </div>
+      </nav>
 
       <div
         className={styles.mobileSheet}
@@ -403,6 +440,9 @@ export default function VipFloorWorkspace() {
           history={state.history}
           instance="mobile"
           readOnly={readOnly}
+          activeTab={inspectorTab}
+          canCommand={canCommand}
+          onTabChange={changeInspectorTab}
           onCommand={openCommand}
         />
       </div>

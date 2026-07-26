@@ -254,8 +254,11 @@ export function adaptLegacyVipBoard(source: LegacyVipBoard, requestedDate: strin
         return counts;
       }, {}),
     },
+    legacyFallbackCount: reservations.length,
     operations: {
-      adminMutationEnabled: source.operations?.adminMutationEnabled === true,
+      // The legacy board has no monotonic numeric version contract. It is
+      // intentionally read-only so commands can only target canonical v2.
+      adminMutationEnabled: false,
       webhookProcessingEnabled: false,
       publicBookingEnabled: false,
     },

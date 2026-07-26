@@ -25,9 +25,8 @@ export type CommandKind = (typeof COMMAND_KINDS)[number];
 export type LiveCommandDraft = {
   kind: CommandKind;
   reservationId: string;
-  expectedUpdatedAt: string;
+  expectedVersion: number;
   payload: {
-    reason: string;
     occurredAt?: string;
     serviceStatus?: VipServiceStatus;
     tableIds?: string[];
@@ -83,7 +82,6 @@ export type WorkspaceState = {
   view: WorkspaceView;
   selectedReservationId: string | null;
   selectedTableId: string | null;
-  sectionId: string;
   query: string;
   statusFilter: string;
   density: "compact" | "comfortable";

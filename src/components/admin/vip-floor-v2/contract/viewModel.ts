@@ -27,15 +27,13 @@ export function toUiReservations(board: VipFloorBoardV2): UiReservation[] {
       const status = getStatusMeta(reservation.serviceStatus);
       const exceptionLabel = reservation.flags.includes("no_contact")
         ? "連絡未達"
-        : reservation.flags.includes("payment_review")
-          ? "決済確認"
-          : reservation.flags.includes("capacity_warning")
-            ? "定員確認"
-            : reservation.flags.includes("time_conflict")
-              ? "時間競合"
-              : reservation.serviceStatus === "late"
-                ? "遅延"
-                : null;
+        : reservation.flags.includes("capacity_warning")
+          ? "定員確認"
+          : reservation.flags.includes("time_conflict")
+            ? "時間競合"
+            : reservation.serviceStatus === "late"
+              ? "遅延"
+              : null;
 
       return {
         id: reservation.id,
@@ -64,7 +62,7 @@ export function toUiReservations(board: VipFloorBoardV2): UiReservation[] {
 export function buildQueueGroups(reservations: UiReservation[]): QueueGroup[] {
   const critical = reservations.filter((item) => item.serviceStatus === "late" || item.serviceStatus === "no_contact");
   const unassigned = reservations.filter((item) => item.tableIds.length === 0);
-  const review = reservations.filter((item) => item.flags.some((flag) => ["payment_review", "capacity_warning", "time_conflict"].includes(flag)));
+  const review = reservations.filter((item) => item.flags.some((flag) => ["capacity_warning", "time_conflict"].includes(flag)));
   const arrivals = reservations.filter((item) => ["expected", "arrived", "partial_arrival"].includes(item.serviceStatus));
 
   return [

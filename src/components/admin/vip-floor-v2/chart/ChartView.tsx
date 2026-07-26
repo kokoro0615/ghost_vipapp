@@ -9,11 +9,10 @@ import { getStatusMeta } from "../contract/statusModel";
 import type { UiReservation } from "../contract/uiTypes";
 import styles from "../VipFloorWorkspace.module.css";
 
-type TimelineProps = {
+type ChartProps = {
   board: VipFloorBoardV2;
   reservations: UiReservation[];
   selectedReservationId: string | null;
-  sectionId: string;
   zoom: 15 | 30 | 60;
   onZoom: (zoom: 15 | 30 | 60) => void;
   onSelect: (id: string) => void;
@@ -30,8 +29,7 @@ function positionStyle(startAt: string, endAt: string, operatingStartAt: string,
   } as CSSProperties;
 }
 
-export default function TimelineView({ board, reservations, selectedReservationId, sectionId, zoom, onZoom, onSelect }: TimelineProps) {
-  const visibleTables = board.tables.filter((table) => sectionId === "all" || table.sectionId === sectionId);
+export default function ChartView({ board, reservations, selectedReservationId, zoom, onZoom, onSelect }: ChartProps) {
   const operatingStart = new Date(board.businessDay.operatingStartAt);
   const operatingEnd = new Date(board.businessDay.operatingEndAt);
   const totalMinutes = Math.max(60, (operatingEnd.getTime() - operatingStart.getTime()) / 60_000);
@@ -54,11 +52,11 @@ export default function TimelineView({ board, reservations, selectedReservationI
   const unassigned = reservations.filter((item) => item.tableIds.length === 0);
 
   return (
-    <section className={styles.timelineView} aria-labelledby="timeline-view-title">
+    <section className={styles.timelineView} aria-labelledby="chart-view-title">
       <div className={styles.viewHeading}>
         <div>
-          <h2 id="timeline-view-title">TABLE × TIME</h2>
-          <p>15分単位の滞在、turnover、block、競合を空間で確認します。</p>
+          <h2 id="chart-view-title">Chart</h2>
+          <p>15分単位の滞在、入替、ブロック、競合を空間で確認します。</p>
         </div>
         <div className={styles.zoomControl} role="group" aria-label="時間軸ズーム">
           <button type="button" onClick={() => onZoom(zoom === 60 ? 30 : 15)} aria-label="時間軸を拡大"><Plus size={15} /></button>
@@ -71,14 +69,14 @@ export default function TimelineView({ board, reservations, selectedReservationI
         <div className={styles.timelineGrid}>
           <div className={styles.timelineCorner}><Clock3 size={14} aria-hidden /> 席 / 時刻</div>
           <div className={styles.timelineTicks} style={{ gridTemplateColumns: `repeat(${tickCount}, 1fr)` }}>{ticks.map((tick) => <span key={tick}>{tick}</span>)}</div>
-          {visibleTables.map((table) => {
+          {board.tables.map((table) => {
             const items = reservations.filter((reservation) => reservation.tableIds.includes(table.id));
             return (
               <div className={styles.timelineRow} key={table.id}>
                 <div className={styles.timelineTableLabel}>
                   <strong>{table.displayCode}</strong>
                   <span>{table.capacityMax}名</span>
-                  {table.operationalLocked ? <small>LOCK</small> : null}
+                  {table.operationalLocked ? <small>ロック</small> : null}
                 </div>
                 <div className={styles.timelineTrack}>
                   {items.map((reservation) => {
@@ -103,7 +101,7 @@ export default function TimelineView({ board, reservations, selectedReservationI
                     );
                   })}
                   {board.blocks.filter((block) => block.targets.tableIds.includes(table.id)).map((block) => (
-                    <span key={block.id} className={styles.timelineBlock} style={positionStyle(block.startAt, block.endAt, board.businessDay.operatingStartAt, board.businessDay.operatingEndAt)}>BLOCK</span>
+                  <span key={block.id} className={styles.timelineBlock} style={positionStyle(block.startAt, block.endAt, board.businessDay.operatingStartAt, board.businessDay.operatingEndAt)}>ブロック</span>
                   ))}
                   <span className={styles.nowLine} style={nowStyle} aria-label="現在時刻" />
                 </div>

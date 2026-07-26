@@ -2,15 +2,29 @@
 
 GHOST OsakaのVIPフロア現場オペレーション画面を、公開サイトから分離して管理するNext.jsアプリです。
 
+## Canonical documents
+
+- [GHOST VIP Manager 正本仕様書](docs/GHOST_VIP_MANAGER_SPEC.md)
+- [GHOST VIP Manager 正本実装計画](docs/GHOST_VIP_MANAGER_IMPLEMENTATION_PLAN.md)
+- [2026-07-26 実装完了度監査](docs/GHOST_VIP_MANAGER_IMPLEMENTATION_AUDIT_2026-07-26.md)
+- [一気通貫実行プロンプト](docs/GHOST_VIP_MANAGER_EXECUTION_PROMPT.md)
+
+旧TableCheck関連文書は`docs/archive/tablecheck-legacy-2026-07/`の履歴資料であり、
+現行の実装指示として使用しません。
+
 ## Current scope
 
 - Floor / Timeline / List の3つの運用ビュー
 - 例外キュー、予約Inspector、command center
-- healthy / loading / stale / reconnecting / error / read-only / pre-open / dense のfixture scenarios
-- 顧客名はマスク済みfixtureのみ
-- 外部API、Supabase、Stripe、TableCheck、実顧客データへの接続は未実装
+- healthy / loading / stale / reconnecting / error / read-only / empty / dense の運用状態
+- GHOST本体管理APIを中継し、実予約データを表示
+- 検索、check-in、到着時間更新、卓割当、延長、memo、service_status更新の6 command入口
+- 顧客情報は表示上の必要最小限（マスク）を維持し、個人情報の新規エクスポートは対象外
+- 外部連携は Basic/PIN 認証付きの本番API連携で、TableCheck/API連携はこのサンドボックス外
 
-画面上の操作はブラウザ内fixture stateだけを更新します。実運用データへ接続するまでは、業務判断の記録先として使用しないでください。
+2026-07-26監査時点では閲覧UIとcommand入口の段階です。正本v1.0の全業務機能と
+共有source上のmutation lineageは未完成のため、顧客提供・本番mutation全面開放は行いません。
+実装状況と次の作業は上記監査文書・正本実装計画を参照してください。
 
 ## Local development
 
@@ -34,6 +48,12 @@ npm run lint
 npm run typecheck
 npm run build
 ```
+
+### Production smoke
+
+現行`scripts/prod-e2e.mjs`は2026-07-26監査でcookie保持、専用fixture、cleanupに不備が見つかったため、
+本番では実行しません。正本計画T-004でread-only smokeへ分離し、mutation E2Eは通知無効の
+隔離staging fixtureへ移します。
 
 ## Deployment safety
 

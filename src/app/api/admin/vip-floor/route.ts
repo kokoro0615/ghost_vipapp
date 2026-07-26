@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { VIP_FLOOR_SCHEMA_VERSION } from "@/lib/vipFloorV2Contract";
 import { copyJson, ghostAdminFetch, readAdminToken } from "@/lib/server/ghostAdminProxy";
 
 export const runtime = "nodejs";
@@ -12,7 +13,36 @@ export async function GET(request: Request) {
   if (date && !/^\d{4}-\d{2}-\d{2}$/u.test(date)) {
     return NextResponse.json({ ok: false, error: "invalid_business_date" }, { status: 400 });
   }
-  const suffix = date ? `?date=${encodeURIComponent(date)}` : "";
-  const response = await ghostAdminFetch(`/api/admin/vip-status${suffix}`, {}, token);
-  return NextResponse.json(await copyJson(response), { status: response.status, headers: { "Cache-Control": "no-store" } });
+  const businessDate = date ?? new Intl.DateTimeFormat("sv-SE", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    timeZone: "Asia/Tokyo",
+  }).format(new Date());
+  const versionedResponse = await ghostAdminFetch(
+    `/api/admin/v2/vip-floor?businessDate=${encodeURIComponent(businessDate)}`,
+    {},
+    token,
+  );
+  const versionedPayload = await copyJson(versionedResponse);
+
+  if (
+    versionedResponse.ok
+    && typeof versionedPayload === "object"
+    && versionedPayload?.schemaVersion === VIP_FLOOR_SCHEMA_VERSION
+  ) {
+    return NextResponse.json(versionedPayload, {
+      status: versionedResponse.status,
+      headers: { "Cache-Control": "no-store", "X-GHOST-Board-Contract": VIP_FLOOR_SCHEMA_VERSION },
+    });
+  }
+
+  // The production backend may not have v2 enabled during the compatibility
+  // window. Legacy read remains available, but the adapter forces mutation off.
+  const legacySuffix = date ? `?date=${encodeURIComponent(date)}` : "";
+  const legacyResponse = await ghostAdminFetch(`/api/admin/vip-status${legacySuffix}`, {}, token);
+  return NextResponse.json(await copyJson(legacyResponse), {
+    status: legacyResponse.status,
+    headers: { "Cache-Control": "no-store", "X-GHOST-Board-Contract": "legacy-read-only" },
+  });
 }

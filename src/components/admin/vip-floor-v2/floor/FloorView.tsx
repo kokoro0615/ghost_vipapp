@@ -14,24 +14,22 @@ type FloorViewProps = {
   reservations: UiReservation[];
   selectedReservationId: string | null;
   selectedTableId: string | null;
-  sectionId: string;
   onSelectTable: (tableId: string, reservationId: string | null) => void;
   onOpenAssignment: () => void;
 };
 
-export default function FloorView({ board, reservations, selectedReservationId, selectedTableId, sectionId, onSelectTable, onOpenAssignment }: FloorViewProps) {
+export default function FloorView({ board, reservations, selectedReservationId, selectedTableId, onSelectTable, onOpenAssignment }: FloorViewProps) {
   const reservationById = new Map(reservations.map((item) => [item.id, item]));
-  const visibleTables = board.tables.filter((table) => sectionId === "all" || table.sectionId === sectionId);
 
   return (
     <section className={styles.floorView} aria-labelledby="floor-view-title">
       <div className={styles.viewHeading}>
         <div>
-          <h2 id="floor-view-title">VIP FLOOR COORDINATE</h2>
-          <p>座席を選択すると、queue・timeline・list・inspectorが同じ予約へ揃います。</p>
+          <h2 id="floor-view-title">フロア図</h2>
+          <p>座席を選択すると、キュー・Chart・一覧・インスペクタが同一予約へ同期します。</p>
         </div>
         <button type="button" className={styles.secondaryButton} onClick={onOpenAssignment} disabled={!selectedReservationId}>
-          <MoveRight aria-hidden size={16} /> 移動先を選択
+          <MoveRight aria-hidden size={16} /> 席割当先を選択
         </button>
       </div>
 
@@ -49,7 +47,7 @@ export default function FloorView({ board, reservations, selectedReservationId, 
           <span>GHOST OSAKA / 1F VIP</span>
         </div>
 
-        {visibleTables.map((table) => {
+        {board.tables.map((table) => {
           const reservation = table.reservationIds.map((id) => reservationById.get(id)).find(Boolean) ?? null;
           const meta = getStatusMeta(reservation?.serviceStatus);
           const Icon = meta.icon;
@@ -78,7 +76,7 @@ export default function FloorView({ board, reservations, selectedReservationId, 
               <span className={styles.nodeCode}>{table.displayCode}</span>
               <span className={styles.nodeStatus}>
                 {table.operationalLocked ? <LockKeyhole size={12} aria-hidden /> : blocked ? <Link2 size={12} aria-hidden /> : <Icon size={12} aria-hidden />}
-                {blocked ? "BLOCK" : table.operationalLocked ? "LOCK" : meta.shortLabel}
+                {blocked ? "ブロック" : table.operationalLocked ? "ロック" : meta.shortLabel}
               </span>
               <span className={styles.nodeDetail}>{reservation ? `${reservation.startLabel} / ${reservation.guestCount}名` : `${table.capacityMax}名 / 空席`}</span>
             </button>
@@ -87,7 +85,7 @@ export default function FloorView({ board, reservations, selectedReservationId, 
       </div>
 
       <div className={styles.floorLegend} aria-label="座席状態の凡例">
-        {["来店予定", "遅延", "着席中", "会計依頼", "空席", "BLOCK / LOCK"].map((label, index) => (
+        {["来店予定", "遅延", "着席中", "会計依頼", "空席", "ブロック / ロック"].map((label, index) => (
           <span key={label} data-cue={["line", "stripe", "solid", "double", "dash", "double"][index]}>{label}</span>
         ))}
       </div>
