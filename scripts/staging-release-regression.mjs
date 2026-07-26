@@ -914,7 +914,7 @@ async function runUiRegression(config, reservationId, uiReservationPlan) {
     await page.evaluate(() => window.dispatchEvent(new Event("online")));
     await page.waitForTimeout(500);
     offlineConsoleExpected = false;
-    await page.reload({ waitUntil: "networkidle" });
+    await page.reload({ waitUntil: "domcontentloaded" });
     await page.getByRole("navigation", { name: "主要ナビゲーション" }).waitFor();
     assert(
       await page.locator(`button[aria-label*="${reservationId}"]`).count() === 0,
