@@ -807,9 +807,12 @@ async function runUiRegression(config, reservationId, uiReservationPlan) {
         `ui_status_filter_failed:${value}`,
       );
     }
-    await page.getByLabel("例外と到着queue")
-      .getByText(uiReservationPublicCode, { exact: true })
-      .click();
+    await search.fill(uiReservationPublicCode);
+    const queueItem = page.getByLabel("例外と到着queue")
+      .getByRole("button")
+      .filter({ hasText: uiReservationPublicCode });
+    await queueItem.waitFor();
+    await queueItem.click();
     await page.locator('aside[aria-label="予約インスペクター"]:visible').waitFor();
     await search.fill("");
 
