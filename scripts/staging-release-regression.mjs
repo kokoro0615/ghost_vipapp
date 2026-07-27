@@ -17,6 +17,7 @@ import {
 
 const CONFIRMATION = "E2E削除可";
 const AUDIT_REASON = "管理画面操作";
+const ADMIN_SESSION_COOKIE = "ghost_vipapp_admin_session";
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/u;
 const FINGERPRINT_PATTERN = /^[a-f0-9]{64}$/u;
 const RC_RUN_ID_PATTERN = /^trial-rc-[a-z0-9][a-z0-9-]{7,72}$/u;
@@ -705,8 +706,9 @@ async function login(client, pin) {
     json: { pin },
   });
   assert(result.response.ok && result.payload?.ok === true, `pin_login_failed:${result.response.status}`);
-  const token = required(result.payload, "token");
   assert(client.jar.size > 0, "pin_login_cookie_missing");
+  const token = client.jar.value(ADMIN_SESSION_COOKIE);
+  assert(typeof token === "string" && token.length > 0, "pin_login_cookie_token_missing");
   const session = await client.requestJson("/api/admin/session");
   assert(session.response.ok && session.payload?.ok === true, "session_read_after_login_failed");
   return token;

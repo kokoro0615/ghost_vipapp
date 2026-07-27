@@ -7,13 +7,15 @@ import {
   assertStagingOrigin,
 } from "../../scripts/lib/e2e-http.mjs";
 
-test("CookieJar stores and clears an HttpOnly session without exposing values", () => {
+test("CookieJar stores and clears an HttpOnly session with explicit in-memory lookup", () => {
   const jar = new CookieJar();
   jar.absorb(new Headers({
     "set-cookie": "ghost_vipapp_admin_session=top-secret; HttpOnly; Secure; Path=/api",
   }));
   assert.equal(jar.size, 1);
   assert.match(jar.header(), /^ghost_vipapp_admin_session=/u);
+  assert.equal(jar.value("ghost_vipapp_admin_session"), "top-secret");
+  assert.equal(jar.value("missing"), null);
 
   jar.absorb(new Headers({
     "set-cookie": "ghost_vipapp_admin_session=; Max-Age=0; HttpOnly; Secure; Path=/api",
