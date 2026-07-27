@@ -9,6 +9,7 @@ GHOST OsakaのVIPフロア現場オペレーション画面を、公開サイト
 - [2026-07-26 実装完了度監査](docs/GHOST_VIP_MANAGER_IMPLEMENTATION_AUDIT_2026-07-26.md)
 - [一気通貫実行プロンプト](docs/GHOST_VIP_MANAGER_EXECUTION_PROMPT.md)
 - [本番完成コード＋Staging DB 顧客Trial一気通貫プロンプト](docs/GHOST_VIP_MANAGER_CUSTOMER_TRIAL_DEPLOYMENT_PROMPT.md)
+- [長時間化収束・残作業限定・Production完遂プロンプト](docs/GHOST_VIP_MANAGER_PRODUCTION_COMPLETION_EXECUTION_PROMPT.md)
 
 旧TableCheck関連文書は`docs/archive/tablecheck-legacy-2026-07/`の履歴資料であり、
 現行の実装指示として使用しません。
@@ -63,4 +64,4 @@ npm run build
 
 このアプリは管理画面です。Vercel Authenticationに加え、`VIPAPP_BASIC_USER` と `VIPAPP_BASIC_PASSWORD` によるアプリ内Basic Authenticationを必須とします。環境変数が欠けている場合はfail-closedで全画面を401にします。
 
-破壊的staging cleanup、Production DB migration、Website/VIP alias promotion、mutation flag有効化は別々のOwner承認Gateです。exact project/SHA/deployment/checksum/rollback evidenceを提示し、freshな明示承認を得るまで実行しません。履歴参照を持つinactive検証卓は物理削除せず、active read/UIからだけ除外します。
+破壊的staging cleanup、Production DB migration、Website/VIP alias promotion、mutation flag有効化は通常は別々のOwner承認Gateです。2026-07-27の正式Production完遂releaseに限り、上記の残作業限定promptに記録されたOwnerのstanding authorizationとfail-closed条件を適用します。履歴参照を持つinactive検証卓は物理削除せず、active read/UIからだけ除外します。
