@@ -13,12 +13,13 @@
 >
 > この文書の作成sessionでは、実装・DB mutation・env変更・deployment・alias変更を行っていない
 
-Prompt作成時の観察状況: target URL自体とTableCheck ID loginへのredirectは確認済み。
-Chrome connectorは`Target closed`、Playwrightは別の未認証context、Orca CLIは未導入だったため、
-この作成sessionでは認証後のlive Manager再観察を行っていない。2026-07-26の認可済みprivate
-Manager実査、現行GHOST source/evidence、TableCheck公式資料をprompt設計へ使用した。
-実装sessionでは下記Gate OBS-0〜3により、事前に渡された資格情報を再提出させず、
-authenticated browser stateでPII-free read-only観察を一度通してからbuilderを開始する。
+前回のprompt作成時点では、target URL自体とTableCheck ID loginへのredirectのみ確認し、
+認証後のlive Manager再観察は未実施だった。現在はOwnerが既存Chromeのリモートデバッグを許可済みで、
+次の実行sessionではそのログイン済みbrowser stateを最初の観察対象として再利用する。
+実行sessionは、事前に渡された資格情報を再提出させず、authenticated browser stateで
+PII-free read-only観察を一度通してからbuilderを開始する。未認証contextやlogin画面を
+TableCheck UIの根拠として扱ってはならない。2026-07-26の認可済みprivate Manager実査、
+現行GHOST source/evidence、TableCheck公式資料は補助的な設計根拠として使用する。
 
 あなたはGHOST VIP Managerの期限付き顧客デモを完成させる統括Solである。
 以下を唯一の実行指示として扱い、認可済みTableCheck Managerのread-only観察、
@@ -227,13 +228,13 @@ Ownerが事前に用意したlogged-in browser stateをそのまま使用する�
 
 ### Gate OBS-0 — authenticated session
 
-1. browser tabsを列挙する。
-2. target URLと同じauthenticated contextを選択する。
-3. 店舗名と対象日だけを確認する。
-4. login formへredirectされた場合、disk/chatからsecretを探索しない。
-5. login stateがない場合は、過去の認可済みresearchと公式資料を使用して他のpreflightを進める。
+1. browser tabsを列挙し、既存のTableCheck Managerタブ（または同じlogged-in context）を特定する。
+2. Chrome DevTools/CDP connectorを再起動・再接続し、target URLと同じauthenticated contextを選択する。
+3. `manager.app.tablecheck.com`のshellが表示されること、店舗名と対象日だけを確認する。
+4. login formへredirectされた場合、disk/chatからsecretを探索せず、別の既存ログイン済みタブ/targetを再確認する。
+5. authenticated targetが取得できない場合だけ`HOLD_AUTHENTICATED_REFERENCE_OBSERVATION`とし、実装・deployへ進まない。
 6. build dispatchはauthenticated live observationが一度成功するまで開かない。
-7. credentialの再提出をOwnerへ求めない。既存browser stateが復旧するまでOBS-0だけをHOLDにする。
+7. credentialの再提出をOwnerへ求めない。browser connectorの再起動または既存sessionの引き継ぎだけを行う。
 
 ### Gate OBS-1 — privacy
 
