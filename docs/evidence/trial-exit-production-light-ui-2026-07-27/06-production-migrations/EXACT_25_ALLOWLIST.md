@@ -1,10 +1,13 @@
 # Production migration exact allowlist
 
-Status: `HOLD_PRODUCTION_SNAPSHOT_RESTORE`
+Status: `PASS_PRODUCTION_APPLIED`
 
-Production migration head is `20260604090000`. The Website release branch
-verifier binds this 24-file forward-only allowlist to the source files by
-SHA-256. Trial-only v16/v17 are excluded.
+Observed: 2026-07-27 JST
+
+The verifier binds this 25-file forward-only allowlist to the Website source by
+SHA-256. Trial-only v16/v17 are excluded. The same exact set passed against the
+isolated Production restore before it was applied once to Production through
+the supported Supabase CLI migration flow.
 
 | Version | SHA-256 |
 |---|---|
@@ -32,35 +35,30 @@ SHA-256. Trial-only v16/v17 are excluded.
 | `20260726174100` | `23bce01d8d5e095a33081c7d5e8dc2fcb8b468a9ec370dd939f3a501fd7dd753` |
 | `20260726174200` | `bb61dcd2417a3a7d7246627ec855520959b1fa5b77cb42e7dfb106a2aa6952cc` |
 | `20260726175000` | `03b438786d967da9a0cb2bd808005d578821a4c643c5d9a1b61a10f8720ed8d1` |
+| `20260726205147` | `4bf5609b1c8f3f9f49d927465b9fecf4682d535404f557a8f6546cc4c954260e` |
 
 Excluded:
 
 - `20260726180000_ghost_vip_manager_trial_safety_v16.sql`
 - `20260726181000_ghost_vip_manager_trial_cleanup_v17.sql`
 
-## `20260714093000` history strategy
+## Production application
 
-Staging previously applied the frozen old source with SHA-256
-`363fc5752309f0f4ae61a39218d66bcd970444e63e6a9d491f4d79486b54f057`.
-Production has not applied this version. The production candidate source
-preserves inactive verification rows, supplies deterministic archive-only
-geometry before the subsequent NOT NULL transition, requires exactly eight
-active official rows, and rejects only active unmapped seats. It does not
-repair or replay staging migration history.
+Production migration history now contains 45 rows with exact head
+`20260726205147`. Source checksums match 25/25 and Trial versions
+`20260726180000`/`20260726181000` are absent from the Production application
+set.
 
-Before Gate B, apply the candidate to a clean database and an isolated restore
-of the production logical snapshot. Compare v15 schema with staging while
-treating v16/v17 as an explicit staging-only extension; verify inactive
-references remain 2+2, active official seats exact 8, T/TRIAL rows 0 and
-orphans 0.
+Post-apply verification returned:
 
-The Website verifier passed the exact file count, exclusions, active filters
-and archive policy. Portable PostgreSQL 16.14 rehearsals passed both a clean
-20+24 migration/restore and a production-shaped synthetic case with inactive
-seats 2, reservation references 2 and offering references 2. The latter
-retained all references, returned only eight official tables from the v14
-board RPC, and restored with 52/52 RLS tables, 159 routines, 100 validated
-foreign keys and zero invalid foreign keys.
+- active/UI official seats 8 and inactive history 2;
+- inactive reservation references 2 and offering references 2;
+- Trial seats/sections/control tables 0;
+- 52/52 public tables with RLS;
+- invalid foreign keys, resource orphans and audit-actor orphans 0;
+- v18 audit timestamp guard present with restricted execute privileges;
+- provider sent baseline unchanged and pending delivery 0;
+- public availability read PASS.
 
-The encrypted production logical snapshot and its isolated restore are still
-missing, so Gate B remains HOLD.
+`npm run verify:backup-restore` independently recomputed all 25 source
+checksums and passed with forbidden Trial migrations 0.

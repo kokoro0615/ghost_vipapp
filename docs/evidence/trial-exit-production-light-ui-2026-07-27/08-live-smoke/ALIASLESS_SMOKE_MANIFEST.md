@@ -1,43 +1,34 @@
-# Aliasless production smoke manifest
+# Production smoke manifest
 
-Status: `PASS_MAINTENANCE_FIXED_URL_ONLY`
+Status: `PASS`
 
-The maintenance anchor `dpl_6zRMGjhUo7HLwAcuWAKRMVKxZg7C` first passed
-aliasless smoke and then, after exact session retirement and fresh Owner
-approval, passed the same checks on the fixed URL:
+Observed: 2026-07-27 JST
 
-- Vercel protection bypassed only through the authenticated CLI;
-- outer Basic absent: 401;
-- existing Basic present: 200;
-- maintenance copy present;
-- PIN, workspace, reservation search and form controls: zero;
-- local session read without a PIN session: 401;
-- command POST without a PIN session: 401;
-- fixed URL resolved to `dpl_6zRMGjhUo7HLwAcuWAKRMVKxZg7C`;
-- exact Trial run non-expired active sessions: 0;
-- fixed URL session, board and command routes without a PIN session: `401`;
-- recent deployment `5xx` and error-level logs: 0.
+Aliasless candidates and the final fixed URLs passed:
 
-The candidate points to read-only staging backend
-`dpl_FSf7tGxgDmpnnfJzNwC8kQFZAWvE`. No business mutation, provider call,
-Gate A cleanup or production database change was performed.
+- unauthenticated outer request: 401;
+- permanent Basic and Owner PIN login: PASS;
+- session read, current board, alternate date and local search: PASS;
+- direct List, Floor and Chart, queue and Inspector: PASS;
+- logout cleared the browser cookie and subsequent session read returned 401;
+- Trial/maintenance customer copy: absent;
+- active visible tables: exact `VIP-1` through `VIP-8`;
+- read-only smoke business mutations: 0;
+- browser console errors and final deployment `5xx`: 0;
+- provider sent delta and provider delivery logs: 0.
 
-This is PR-3 maintenance evidence only. The final Website/VIP read-only
-production candidates, permanent credentials, authenticated production board,
-physical iPad witness and Gate C/D approvals remain HOLD.
+Public Website checks on `https://ghost-ruby-one.vercel.app`:
 
-Required on the exact candidates before alias promotion:
+| Endpoint | Result |
+|---|---|
+| availability for `2026-07-29`, 2 guests | 200, 24 rows |
+| seat availability for `2026-07-29`, 2 guests | 200, 48 rows |
+| public hold POST | 403 `public_booking_disabled` |
 
-- unauthenticated outer request returns 401;
-- permanent Basic succeeds;
-- permanent Owner PIN succeeds and creates a session;
-- current-day board, alternate date and local search succeed;
-- List, Floor and Chart are directly reachable;
-- logout clears the session and the next session read returns 401;
-- mutation requests executed: zero;
-- Trial/T cues: zero;
-- visible active tables: exact `VIP-1` through `VIP-8`;
-- console errors and server 5xx: zero;
-- provider delivery and real-customer mutation: zero.
+The final fixed aliases independently resolved to Website
+`dpl_Gj89YEqt6KSnxaL1fcatCpQ2Y75e` and VIP
+`dpl_CvFzDDArUGR8j7QyAUtXG9cQ6gxf`.
 
-Use only synthetic, PII-free data. Do not use `prod-e2e.mjs` for mutation.
+After all authenticated smoke and mutation canaries, the dedicated Production
+admin remained active while all of its temporary sessions were deleted.
+Canary reservations, action requests and isolated arrival controls were 0.
