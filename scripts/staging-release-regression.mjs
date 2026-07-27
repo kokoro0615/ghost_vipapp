@@ -34,6 +34,10 @@ const OFFICIAL_DISPLAY_CODES = new Set([
 
 async function main() {
   const config = await loadConfiguration();
+  if (config.focusedCustomerProfile) {
+    await runFocusedCustomerProfile(config);
+    return;
+  }
   const client = createClient(config);
   let loggedIn = false;
   let browser = null;
@@ -71,7 +75,8 @@ async function main() {
     );
     const expiredSession = await client.requestJson("/api/admin/session");
     assert(expiredSession.response.status === 401, "expired_session_still_authenticated");
-    await login(client, config.pin);
+    const backendSessionToken = await login(client, config.pin);
+    const backendClient = createBackendClient(config, backendSessionToken);
 
     const options = await readOptions(client, config.businessDate);
     const initialBoard = await readBoard(client, config.businessDate);
@@ -375,30 +380,13 @@ async function main() {
       "table_staff_assignment.set",
     );
 
-    const customerRead = await client.requestJson(
-      `/api/admin/vip-floor/customers/${customerId}`,
-    );
-    assert(customerRead.response.ok && customerRead.payload?.ok === true, "customer_read_failed");
-    const profileVersion = positiveInteger(
-      customerRead.payload?.customer?.profileVersion,
-      "customer_profile_version_missing",
-    );
-    await command(
+    await exerciseCustomerProfile({
       client,
-      `/api/admin/vip-floor/customers/${customerId}`,
-      "PATCH",
-      {
-        expectedVersion: profileVersion,
-        eventDayId,
-        reservationId,
-        nationalityCode: "JP",
-        birthDate: null,
-        anniversaryDate: null,
-        vipRank: "RC",
-        reason: AUDIT_REASON,
-      },
-      "customer_profile.attributes_updated",
-    );
+      backendClient,
+      eventDayId,
+      reservationId,
+      customerId,
+    });
 
     board = await readBoard(client, config.businessDate);
     reservation = findReservation(board, reservationId);
@@ -483,7 +471,10 @@ async function main() {
       realtimeGapRecovery: true,
       offlineReadOnly: true,
       sloAlert: true,
-      verifiedAuditActions: ["customer_profile.upserted"],
+      verifiedAuditActions: [
+        "customer_profile.upserted",
+        "customer_profile.attributes_updated",
+      ],
     });
   } catch (error) {
     primaryError = error;
@@ -533,6 +524,137 @@ async function main() {
   });
 }
 
+async function runFocusedCustomerProfile(config) {
+  const client = createClient(config);
+  let loggedIn = false;
+  let primaryError = null;
+  let cleanupComplete = false;
+
+  try {
+    emit("staging_customer_profile_probe_started", {
+      contract: "vip-floor.v2",
+      trialRunId: config.trialRunId,
+      providerDelivery: "disabled",
+    });
+    await runRequiredLifecycle(
+      config.seedScript,
+      "seed-vip-manager-release-candidate.mjs",
+      lifecycleArgs(config, "seeded", true),
+      config,
+    );
+
+    const backendSessionToken = await login(client, config.pin);
+    loggedIn = true;
+    const backendClient = createBackendClient(config, backendSessionToken);
+    const options = await readOptions(client, config.businessDate);
+    const initialBoard = await readBoard(client, config.businessDate);
+    const tableByCode = new Map(
+      officialTables(initialBoard).map((table) => [table.displayCode, table]),
+    );
+    const offering = options.offerings.find((item) => item?.name === "RELEASE CANDIDATE VIP");
+    assert(offering && UUID_PATTERN.test(offering.id ?? ""), "release_candidate_offering_missing");
+    const eventDayId = requireUuid(
+      options.businessDay?.id,
+      "release_candidate_event_day_missing",
+    );
+    const now = Date.now();
+    const vip1 = tableByCode.get("VIP-1");
+    const createResult = await command(
+      client,
+      "/api/admin/vip-floor/operations",
+      "POST",
+      {
+        kind: "reservation_create",
+        payload: {
+          eventDayId,
+          offeringId: offering.id,
+          scheduledStartAt: new Date(now - 30 * 60_000).toISOString(),
+          scheduledEndAt: new Date(now + 90 * 60_000).toISOString(),
+          guestCount: 2,
+          tableIds: [vip1.id],
+          expectedTableVersions: tableVersions([vip1]),
+          existingCustomerId: null,
+          displayName: "Release Candidate Profile Probe",
+          phone: null,
+          email: "release-candidate-profile-probe@example.com",
+          languageCode: "ja",
+          guestLabel: "RC Profile Probe",
+          operatorNote: "Synthetic focused customer profile probe",
+          sourceChannel: "admin_hold",
+          serviceStatus: "expected",
+          bookingStaffMemberId: null,
+          notificationPreference: "none",
+          capacityOverride: false,
+        },
+      },
+      "reservation.created",
+    );
+    const reservationId = requireUuid(
+      createResult.reservationId,
+      "focused_created_reservation_id_missing",
+    );
+    const customerId = requireUuid(
+      createResult.customerId,
+      "focused_created_customer_id_missing",
+    );
+    await exerciseCustomerProfile({
+      client,
+      backendClient,
+      eventDayId,
+      reservationId,
+      customerId,
+    });
+
+    await delay(2_500);
+    await runRequiredLifecycle(
+      config.verifyScript,
+      "verify-vip-manager-release-candidate.mjs",
+      lifecycleArgs(config, "customer-profile", false),
+      config,
+    );
+    emit("staging_customer_profile_probe_verified", {
+      profileWrite: true,
+      idempotencyReplay: true,
+      staleConflict: 409,
+      auditActions: [
+        "customer_profile.upserted",
+        "customer_profile.attributes_updated",
+      ],
+      providerDelivery: 0,
+    });
+  } catch (error) {
+    primaryError = error;
+  } finally {
+    if (loggedIn) {
+      await client.requestJson("/api/admin/session", { method: "DELETE" }).catch(() => undefined);
+      client.jar.clear();
+    }
+    try {
+      await delay(3_000);
+      await runRequiredLifecycle(
+        config.cleanupScript,
+        "cleanup-vip-manager-trial.mjs",
+        lifecycleArgs(config, "cleanup", false),
+        config,
+      );
+      await verifyCleanRelease(config);
+      cleanupComplete = true;
+    } catch (cleanupError) {
+      primaryError = primaryError
+        ? new Error(`${safeErrorCode(primaryError)}:cleanup:${safeErrorCode(cleanupError)}`)
+        : cleanupError;
+    }
+  }
+
+  if (primaryError) throw primaryError;
+  assert(cleanupComplete, "focused_customer_profile_cleanup_not_completed");
+  emit("staging_customer_profile_probe_completed", {
+    cleanupVerified: true,
+    baselineRestored: true,
+    providerDelivery: 0,
+  });
+}
+
 function createClient(config) {
   return new SafeHttpClient({
     origin: config.origin,
@@ -562,15 +684,32 @@ function createClient(config) {
   });
 }
 
+function createBackendClient(config, sessionToken) {
+  return new SafeHttpClient({
+    origin: config.backendOrigin,
+    basicUser: null,
+    basicPassword: null,
+    defaultHeaders: {
+      authorization: `Bearer ${sessionToken}`,
+      "x-vercel-protection-bypass": config.backendProtectionBypass,
+    },
+    rules: [
+      { method: "PATCH", path: /^\/api\/admin\/v2\/customers\/[0-9a-f-]+$/u },
+    ],
+  });
+}
+
 async function login(client, pin) {
   const result = await client.requestJson("/api/admin/session/pin", {
     method: "POST",
     json: { pin },
   });
   assert(result.response.ok && result.payload?.ok === true, `pin_login_failed:${result.response.status}`);
+  const token = required(result.payload, "token");
   assert(client.jar.size > 0, "pin_login_cookie_missing");
   const session = await client.requestJson("/api/admin/session");
   assert(session.response.ok && session.payload?.ok === true, "session_read_after_login_failed");
+  return token;
 }
 
 async function readOptions(client, businessDate) {
@@ -641,6 +780,112 @@ async function command(client, pathname, method, json, expectedAction) {
   requireUuid(payload.auditLogId, `${expectedAction}_audit_missing`);
   positiveInteger(payload.entityVersion, `${expectedAction}_version_missing`);
   return payload;
+}
+
+export async function exerciseCustomerProfile({
+  client,
+  backendClient,
+  eventDayId,
+  reservationId,
+  customerId,
+}) {
+  const customerRead = await client.requestJson(
+    `/api/admin/vip-floor/customers/${customerId}`,
+  );
+  assert(customerRead.response.ok && customerRead.payload?.ok === true, "customer_read_failed");
+  const profileVersion = positiveInteger(
+    customerRead.payload?.customer?.profileVersion,
+    "customer_profile_version_missing",
+  );
+  const profilePayload = {
+    expectedVersion: profileVersion,
+    eventDayId,
+    reservationId,
+    displayName: "Release Candidate Guest Updated",
+    nameKana: null,
+    phone: null,
+    email: "release-candidate-updated@example.com",
+    languageCode: "ja",
+    allergies: null,
+    preferences: "Synthetic profile verification",
+    reason: AUDIT_REASON,
+  };
+  const profileIdempotencyKey = `rc-profile-${randomUUID()}`;
+  const profileWrite = await backendClient.requestJson(
+    `/api/admin/v2/customers/${customerId}`,
+    {
+      method: "PATCH",
+      basic: false,
+      json: profilePayload,
+      headers: { "Idempotency-Key": profileIdempotencyKey },
+    },
+  );
+  assert(
+    profileWrite.response.ok && profileWrite.payload?.ok === true,
+    `customer_profile.upserted_failed:${profileWrite.response.status}:${
+      safeCommandFailureCode(profileWrite.payload)
+    }`,
+  );
+  assert(
+    profileWrite.payload?.action === "customer_profile.upserted",
+    "customer_profile.upserted_action_mismatch",
+  );
+  requireUuid(profileWrite.payload?.auditLogId, "customer_profile.upserted_audit_missing");
+  const updatedProfileVersion = positiveInteger(
+    profileWrite.payload?.entityVersion,
+    "customer_profile.upserted_version_missing",
+  );
+  assert(updatedProfileVersion > profileVersion, "customer_profile_version_not_advanced");
+
+  const profileReplay = await backendClient.requestJson(
+    `/api/admin/v2/customers/${customerId}`,
+    {
+      method: "PATCH",
+      basic: false,
+      json: profilePayload,
+      headers: { "Idempotency-Key": profileIdempotencyKey },
+    },
+  );
+  assert(
+    profileReplay.response.ok
+      && profileReplay.payload?.ok === true
+      && profileReplay.payload?.reused === true,
+    "customer_profile_replay_not_reused",
+  );
+  assert(
+    profileReplay.payload?.entityVersion === updatedProfileVersion,
+    "customer_profile_replay_version_changed",
+  );
+
+  const profileConflict = await backendClient.requestJson(
+    `/api/admin/v2/customers/${customerId}`,
+    {
+      method: "PATCH",
+      basic: false,
+      json: profilePayload,
+      headers: { "Idempotency-Key": `rc-profile-conflict-${randomUUID()}` },
+    },
+  );
+  assert(profileConflict.response.status === 409, "customer_profile_stale_conflict_not_409");
+
+  await command(
+    client,
+    `/api/admin/vip-floor/customers/${customerId}`,
+    "PATCH",
+    {
+      expectedVersion: updatedProfileVersion,
+      eventDayId,
+      reservationId,
+      nationalityCode: "JP",
+      birthDate: null,
+      anniversaryDate: null,
+      vipRank: "RC",
+      reason: AUDIT_REASON,
+    },
+    "customer_profile.attributes_updated",
+  );
+
+  return { profileVersion: updatedProfileVersion };
 }
 
 function safeCommandFailureCode(payload) {
@@ -1163,6 +1408,8 @@ async function loadConfiguration() {
     basicPassword: required(env, "VIPAPP_BASIC_PASSWORD"),
     pin: required(env, "VIPAPP_OWNER_PIN"),
     protectionBypass: required(env, "GHOST_VIPAPP_PROTECTION_BYPASS"),
+    backendProtectionBypass: required(env, "GHOST_VIPAPP_BACKEND_PROTECTION_BYPASS"),
+    focusedCustomerProfile: process.argv.includes("--focused-customer-profile"),
   };
 }
 
