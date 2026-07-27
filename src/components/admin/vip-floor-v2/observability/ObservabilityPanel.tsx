@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Activity, RefreshCw, TriangleAlert, X } from "lucide-react";
 
+import { DemoCue, useDemoMode } from "../demo/DemoMode";
 import styles from "../VipFloorWorkspace.module.css";
 
-type SloPayload = {
+export type SloPayload = {
   generatedAt: string;
   windowMinutes: number;
   metrics: Record<string, number>;
@@ -16,6 +17,7 @@ type SloPayload = {
 type Props = {
   open: boolean;
   onClose: () => void;
+  onLoad: () => Promise<SloPayload | null>;
 };
 
 const METRIC_LABELS: Array<[string, string, string]> = [
@@ -28,24 +30,22 @@ const METRIC_LABELS: Array<[string, string, string]> = [
   ["realtimeUnavailableCount", "Realtime停止", "件"],
 ];
 
-export function ObservabilityPanel({ open, onClose }: Props) {
+export function ObservabilityPanel({ open, onClose, onLoad }: Props) {
+  const { enabled: isDemo } = useDemoMode();
   const [payload, setPayload] = useState<SloPayload | null>(null);
   const [message, setMessage] = useState("");
   const panelRef = useRef<HTMLDivElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
 
-  async function load() {
-    const response = await fetch("/api/admin/vip-floor/observability?windowMinutes=60", {
-      cache: "no-store",
-    });
-    const data = await response.json().catch(() => ({})) as Record<string, unknown>;
-    if (!response.ok || data.ok !== true || !data.metrics || !data.alerts) {
+  const load = useCallback(async () => {
+    const data = await onLoad();
+    if (!data) {
       setMessage("SLOを取得できませんでした。");
       return;
     }
-    setPayload(data as unknown as SloPayload);
+    setPayload(data);
     setMessage("");
-  }
+  }, [onLoad]);
 
   useEffect(() => {
     if (!open) return;
@@ -58,7 +58,7 @@ export function ObservabilityPanel({ open, onClose }: Props) {
       window.cancelAnimationFrame(frame);
       previousFocusRef.current?.focus();
     };
-  }, [open]);
+  }, [load, open]);
 
   function trapFocus(event: React.KeyboardEvent<HTMLDivElement>) {
     if (event.key === "Escape") {
@@ -97,9 +97,10 @@ export function ObservabilityPanel({ open, onClose }: Props) {
       >
         <header className={styles.commandHeader}>
           <div>
-            <span>GHOST MANAGER · LAST 60 MIN</span>
+            <span>{isDemo ? "DEMO · LOCAL LEDGER" : "GHOST MANAGER · LAST 60 MIN"}</span>
             <h2 id="slo-panel-title">運用SLO / Alert</h2>
           </div>
+          <DemoCue compact />
           <button type="button" onClick={onClose} aria-label="SLOを閉じる"><X size={19} /></button>
         </header>
         <div className={styles.observabilityBody}>

@@ -1,7 +1,8 @@
 "use client";
 
 import Image from "next/image";
-import { Link2, LockKeyhole, MapPinned, MoveRight } from "lucide-react";
+import { Link2, LockKeyhole, MapPinned, MoveRight, Search, TriangleAlert } from "lucide-react";
+import { useMemo, useState } from "react";
 
 import type { VipFloorBoardV2 } from "@/lib/vipFloorV2Contract";
 
@@ -15,6 +16,7 @@ type FloorViewProps = {
   selectedReservationId: string | null;
   selectedTableId: string | null;
   onSelectTable: (tableId: string, reservationId: string | null) => void;
+  onSelectReservation: (reservationId: string) => void;
   onOpenAssignment: () => void;
   staffData: StaffWorkspaceData | null;
   staffFilter: string;
@@ -26,11 +28,30 @@ export default function FloorView({
   selectedReservationId,
   selectedTableId,
   onSelectTable,
+  onSelectReservation,
   onOpenAssignment,
   staffData,
   staffFilter,
 }: FloorViewProps) {
+  const [taskMode, setTaskMode] = useState<"reservations" | "waitlist" | "finished" | "blocks">("reservations");
+  const [query, setQuery] = useState("");
   const reservationById = new Map(reservations.map((item) => [item.id, item]));
+  const railReservations = useMemo(() => {
+    const normalized = query.trim().toLocaleLowerCase("ja-JP");
+    return reservations.filter((item) => {
+      const finished = item.serviceStatus === "completed" || item.lifecycleStatus === "cancelled";
+      if (taskMode === "finished" && !finished) return false;
+      if (taskMode === "reservations" && finished) return false;
+      if (taskMode === "waitlist" && item.tableIds.length > 0) return false;
+      if (taskMode === "blocks") return false;
+      return !normalized || [
+        item.publicCode,
+        item.guestLabel,
+        item.tableCodes.join(" "),
+        item.startLabel,
+      ].join(" ").toLocaleLowerCase("ja-JP").includes(normalized);
+    });
+  }, [query, reservations, taskMode]);
 
   return (
     <section className={styles.floorView} aria-labelledby="floor-view-title">
@@ -44,7 +65,65 @@ export default function FloorView({
         </button>
       </div>
 
-      <div className={styles.floorCanvas}>
+      <div className={styles.floorTaskTabs} role="tablist" aria-label="Floorタスク">
+        {([
+          ["reservations", "予約"],
+          ["waitlist", "未割当"],
+          ["finished", "完了"],
+          ["blocks", "ブロック"],
+        ] as const).map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            role="tab"
+            aria-selected={taskMode === key}
+            data-active={taskMode === key || undefined}
+            onClick={() => setTaskMode(key)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      <div className={styles.floorWorkArea}>
+        <aside className={styles.floorTaskRail} aria-label="Floor予約タスク">
+          <label>
+            <Search size={14} aria-hidden />
+            <span className="sr-only">Floorタスクを検索</span>
+            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="番号 / ゲスト / 席" />
+          </label>
+          <div className={styles.floorTaskList}>
+            {taskMode === "blocks" ? board.blocks.map((block) => (
+              <button
+                key={block.id}
+                type="button"
+                onClick={() => onSelectTable(block.targets.tableIds[0] ?? board.tables[0]?.id ?? "", null)}
+              >
+                <TriangleAlert size={14} aria-hidden />
+                <span><strong>{block.kind}</strong><small>{block.targets.tableIds.join(" + ") || "全席"} · {new Intl.DateTimeFormat("ja-JP", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Tokyo" }).format(new Date(block.startAt))}</small></span>
+              </button>
+            )) : railReservations.map((reservation) => {
+              const meta = getStatusMeta(reservation.serviceStatus);
+              const Icon = meta.icon;
+              return (
+                <button
+                  key={reservation.id}
+                  type="button"
+                  data-selected={reservation.id === selectedReservationId || undefined}
+                  onClick={() => onSelectReservation(reservation.id)}
+                >
+                  <Icon size={14} aria-hidden />
+                  <span><strong>{reservation.startLabel} · {reservation.publicCode}</strong><small>{reservation.guestLabel} · {reservation.tableCodes.join(" + ") || "未割当"}</small></span>
+                </button>
+              );
+            })}
+            {(taskMode === "blocks" ? board.blocks.length === 0 : railReservations.length === 0) ? (
+              <p>この条件の合成タスクはありません。</p>
+            ) : null}
+          </div>
+        </aside>
+
+        <div className={styles.floorCanvas}>
         <Image
           src="/media/images/vipmapv3.9239fd2174.webp"
           alt="GHOST Osaka VIPフロア座席図"
@@ -104,12 +183,19 @@ export default function FloorView({
             </button>
           );
         })}
+        </div>
       </div>
 
       <div className={styles.floorLegend} aria-label="座席状態の凡例">
         {["来店予定", "遅延", "着席中", "会計依頼", "空席", "ブロック / ロック"].map((label, index) => (
           <span key={label} data-cue={["line", "stripe", "solid", "double", "dash", "double"][index]}>{label}</span>
         ))}
+      </div>
+      <div className={styles.floorContextAction}>
+        <span>{selectedTableId ? `${selectedTableId} を選択中` : "VIP席を選択してください"}</span>
+        <button type="button" className={styles.primaryButton} onClick={onOpenAssignment} disabled={!selectedReservationId}>
+          <MoveRight aria-hidden size={16} />割当を確認
+        </button>
       </div>
     </section>
   );

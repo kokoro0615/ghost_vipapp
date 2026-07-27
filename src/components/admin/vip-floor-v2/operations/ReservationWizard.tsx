@@ -11,6 +11,7 @@ import type {
   StaffWorkspaceData,
   UiReservation,
 } from "../contract/uiTypes";
+import { useDemoMode } from "../demo/DemoMode";
 import styles from "../VipFloorWorkspace.module.css";
 import { useTrialMode } from "../TrialMode";
 
@@ -56,6 +57,8 @@ export function ReservationWizard({
   onDone,
 }: Props) {
   const trialMode = useTrialMode();
+  const demoMode = useDemoMode();
+  const syntheticMode = trialMode || demoMode.enabled;
   const defaults = useMemo(
     () => reservation
       ? {
@@ -212,21 +215,33 @@ export function ReservationWizard({
         ) : null}
         {step === 4 ? (
           <fieldset>
-            <legend>顧客（暗号化・Owner限定）</legend>
+            <legend>{demoMode.enabled ? "顧客（合成データ専用）" : "顧客（暗号化・Owner限定）"}</legend>
             {reservation ? (
               <div className={styles.wizardStatement}>
                 <span>CUSTOMER LINK</span>
                 <strong>{reservation.guestLabel}</strong>
-                <p>{reservation.customerId ? "現在の暗号化顧客リンクを保持します。" : "顧客未紐付けのまま更新します。"}</p>
+                <p>{demoMode.enabled
+                  ? reservation.customerId
+                    ? "現在の合成顧客リンクをbrowser-localで保持します。"
+                    : "合成顧客未紐付けのまま更新します。"
+                  : reservation.customerId
+                    ? "現在の暗号化顧客リンクを保持します。"
+                    : "顧客未紐付けのまま更新します。"}</p>
               </div>
             ) : (
               <>
-                <label>氏名<input value={draft.displayName} maxLength={120} autoComplete="off" placeholder={trialMode ? "例: TRIAL-ゲスト01" : undefined} onChange={(event) => patch({ displayName: event.target.value })} /></label>
+                <label>氏名<input value={draft.displayName} maxLength={120} autoComplete="off" placeholder={demoMode.enabled ? "例: デモゲスト001" : trialMode ? "例: TRIAL-ゲスト01" : undefined} onChange={(event) => patch({ displayName: event.target.value })} /></label>
                 <div className={styles.formColumns}>
-                  <label>電話<input type="tel" value={draft.phone} maxLength={40} autoComplete="off" disabled={trialMode} aria-describedby={trialMode ? "trial-phone-rule" : undefined} onChange={(event) => patch({ phone: event.target.value })} /></label>
-                  <label>Eメール<input type="email" value={draft.email} maxLength={254} autoComplete="off" placeholder={trialMode ? "trial-01@example.com" : undefined} pattern={trialMode ? "^[^@\\s]+@example\\.com$" : undefined} onChange={(event) => patch({ email: event.target.value })} /></label>
+                  <label>電話<input type="tel" value={draft.phone} maxLength={40} autoComplete="off" disabled={syntheticMode} aria-describedby={syntheticMode ? "synthetic-phone-rule" : undefined} onChange={(event) => patch({ phone: event.target.value })} /></label>
+                  <label>Eメール<input type="email" value={draft.email} maxLength={254} autoComplete="off" placeholder={demoMode.enabled ? "demo-001@example.invalid" : trialMode ? "trial-01@example.com" : undefined} pattern={demoMode.enabled ? "^[^@\\s]+@example\\.invalid$" : trialMode ? "^[^@\\s]+@example\\.com$" : undefined} onChange={(event) => patch({ email: event.target.value })} /></label>
                 </div>
-                {trialMode ? <p id="trial-phone-rule" className={styles.trialInputHint}>TRIALでは電話番号は入力できません。Eメールは@example.comのみ使用できます。</p> : null}
+                {syntheticMode ? (
+                  <p id="synthetic-phone-rule" className={styles.trialInputHint}>
+                    {demoMode.enabled
+                      ? "DEMOでは電話番号を保存できません。氏名はデモ cue必須、Eメールは@example.invalidだけ使用できます。"
+                      : "TRIALでは電話番号は入力できません。Eメールは@example.comのみ使用できます。"}
+                  </p>
+                ) : null}
                 <label>言語<select value={draft.languageCode} onChange={(event) => patch({ languageCode: event.target.value })}><option value="ja">日本語</option><option value="en">English</option><option value="zh">中文</option><option value="ko">한국어</option></select></label>
                 <p className={styles.wizardHint}>電話の完全一致を優先し、電話がない場合だけEメールで自動集約します。</p>
               </>
@@ -271,7 +286,7 @@ export function ReservationWizard({
             <fieldset>
               <legend>顧客通知</legend>
               <label className={styles.choiceRow}><input type="radio" name="notify" checked={draft.notificationPreference === "none"} onChange={() => patch({ notificationPreference: "none" })} />送信しない</label>
-              <label className={styles.choiceRow}><input type="radio" name="notify" checked={draft.notificationPreference === "email"} onChange={() => patch({ notificationPreference: "email" })} /><Mail size={15} />Eメール送信</label>
+              <label className={styles.choiceRow}><input type="radio" name="notify" checked={draft.notificationPreference === "email"} disabled={demoMode.enabled} onChange={() => patch({ notificationPreference: "email" })} /><Mail size={15} />{demoMode.enabled ? "DEMOでは外部送信なし" : "Eメール送信"}</label>
             </fieldset>
             {draft.notificationPreference === "email" && !reservation && !draft.email ? <p className={styles.wizardWarning}>Eメール送信には顧客Eメールが必要です。</p> : null}
           </div>

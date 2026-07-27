@@ -6,6 +6,7 @@ import { AlertTriangle, ArrowLeft, ArrowRight, Check, LockKeyhole, X } from "luc
 import type { VipFloorBoardV2, VipServiceStatus } from "@/lib/vipFloorV2Contract";
 
 import type { CommandKind, LiveCommandDraft, UiReservation } from "../contract/uiTypes";
+import { DemoCue, useDemoMode } from "../demo/DemoMode";
 import styles from "../VipFloorWorkspace.module.css";
 
 const commandLabels: Record<CommandKind, string> = {
@@ -63,6 +64,7 @@ export function CommandCenter({
   onStep,
   onRun,
 }: Props) {
+  const demoMode = useDemoMode();
   const panelRef = useRef<HTMLDivElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
   const source = reservation
@@ -72,13 +74,17 @@ export function CommandCenter({
     ? board.notes.find((item) => item.reservationId === source.id) ?? null
     : null;
   const impact = useMemo(() => {
-    if (kind === "assignment") return "GHOST予約台帳の卓割当を置き換え、全端末の表示へ反映します。";
-    if (kind === "check_in") return "来店を確定し、着席開始と利用期限をGHOST予約台帳へ記録します。";
+    if (kind === "assignment") return demoMode.enabled
+      ? "browser-local合成台帳の卓割当を置き換え、この端末の各viewへ反映します。"
+      : "GHOST予約台帳の卓割当を置き換え、全端末の表示へ反映します。";
+    if (kind === "check_in") return demoMode.enabled
+      ? "合成来店を確定し、着席開始と利用期限をbrowser-local台帳へ記録します。"
+      : "来店を確定し、着席開始と利用期限をGHOST予約台帳へ記録します。";
     if (kind === "arrival_time") return "入力した到着時刻を予約へ記録します。未来時刻は保存できません。";
     if (kind === "seat_extension") return "現在の利用期限を15分単位、最大120分まで延長します。";
     if (kind === "note") return "500文字以内の現場共有メモを監査付きで保存します。";
     return "接客状態を更新し、Floor・Chart・Listへ反映します。";
-  }, [kind]);
+  }, [demoMode.enabled, kind]);
 
   useEffect(() => {
     if (!open) return;
@@ -201,6 +207,7 @@ export function CommandCenter({
           <div><span>GHOST 実行コマンド</span><h2 id="command-title">{commandLabels[kind]}</h2></div>
           <button type="button" onClick={onClose} aria-label="操作画面を閉じる"><X size={19} /></button>
         </header>
+        <DemoCue compact className={styles.dialogDemoCue} />
         <div className={styles.stepRail} aria-label="操作ステップ">
           <span data-current={step === 1 || undefined}>入力</span>
           <ArrowRight size={14} />
@@ -276,7 +283,7 @@ export function CommandCenter({
                   name="note"
                   defaultValue={existingNote?.body ?? ""}
                   maxLength={500}
-                  placeholder="入口・フロア・担当者間で共有する内容"
+                  placeholder={demoMode.enabled ? "例: デモ：入口で到着確認済み" : "入口・フロア・担当者間で共有する内容"}
                   required
                 />
               </label>
@@ -304,7 +311,7 @@ export function CommandCenter({
             <section className={styles.confirmation}>
               <LockKeyhole size={18} />
               <div>
-                <strong>本番台帳への反映を確認</strong>
+                <strong>{demoMode.enabled ? "browser-local合成台帳への反映を確認" : "本番台帳への反映を確認"}</strong>
                 <p>{impact}</p>
                 <small>保存前に更新版を照合し、競合時は反映せず最新状態を再読込します。</small>
               </div>
@@ -329,7 +336,7 @@ export function CommandCenter({
             <button type="submit" className={styles.primaryButton} disabled={pending}>
               {pending ? "反映中" : step === 1
                 ? <>確認へ<ArrowRight size={16} /></>
-                : <><Check size={16} />GHOSTへ反映</>}
+                : <><Check size={16} />{demoMode.enabled ? "合成台帳へ反映" : "GHOSTへ反映"}</>}
             </button>
           </footer>
         </form>

@@ -16,6 +16,7 @@ import type {
   WaitlistAction,
   WaitlistEntry,
 } from "../contract/uiTypes";
+import { DemoCue, useDemoMode } from "../demo/DemoMode";
 import styles from "../VipFloorWorkspace.module.css";
 import { useTrialMode } from "../TrialMode";
 
@@ -39,6 +40,7 @@ export function WaitlistPanel({
   onAction,
 }: Props) {
   const trialMode = useTrialMode();
+  const demoMode = useDemoMode();
   const [mode, setMode] = useState<"queue" | "create">("queue");
   const [now, setNow] = useState(() => Date.now());
   const panelRef = useRef<HTMLDivElement>(null);
@@ -84,7 +86,8 @@ export function WaitlistPanel({
 
   async function create(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const data = new FormData(event.currentTarget);
+    const form = event.currentTarget;
+    const data = new FormData(form);
     const saved = await onAction({
       action: "create",
       payload: {
@@ -95,7 +98,7 @@ export function WaitlistPanel({
       },
     });
     if (saved) {
-      event.currentTarget.reset();
+      form.reset();
       setMode("queue");
       await onRefresh();
     }
@@ -137,6 +140,7 @@ export function WaitlistPanel({
             <X size={19} />
           </button>
         </header>
+        <DemoCue compact className={styles.dialogDemoCue} />
 
         <div className={styles.operationTabs}>
           <div role="tablist" aria-label="Waitlist表示">
@@ -172,11 +176,11 @@ export function WaitlistPanel({
               <span>{board.businessDay.businessDate} / 連絡は任意</span>
             </div>
             <fieldset disabled={pending}>
-              <legend>連絡先は暗号化し、Owner以外へ表示しません</legend>
+              <legend>{demoMode.enabled ? "合成データ専用・外部通知なし" : "連絡先は暗号化し、Owner以外へ表示しません"}</legend>
               <div className={styles.formColumns}>
                 <label>
-                  表示名（任意）
-                  <input name="guestLabel" maxLength={80} placeholder={trialMode ? "例: TRIAL-待機01" : "入口で識別できる名前"} />
+                  表示名{demoMode.enabled ? "（デモ cue必須）" : "（任意）"}
+                  <input name="guestLabel" maxLength={80} required={demoMode.enabled} placeholder={demoMode.enabled ? "例: デモゲスト待機003" : trialMode ? "例: TRIAL-待機01" : "入口で識別できる名前"} />
                 </label>
                 <label>
                   人数
@@ -184,9 +188,10 @@ export function WaitlistPanel({
                 </label>
               </div>
               <label>
-                Eメール（呼出通知・任意）
-                <input type="email" name="email" maxLength={254} autoComplete="off" placeholder={trialMode ? "trial-01@example.com" : undefined} pattern={trialMode ? "^[^@\\s]+@example\\.com$" : undefined} />
+                Eメール（{demoMode.enabled ? "合成値・実送信なし" : "呼出通知・任意"}）
+                <input type="email" name="email" maxLength={254} autoComplete="off" placeholder={demoMode.enabled ? "demo-wait-003@example.invalid" : trialMode ? "trial-01@example.com" : undefined} pattern={demoMode.enabled ? "^[^@\\s]+@example\\.invalid$" : trialMode ? "^[^@\\s]+@example\\.com$" : undefined} />
               </label>
+              {demoMode.enabled ? <p className={styles.trialInputHint}>呼出はbrowser-local auditだけを更新し、Eメール・SMS・LINEを送信しません。</p> : null}
             </fieldset>
             <footer className={styles.commandFooter}>
               <button type="button" className={styles.secondaryButton} onClick={() => setMode("queue")}>
@@ -239,6 +244,7 @@ function WaitlistRow({
     reservationId?: string | null,
   ) => Promise<void>;
 }) {
+  const demoMode = useDemoMode();
   const [reservationId, setReservationId] = useState("");
   const remaining = entry.callExpiresAt
     ? Math.max(0, Math.ceil((Date.parse(entry.callExpiresAt) - now) / 60_000))
@@ -250,7 +256,7 @@ function WaitlistRow({
       <header>
         <div>
           <strong>{entry.guestLabel || "表示名なし"} · {entry.guestCount}名</strong>
-          <span>{entry.email ? "Eメール通知可" : "連絡先なし"}</span>
+          <span>{demoMode.enabled ? "DEMO · 実送信なし" : entry.email ? "Eメール通知可" : "連絡先なし"}</span>
         </div>
         <span className={styles.waitlistStatus}>
           {entry.status === "waiting" ? "待機"
@@ -267,7 +273,9 @@ function WaitlistRow({
             onClick={() => void onTransition(entry, "call")}
             disabled={pending}
           >
-            <BellRing size={15} />{entry.storedStatus === "called" ? "再通知" : "呼出（30分）"}
+            <BellRing size={15} />{demoMode.enabled
+              ? entry.storedStatus === "called" ? "デモ再呼出" : "デモ呼出（実送信なし）"
+              : entry.storedStatus === "called" ? "再通知" : "呼出（30分）"}
           </button>
           {entry.storedStatus === "called" ? (
             <>

@@ -4,7 +4,18 @@ import { useEffect, useRef, useState } from "react";
 import { Link2, Save, Unlink, UserRound, X } from "lucide-react";
 
 import type { CustomerDetail, UiReservation } from "../contract/uiTypes";
+import { DemoCue, useDemoMode } from "../demo/DemoMode";
 import styles from "../VipFloorWorkspace.module.css";
+
+type CustomerPatch = {
+  expectedVersion: number;
+  eventDayId: string;
+  reservationId: string;
+  nationalityCode: string | null;
+  birthDate: string | null;
+  anniversaryDate: string | null;
+  vipRank: string | null;
+};
 
 type Props = {
   open: boolean;
@@ -12,6 +23,13 @@ type Props = {
   reservation: UiReservation | null;
   pending: boolean;
   onClose: () => void;
+  onLoadCustomer: (customerId: string) => Promise<CustomerDetail | null>;
+  onSaveCustomer: (customerId: string, patch: CustomerPatch) => Promise<boolean>;
+  onRelinkCustomer: (draft: {
+    reservationId: string;
+    expectedVersion: number;
+    customerId: string | null;
+  }) => Promise<boolean>;
   onChanged: () => Promise<void>;
 };
 
@@ -21,8 +39,12 @@ export function CustomerPanel({
   reservation,
   pending,
   onClose,
+  onLoadCustomer,
+  onSaveCustomer,
+  onRelinkCustomer,
   onChanged,
 }: Props) {
+  const { enabled: isDemo } = useDemoMode();
   const [detail, setDetail] = useState<CustomerDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
@@ -33,16 +55,13 @@ export function CustomerPanel({
   useEffect(() => {
     if (!open || !reservation?.customerId) return;
     let cancelled = false;
-    fetch(`/api/admin/vip-floor/customers/${encodeURIComponent(reservation.customerId)}`, {
-      cache: "no-store",
-    })
-      .then(async (response) => {
-        const payload = await response.json().catch(() => ({})) as Record<string, unknown>;
-        if (!response.ok || payload.ok !== true || !payload.customer) {
-          throw new Error("customer_read_failed");
-        }
-        if (!cancelled) {
-          setDetail(payload.customer as CustomerDetail);
+    onLoadCustomer(reservation.customerId)
+      .then((customer) => {
+        if (!cancelled && customer) {
+          setDetail(customer);
+          setLoading(false);
+        } else if (!cancelled) {
+          setMessage("顧客詳細を取得できませんでした。");
           setLoading(false);
         }
       })
@@ -55,7 +74,7 @@ export function CustomerPanel({
     return () => {
       cancelled = true;
     };
-  }, [open, reservation?.customerId]);
+  }, [onLoadCustomer, open, reservation?.customerId]);
 
   useEffect(() => {
     if (!open) return;
@@ -98,59 +117,32 @@ export function CustomerPanel({
     event.preventDefault();
     if (!activeReservation.customerId || !detail?.profileVersion) return;
     const form = new FormData(event.currentTarget);
-    const response = await fetch(
-      `/api/admin/vip-floor/customers/${encodeURIComponent(activeReservation.customerId)}`,
-      {
-        method: "PATCH",
-        headers: {
-          "content-type": "application/json",
-          "idempotency-key": crypto.randomUUID(),
-        },
-        body: JSON.stringify({
-          expectedVersion: detail.profileVersion,
-          eventDayId,
-          reservationId: activeReservation.id,
-          nationalityCode: nullable(form.get("nationalityCode")),
-          birthDate: nullable(form.get("birthDate")),
-          anniversaryDate: nullable(form.get("anniversaryDate")),
-          vipRank: nullable(form.get("vipRank")),
-        }),
-      },
-    );
-    if (!response.ok) {
-      setMessage(response.status === 409
-        ? "顧客profileが更新されています。閉じて再読込してください。"
-        : "顧客属性を保存できませんでした。");
+    const saved = await onSaveCustomer(activeReservation.customerId, {
+      expectedVersion: detail.profileVersion,
+      eventDayId,
+      reservationId: activeReservation.id,
+      nationalityCode: nullable(form.get("nationalityCode")),
+      birthDate: nullable(form.get("birthDate")),
+      anniversaryDate: nullable(form.get("anniversaryDate")),
+      vipRank: nullable(form.get("vipRank")),
+    });
+    if (!saved) {
+      setMessage("顧客profileが更新されているか、入力を保存できませんでした。");
       return;
     }
     setMessage("顧客属性を保存しました。");
-    const next = await fetch(
-      `/api/admin/vip-floor/customers/${encodeURIComponent(activeReservation.customerId)}`,
-      { cache: "no-store" },
-    );
-    const payload = await next.json().catch(() => ({})) as Record<string, unknown>;
-    if (next.ok && payload.customer) setDetail(payload.customer as CustomerDetail);
+    const next = await onLoadCustomer(activeReservation.customerId);
+    if (next) setDetail(next);
   }
 
   async function relink(customerId: string | null) {
-    const response = await fetch(
-      `/api/admin/vip-floor/reservations/${encodeURIComponent(activeReservation.id)}/customer-link`,
-      {
-        method: "PATCH",
-        headers: {
-          "content-type": "application/json",
-          "idempotency-key": crypto.randomUUID(),
-        },
-        body: JSON.stringify({
-          expectedVersion: activeReservation.version,
-          customerId,
-        }),
-      },
-    );
-    if (!response.ok) {
-      setMessage(response.status === 409
-        ? "予約が更新されています。台帳を再読込してください。"
-        : "顧客リンクを更新できませんでした。");
+    const saved = await onRelinkCustomer({
+      reservationId: activeReservation.id,
+      expectedVersion: activeReservation.version,
+      customerId,
+    });
+    if (!saved) {
+      setMessage("予約が更新されているか、顧客リンクを保存できませんでした。");
       return;
     }
     await onChanged();
@@ -169,16 +161,17 @@ export function CustomerPanel({
       >
         <header className={styles.commandHeader}>
           <div>
-            <span>OWNER · ENCRYPTED CUSTOMER</span>
+            <span>{isDemo ? "DEMO · SYNTHETIC CUSTOMER" : "OWNER · ENCRYPTED CUSTOMER"}</span>
             <h2 id="customer-panel-title">顧客詳細と紐付け</h2>
           </div>
+          <DemoCue compact />
           <button type="button" onClick={onClose} aria-label="顧客詳細を閉じる">
             <X size={19} />
           </button>
         </header>
 
         <div className={styles.customerBody}>
-          {loading ? <p aria-busy="true">暗号化profileを復号しています…</p> : null}
+          {loading ? <p aria-busy="true">{isDemo ? "合成profileを読み込んでいます…" : "暗号化profileを復号しています…"}</p> : null}
           {detail ? (
             <>
               <section className={styles.customerIdentity}>
@@ -196,9 +189,10 @@ export function CustomerPanel({
                   <div className={styles.formColumns}>
                     <label>国籍コード<input name="nationalityCode" maxLength={2} defaultValue={detail.attributes?.nationalityCode ?? ""} placeholder="JP" /></label>
                     <label>VIP Rank<input name="vipRank" maxLength={32} defaultValue={detail.attributes?.vipRank ?? ""} /></label>
-                    <label>生年月日<input name="birthDate" type="date" defaultValue={detail.attributes?.birthDate ?? ""} /></label>
-                    <label>記念日<input name="anniversaryDate" type="date" defaultValue={detail.attributes?.anniversaryDate ?? ""} /></label>
+                    <label>生年月日<input name="birthDate" type="date" disabled={isDemo} defaultValue={isDemo ? "" : detail.attributes?.birthDate ?? ""} /></label>
+                    <label>記念日<input name="anniversaryDate" type="date" disabled={isDemo} defaultValue={isDemo ? "" : detail.attributes?.anniversaryDate ?? ""} /></label>
                   </div>
+                  {isDemo ? <p className={styles.wizardHint}>DEMOでは個人日付を保存できません。国籍コードと「デモ」を含むVIP Rankだけを合成属性として保存できます。</p> : null}
                   <button type="submit" className={styles.primaryButton}><Save size={15} />属性を保存</button>
                 </fieldset>
               </form>

@@ -4,7 +4,7 @@ import { access, mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 
-import { chromium } from "playwright-core";
+import { chromium, webkit } from "playwright-core";
 import {
   buildQaSummary,
   QA_ALLOWED_MEDIA_SELECTORS,
@@ -23,10 +23,12 @@ const artifactDirectory = path.resolve(
   process.env.GHOST_VIP_QA_ARTIFACT_DIR
     ?? "/tmp/ghost-vip-light-ui-qa",
 );
+const targetedViewport = process.env.GHOST_VIP_QA_VIEWPORT?.trim() || null;
+const webkitExecutablePath = process.env.GHOST_VIP_WEBKIT_EXECUTABLE?.trim() || null;
 
 let server;
 let serverOutput = "";
-let browser;
+const browsers = new Map();
 
 async function main() {
   await Promise.all([access(chromePath), access(axePath), access(nextBin)]);
@@ -48,16 +50,29 @@ async function main() {
 
   try {
     await waitForServer();
-    browser = await chromium.launch({
+    browsers.set("chromium", await chromium.launch({
       executablePath: chromePath,
       headless: true,
-    });
+    }));
 
     await mkdir(artifactDirectory, { recursive: true, mode: 0o700 });
     const results = [];
-    for (const viewport of QA_VIEWPORTS) {
+    const selectedViewports = targetedViewport
+      ? QA_VIEWPORTS.filter(({ browser, width, height }) =>
+          `${browser}-${width}x${height}` === targetedViewport)
+      : QA_VIEWPORTS;
+    assert.ok(selectedViewports.length > 0, `unknown QA viewport: ${targetedViewport}`);
+    for (const viewport of selectedViewports) {
+      if (!browsers.has(viewport.browser)) {
+        assert.equal(viewport.browser, "webkit", `unsupported QA browser: ${viewport.browser}`);
+        browsers.set("webkit", await webkit.launch({
+          headless: true,
+          ...(webkitExecutablePath ? { executablePath: webkitExecutablePath } : {}),
+        }));
+      }
+      const browser = browsers.get(viewport.browser);
       const context = await browser.newContext({
-        viewport,
+        viewport: { width: viewport.width, height: viewport.height },
         httpCredentials: {
           username: "a11y",
           password: "synthetic-only",
@@ -69,15 +84,24 @@ async function main() {
     }
     const summary = buildQaSummary(results, artifactDirectory);
     assert.deepEqual(summary.missingStates, [], "required UI QA states missing");
-    assert.deepEqual(summary.missingViewports, [], "required UI QA viewports missing");
+    if (!targetedViewport) {
+      assert.deepEqual(summary.missingViewports, [], "required UI QA viewports missing");
+    }
+    const reportedSummary = targetedViewport
+      ? {
+          ...summary,
+          ok: summary.missingStates.length === 0,
+          targetedViewport,
+        }
+      : summary;
     await writeFile(
       path.join(artifactDirectory, "qa-summary.json"),
-      `${JSON.stringify({ ...summary, results }, null, 2)}\n`,
+      `${JSON.stringify({ ...reportedSummary, results }, null, 2)}\n`,
       { mode: 0o600 },
     );
-    console.log(JSON.stringify(summary));
+    console.log(JSON.stringify(reportedSummary));
   } finally {
-    if (browser) await browser.close();
+    await Promise.all([...browsers.values()].map((activeBrowser) => activeBrowser.close()));
     server.kill("SIGTERM");
     await Promise.race([
       new Promise((resolve) => server.once("exit", resolve)),
@@ -118,6 +142,7 @@ async function auditViewport(context, viewport) {
   await page.getByRole("button", { name: /新規オペレーション/u }).click();
   const operationDialog = page.getByRole("dialog", { name: "新規オペレーション" });
   await operationDialog.waitFor();
+  await operationDialog.getByLabel("プラン").waitFor();
   await capture(page, "walk-in");
   await page.getByRole("tab", { name: /受付ブロック/u }).click();
   await capture(page, "block");
@@ -222,6 +247,39 @@ async function auditViewport(context, viewport) {
   await capture(conflictPage, "conflict");
   await conflictPage.close();
 
+  const demoLoginPage = await newQaPage(context, { demoMode: "login" });
+  await demoLoginPage.goto(`${origin}/?view=list&date=2026-07-27`, {
+    waitUntil: "domcontentloaded",
+  });
+  await demoLoginPage.getByLabel("デモ専用PIN").waitFor();
+  await capture(demoLoginPage, "demo-login");
+  await demoLoginPage.close();
+
+  const demoResetPage = await newQaPage(context, { demoMode: "authenticated" });
+  await goToDemoWorkspace(demoResetPage, "list", "2026-07-27");
+  await demoResetPage.getByRole("button", { name: "メニュー", exact: true }).click();
+  await demoResetPage.getByRole("button", { name: /デモ初期化/u }).click();
+  await demoResetPage.getByRole("dialog", { name: "合成データを初期状態へ戻す" }).waitFor();
+  await capture(demoResetPage, "demo-reset");
+  await demoResetPage.close();
+
+  const demoNearExpiryPage = await newQaPage(context, {
+    demoMode: "authenticated",
+    fixedNow: "2026-08-27T12:00:00+09:00",
+  });
+  await goToDemoWorkspace(demoNearExpiryPage, "list", "2026-08-27");
+  await demoNearExpiryPage.locator('[data-expiry-phase="near"]').first().waitFor();
+  await capture(demoNearExpiryPage, "demo-near-expiry");
+  await demoNearExpiryPage.close();
+
+  const demoExpiredPage = await newQaPage(context, { demoMode: "expired" });
+  await demoExpiredPage.goto(`${origin}/?view=list&date=2026-08-27`, {
+    waitUntil: "domcontentloaded",
+  });
+  await demoExpiredPage.getByRole("heading", { name: "デモ利用期間は終了しました" }).waitFor();
+  await capture(demoExpiredPage, "demo-expired");
+  await demoExpiredPage.close();
+
   return results;
 }
 
@@ -253,6 +311,14 @@ async function goToWorkspace(page, view, detail = null) {
     waitUntil: "domcontentloaded",
   });
   await page.locator("#vip-workspace-main").waitFor();
+}
+
+async function goToDemoWorkspace(page, view, date) {
+  await page.goto(`${origin}/?view=${view}&date=${date}`, {
+    waitUntil: "domcontentloaded",
+  });
+  await page.locator("#vip-workspace-main").waitFor();
+  await page.locator('[data-lease-state="active"]').first().waitFor();
 }
 
 async function openReservationDetail(page, viewport) {
@@ -288,6 +354,12 @@ async function waitForServer() {
 }
 
 async function installSyntheticRoutes(page, scenario = {}) {
+  if (scenario.fixedNow) {
+    await page.addInitScript((fixedNow) => {
+      const fixedTime = Date.parse(fixedNow);
+      Date.now = () => fixedTime;
+    }, scenario.fixedNow);
+  }
   await page.addInitScript(({ eventMode }) => {
     window.EventSource = class SyntheticEventSource {
       listeners = new Map();
@@ -319,6 +391,16 @@ async function installSyntheticRoutes(page, scenario = {}) {
       }
     };
   }, { eventMode: scenario.eventMode ?? null });
+  const demoPublicConfig = {
+    mode: "demo",
+    workspaceId: "visual-qa-demo-workspace",
+    dataVersion: "visual-qa-v1",
+    startsAt: "2026-07-27T00:00:00+09:00",
+    expiresAt: "2026-08-27T23:59:59+09:00",
+    leaseIntervalMs: 60_000,
+  };
+  const demoServerNow = scenario.fixedNow ?? new Date().toISOString();
+  const demoLeaseExpiresAt = new Date(Date.parse(demoServerNow) + 60_000).toISOString();
   await page.route("**/api/admin/session/pin", (route) => route.fulfill({
     status: scenario.authenticated === false ? 401 : 200,
     contentType: "application/json",
@@ -326,12 +408,62 @@ async function installSyntheticRoutes(page, scenario = {}) {
       ? { ok: false, error: "invalid_pin" }
       : { ok: true, role: "owner", displayName: "Owner" }),
   }));
-  await page.route("**/api/admin/session", (route) => route.fulfill({
-    status: scenario.authenticated === false ? 401 : 200,
+  await page.route("**/api/admin/session", (route) => {
+    if (scenario.demoMode === "expired") {
+      return route.fulfill({
+        status: 410,
+        contentType: "application/json",
+        body: JSON.stringify({
+          ...demoPublicConfig,
+          ok: false,
+          authenticated: false,
+          error: "demo_expired",
+        }),
+      });
+    }
+    if (scenario.demoMode === "login") {
+      return route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          ...demoPublicConfig,
+          ok: false,
+          authenticated: false,
+        }),
+      });
+    }
+    if (scenario.demoMode === "authenticated") {
+      return route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          ...demoPublicConfig,
+          ok: true,
+          authenticated: true,
+          role: "owner-compatible-demo",
+          displayName: "Demo Operator",
+        }),
+      });
+    }
+    return route.fulfill({
+      status: scenario.authenticated === false ? 401 : 200,
+      contentType: "application/json",
+      body: JSON.stringify(scenario.authenticated === false
+        ? { ok: false, error: "unauthenticated" }
+        : { ok: true, role: scenario.role ?? "owner", displayName: scenario.role === "viewer" ? "Viewer" : "Owner" }),
+    });
+  });
+  await page.route("**/api/admin/demo/lease", (route) => route.fulfill({
+    status: scenario.demoMode === "expired" ? 410 : 200,
     contentType: "application/json",
-    body: JSON.stringify(scenario.authenticated === false
-      ? { ok: false, error: "unauthenticated" }
-      : { ok: true, role: scenario.role ?? "owner", displayName: scenario.role === "viewer" ? "Viewer" : "Owner" }),
+    body: JSON.stringify(scenario.demoMode === "expired"
+      ? { ok: false, error: "demo_expired" }
+      : {
+          ...demoPublicConfig,
+          ok: true,
+          serverNow: demoServerNow,
+          leaseExpiresAt: demoLeaseExpiresAt,
+        }),
   }));
   await page.route("**/api/admin/vip-floor/options?**", (route) => route.fulfill({
     status: 200,
@@ -395,7 +527,8 @@ async function installSyntheticRoutes(page, scenario = {}) {
 }
 
 async function auditPage(page, { state, viewport }) {
-  const label = `${viewport.width}x${viewport.height}:${state}`;
+  const viewportKey = `${viewport.browser}-${viewport.width}x${viewport.height}`;
+  const label = `${viewportKey}:${state}`;
   await page.addScriptTag({ path: axePath });
   const report = await page.evaluate(async () =>
     window.axe.run(document, {
@@ -408,13 +541,44 @@ async function auditPage(page, { state, viewport }) {
     violation.impact === "critical"
     || violation.impact === "serious"
     || violation.impact === "moderate");
+  const actionableTargets = actionable.flatMap((violation) =>
+    violation.nodes.flatMap((node) => node.target));
+  const targetGeometry = actionableTargets.length > 0
+    ? await page.evaluate((selectors) => selectors.map((selector) => {
+        const element = document.querySelector(selector);
+        const label = element?.closest("label");
+        const rect = element?.getBoundingClientRect();
+        const labelRect = label?.getBoundingClientRect();
+        const style = element ? getComputedStyle(element) : null;
+        return {
+          selector,
+          rect: rect ? { width: rect.width, height: rect.height, x: rect.x, y: rect.y } : null,
+          labelRect: labelRect
+            ? { width: labelRect.width, height: labelRect.height, x: labelRect.x, y: labelRect.y }
+            : null,
+          margin: style?.margin ?? null,
+          opacity: style?.opacity ?? null,
+          color: style?.color ?? null,
+          backgroundColor: style?.backgroundColor ?? null,
+          disabled: element instanceof HTMLButtonElement || element instanceof HTMLInputElement
+            ? element.disabled
+            : null,
+        };
+      }), actionableTargets)
+    : [];
   assert.deepEqual(
-    actionable.map(({ id, impact, nodes }) => ({
-      id,
-      impact,
-      targets: nodes.map((node) => node.target),
-    })),
-    [],
+    {
+      violations: actionable.map(({ id, impact, nodes }) => ({
+        id,
+        impact,
+        targets: nodes.map((node) => ({
+          target: node.target,
+          failureSummary: node.failureSummary,
+        })),
+      })),
+      targetGeometry,
+    },
+    { violations: [], targetGeometry: [] },
     `axe violations in ${label}`,
   );
 
@@ -583,6 +747,7 @@ async function auditPage(page, { state, viewport }) {
   const unexpectedConsoleErrors = page.qaConsoleErrors.filter((entry) =>
     !(
       (state === "login" && /status of 401 \(Unauthorized\)/u.test(entry))
+      || (state === "demo-expired" && /status of 410 \(Gone\)/u.test(entry))
       || (state === "error" && /status of 503 \(Service Unavailable\)/u.test(entry))
       || (state === "conflict" && /status of 409 \(Conflict\)/u.test(entry))
     ));
@@ -594,7 +759,6 @@ async function auditPage(page, { state, viewport }) {
   const unexpected5xx = page.qaServerErrors.filter((entry) =>
     !(state === "error" && entry.status === 503 && entry.url === "/api/admin/vip-floor"));
   assert.deepEqual(unexpected5xx, [], `unexpected server 5xx in ${label}`);
-  const viewportKey = `${viewport.width}x${viewport.height}`;
   const screenshotPath = path.join(
     artifactDirectory,
     viewportKey,

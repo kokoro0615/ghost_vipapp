@@ -42,6 +42,11 @@ export default function ReservationListView({ reservations, selectedReservationI
             </tr>
           </thead>
           <tbody>
+            {reservations.length === 0 ? (
+              <tr className={styles.emptyTableRow}>
+                <td colSpan={8}>一致する予約はありません。検索またはステータス条件を解除してください。</td>
+              </tr>
+            ) : null}
             {reservations.map((reservation) => {
               const meta = getStatusMeta(reservation.serviceStatus);
               const Icon = meta.icon;

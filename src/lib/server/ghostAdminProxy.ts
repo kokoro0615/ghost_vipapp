@@ -4,6 +4,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 
 import { normalizeVipAdminRole, type VipAdminRole } from "@/lib/adminPermissions";
+import { readTrustedAccessLane } from "@/lib/demo/accessContract";
 
 const SESSION_COOKIE = "ghost_vipapp_admin_session";
 const BACKEND_ORIGIN = (process.env.GHOST_ADMIN_API_ORIGIN ?? "https://ghost-ruby-one.vercel.app").replace(/\/$/u, "");
@@ -21,6 +22,7 @@ export type AdminSessionActor = {
 };
 
 export function readAdminToken(request: Request) {
+  if (readTrustedAccessLane(request) !== "owner") return null;
   const value = request.headers.get("cookie")?.split(";").map((item) => item.trim()).find((item) => item.startsWith(`${SESSION_COOKIE}=`));
   return value ? decodeURIComponent(value.slice(SESSION_COOKIE.length + 1)) : null;
 }
@@ -59,6 +61,14 @@ export async function ghostAdminFetch(path: string, init: RequestInit = {}, toke
 
 export function copyJson(response: Response) {
   return response.json().catch(() => ({}));
+}
+
+export function loginAdminPin(body: string) {
+  return ghostAdminFetch("/api/admin/session/pin", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body,
+  });
 }
 
 export async function readAdminSession(token: string) {

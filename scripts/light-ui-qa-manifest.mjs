@@ -1,14 +1,21 @@
 export const QA_VIEWPORTS = Object.freeze([
-  { width: 320, height: 720 },
-  { width: 375, height: 812 },
-  { width: 768, height: 1024 },
-  { width: 1024, height: 768 },
-  { width: 1194, height: 834 },
-  { width: 1366, height: 1024 },
+  { browser: "chromium", width: 1440, height: 900 },
+  { browser: "chromium", width: 1366, height: 768 },
+  { browser: "chromium", width: 1194, height: 834 },
+  { browser: "chromium", width: 1024, height: 768 },
+  { browser: "chromium", width: 768, height: 1024 },
+  { browser: "chromium", width: 390, height: 844 },
+  { browser: "chromium", width: 375, height: 812 },
+  { browser: "chromium", width: 320, height: 800 },
+  { browser: "webkit", width: 1194, height: 834 },
 ]);
 
 export const QA_REQUIRED_STATES = Object.freeze([
   "login",
+  "demo-login",
+  "demo-reset",
+  "demo-near-expiry",
+  "demo-expired",
   "list",
   "floor",
   "chart",
@@ -76,7 +83,9 @@ export function buildQaSummary(results, artifactDirectory) {
   const states = [...new Set(results.map((result) => result.state))].sort();
   const viewportKeys = [...new Set(results.map((result) => result.viewport))].sort();
   const missingStates = QA_REQUIRED_STATES.filter((state) => !states.includes(state));
-  const expectedViewportKeys = QA_VIEWPORTS.map(({ width, height }) => `${width}x${height}`).sort();
+  const expectedViewportKeys = QA_VIEWPORTS
+    .map(({ browser, width, height }) => `${browser}-${width}x${height}`)
+    .sort();
   const missingViewports = expectedViewportKeys.filter((viewport) => !viewportKeys.includes(viewport));
   return {
     schemaVersion: "ghost-vip-light-ui-qa.v1",

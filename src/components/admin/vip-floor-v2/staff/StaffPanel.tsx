@@ -9,6 +9,7 @@ import type {
   StaffAction,
   StaffWorkspaceData,
 } from "../contract/uiTypes";
+import { DemoCue, useDemoMode } from "../demo/DemoMode";
 import styles from "../VipFloorWorkspace.module.css";
 import { useTrialMode } from "../TrialMode";
 
@@ -24,6 +25,7 @@ type Props = {
 
 export function StaffPanel({ open, pending, board, data, onClose, onRefresh, onAction }: Props) {
   const trialMode = useTrialMode();
+  const demoMode = useDemoMode();
   const panelRef = useRef<HTMLDivElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
   const [mode, setMode] = useState<"assignments" | "master">("assignments");
@@ -106,6 +108,7 @@ export function StaffPanel({ open, pending, board, data, onClose, onRefresh, onA
           <div><span>GHOST FLOOR CREW</span><h2 id="staff-title">スタッフ担当卓</h2></div>
           <button type="button" onClick={onClose} aria-label="スタッフ担当卓を閉じる"><X size={19} /></button>
         </header>
+        <DemoCue compact className={styles.dialogDemoCue} />
         <div className={styles.operationTabs} role="tablist" aria-label="スタッフ管理">
           <button type="button" role="tab" aria-selected={mode === "assignments"} data-active={mode === "assignments" || undefined} onClick={() => setMode("assignments")}>
             <UsersRound size={16} />担当卓
@@ -123,7 +126,7 @@ export function StaffPanel({ open, pending, board, data, onClose, onRefresh, onA
             <form className={styles.staffCreate} onSubmit={create}>
               <label>
                 表示名
-                <input name="displayName" maxLength={80} required placeholder={trialMode ? "例: TRIAL-スタッフ01" : "Ownerが初期スタッフを登録"} />
+                <input name="displayName" maxLength={80} required placeholder={demoMode.enabled ? "例: デモスタッフD" : trialMode ? "例: TRIAL-スタッフ01" : "Ownerが初期スタッフを登録"} />
               </label>
               <button type="submit" className={styles.primaryButton} disabled={pending}>
                 <Check size={16} />登録

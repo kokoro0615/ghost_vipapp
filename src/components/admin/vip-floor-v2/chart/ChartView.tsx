@@ -1,6 +1,6 @@
 "use client";
 
-import type { CSSProperties } from "react";
+import { type CSSProperties, useState } from "react";
 import { Clock3, Minus, Plus, TriangleAlert } from "lucide-react";
 
 import type { VipFloorBoardV2 } from "@/lib/vipFloorV2Contract";
@@ -30,6 +30,12 @@ function positionStyle(startAt: string, endAt: string, operatingStartAt: string,
 }
 
 export default function ChartView({ board, reservations, selectedReservationId, zoom, onZoom, onSelect }: ChartProps) {
+  const [renderedAt] = useState(() => Date.now());
+  const selectedReservation = reservations.find((item) => item.id === selectedReservationId);
+  const [mobileTableId, setMobileTableId] = useState(
+    selectedReservation?.tableIds[0] ?? board.tables[0]?.id ?? "",
+  );
+  const [mobileWindowStart, setMobileWindowStart] = useState(0);
   const operatingStart = new Date(board.businessDay.operatingStartAt);
   const operatingEnd = new Date(board.businessDay.operatingEndAt);
   const totalMinutes = Math.max(60, (operatingEnd.getTime() - operatingStart.getTime()) / 60_000);
@@ -44,12 +50,30 @@ export default function ChartView({ board, reservations, selectedReservationId, 
     }).format(value);
   });
   const nowStyle = positionStyle(
-    new Date().toISOString(),
-    new Date(Date.now() + 60_000).toISOString(),
+    new Date(renderedAt).toISOString(),
+    new Date(renderedAt + 60_000).toISOString(),
     board.businessDay.operatingStartAt,
     board.businessDay.operatingEndAt,
   );
   const unassigned = reservations.filter((item) => item.tableIds.length === 0);
+  const mobileWindow = (() => {
+    const start = new Date(operatingStart.getTime() + mobileWindowStart * 60_000);
+    const end = new Date(Math.min(
+      operatingEnd.getTime(),
+      start.getTime() + 120 * 60_000,
+    ));
+    const items = reservations.filter((item) =>
+      item.tableIds.includes(mobileTableId)
+      && new Date(item.endAt).getTime() > start.getTime()
+      && new Date(item.startAt).getTime() < end.getTime());
+    return { start, end, items };
+  })();
+  const timeFormatter = new Intl.DateTimeFormat("ja-JP", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: "Asia/Tokyo",
+  });
 
   return (
     <section className={styles.timelineView} aria-labelledby="chart-view-title">
@@ -64,6 +88,49 @@ export default function ChartView({ board, reservations, selectedReservationId, 
           <button type="button" onClick={() => onZoom(zoom === 15 ? 30 : 60)} aria-label="時間軸を縮小"><Minus size={15} /></button>
         </div>
       </div>
+
+      <section className={styles.chartMobileFocus} aria-label="モバイルChartフォーカス">
+        <div>
+          <label>
+            <span>VIP席</span>
+            <select value={mobileTableId} onChange={(event) => setMobileTableId(event.target.value)}>
+              {board.tables.map((table) => <option key={table.id} value={table.id}>{table.displayCode}</option>)}
+            </select>
+          </label>
+          <label>
+            <span>時間帯</span>
+            <select value={mobileWindowStart} onChange={(event) => setMobileWindowStart(Number(event.target.value))}>
+              {Array.from({ length: Math.max(1, Math.ceil(totalMinutes / 120)) }, (_, index) => {
+                const minute = index * 120;
+                const at = new Date(operatingStart.getTime() + minute * 60_000);
+                return <option key={minute} value={minute}>{timeFormatter.format(at)}から</option>;
+              })}
+            </select>
+          </label>
+        </div>
+        <header>
+          <strong>{board.tables.find((table) => table.id === mobileTableId)?.displayCode ?? "VIP席"}</strong>
+          <span>{timeFormatter.format(mobileWindow.start)}–{timeFormatter.format(mobileWindow.end)}</span>
+        </header>
+        <div className={styles.chartMobileItems}>
+          {mobileWindow.items.map((reservation) => {
+            const meta = getStatusMeta(reservation.serviceStatus);
+            const Icon = meta.icon;
+            return (
+              <button
+                key={reservation.id}
+                type="button"
+                data-selected={reservation.id === selectedReservationId || undefined}
+                onClick={() => onSelect(reservation.id)}
+              >
+                <Icon size={15} aria-hidden />
+                <span><strong>{reservation.startLabel}–{reservation.endLabel}</strong><small>{reservation.publicCode} · {reservation.guestLabel}</small></span>
+              </button>
+            );
+          })}
+          {mobileWindow.items.length === 0 ? <p>このVIP席・時間帯に予約はありません。</p> : null}
+        </div>
+      </section>
 
       <div className={styles.timelineScroller} tabIndex={0} aria-label="VIP席の時間軸。左右にスクロールできます。" data-zoom={zoom}>
         <div className={styles.timelineGrid}>

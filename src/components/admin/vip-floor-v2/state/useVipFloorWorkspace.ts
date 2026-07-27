@@ -1,7 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useReducer, useState } from "react";
+import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 
+import type { SloPayload } from "../observability/ObservabilityPanel";
+import type {
+  DemoCustomerLinkDraft,
+  DemoCustomerPatch,
+  DemoPublicConfig,
+  DemoTransport,
+} from "@/lib/demo/contract";
+import { createDemoTransport } from "@/lib/demo/transport";
 import {
   adaptLegacyVipBoard,
   createEmptyVipBoard,
@@ -26,14 +34,19 @@ import type {
   StaffWorkspaceData,
   WaitlistAction,
   WaitlistEntry,
+  CustomerDetail,
 } from "../contract/uiTypes";
 import { createInitialState, workspaceReducer } from "./reducer";
 
 type Session = {
   ok: boolean;
-  role?: VipAdminRole;
+  authenticated?: boolean;
+  mode?: "owner" | "demo";
+  role?: VipAdminRole | "owner-compatible-demo";
   displayName?: string | null;
-};
+  error?: string;
+  sessionExpiresAt?: string;
+} & Partial<DemoPublicConfig>;
 
 type AuthState =
   | { status: "checking"; session: null }
@@ -60,17 +73,79 @@ function readErrorMessage(status: number, payload: Record<string, unknown>) {
     : "保存できませんでした。通信状態を確認して再試行してください。";
 }
 
+function readDemoConfig(payload: Session): DemoPublicConfig | null {
+  if (
+    payload.mode !== "demo"
+    || typeof payload.workspaceId !== "string"
+    || typeof payload.dataVersion !== "string"
+    || payload.startsAt !== "2026-07-27T00:00:00+09:00"
+    || payload.expiresAt !== "2026-08-27T23:59:59+09:00"
+    || payload.leaseIntervalMs !== 60_000
+  ) {
+    return null;
+  }
+  return {
+    mode: "demo",
+    workspaceId: payload.workspaceId,
+    dataVersion: payload.dataVersion,
+    startsAt: payload.startsAt,
+    expiresAt: payload.expiresAt,
+    leaseIntervalMs: payload.leaseIntervalMs,
+  };
+}
+
 export function useVipFloorWorkspace(initialBusinessDate?: string) {
   const [initialDate] = useState(() => initialBusinessDate ?? currentBusinessDate());
   const [state, dispatch] = useReducer(workspaceReducer, createEmptyVipBoard(initialDate), createInitialState);
   const [auth, setAuth] = useState<AuthState>({ status: "checking", session: null });
   const [businessDate, setBusinessDateState] = useState(initialDate);
   const [offline, setOffline] = useState(false);
+  const [demoConfig, setDemoConfig] = useState<DemoPublicConfig | null>(null);
+  const [demoLeaseState, setDemoLeaseState] = useState<
+    "inactive" | "checking" | "active" | "read_only" | "expired"
+  >("inactive");
+  const demoTransportRef = useRef<DemoTransport | null>(null);
+  const authMode = auth.status === "authenticated" ? auth.session.mode ?? "owner" : null;
+  const isDemo = auth.status === "authenticated" && auth.session.mode === "demo";
+  const operatorAuthorized = auth.status === "authenticated"
+    && (auth.session.role === "owner" || auth.session.role === "owner-compatible-demo");
   const mutationBlocked = offline
     || ["loading", "stale", "reconnecting", "error", "read_only"].includes(state.globalState)
-    || !state.board.operations.adminMutationEnabled;
+    || !state.board.operations.adminMutationEnabled
+    || (isDemo && demoLeaseState !== "active");
 
   const loadBoard = useCallback(async (date: string, mode: "initial" | "refresh" = "refresh") => {
+    const demoTransport = demoTransportRef.current;
+    if (demoTransport) {
+      dispatch(mode === "initial"
+        ? {
+            type: "globalState",
+            state: "loading",
+            description: "browser-local合成台帳を読み込んでいます。",
+            message: "DEMO · 合成予約を読み込んでいます",
+          }
+        : { type: "pending", pending: true });
+      const result = await demoTransport.loadBoard(date);
+      if (!result.ok) {
+        const payload = result.payload as unknown as Record<string, unknown>;
+        dispatch({
+          type: "globalState",
+          state: payload.read_only === true ? "read_only" : "error",
+          description: typeof payload.message === "string"
+            ? payload.message
+            : "browser-local合成台帳を読み込めません。",
+          message: "DEMO · ローカル台帳を確認してください",
+        });
+        return false;
+      }
+      dispatch({
+        type: "hydrate",
+        board: result.payload,
+        message: "DEMO · browser-local合成台帳",
+      });
+      return true;
+    }
+
     if (typeof navigator !== "undefined" && !navigator.onLine) {
       setOffline(true);
       const cachedBoard = readSafeBoardCache(date);
@@ -150,7 +225,12 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
         const response = await fetch("/api/admin/session", { cache: "no-store" });
         const payload = await response.json().catch(() => ({})) as Session;
         if (cancelled) return;
+        const publicDemoConfig = readDemoConfig(payload);
+        if (publicDemoConfig) setDemoConfig(publicDemoConfig);
         if (!response.ok || !payload.ok) {
+          if (response.status === 410 && publicDemoConfig) {
+            setDemoLeaseState("expired");
+          }
           setAuth({ status: "unauthenticated", session: null });
           dispatch({
             type: "globalState",
@@ -159,6 +239,24 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
             message: "PINでログインしてください",
           });
           return;
+        }
+        if (payload.mode === "demo") {
+          if (!publicDemoConfig || payload.role !== "owner-compatible-demo") {
+            setAuth({ status: "unauthenticated", session: null });
+            setDemoLeaseState("read_only");
+            return;
+          }
+          demoTransportRef.current = createDemoTransport(publicDemoConfig);
+          try {
+            demoTransportRef.current.purgeExpired();
+          } catch {
+            setDemoLeaseState("read_only");
+          }
+          setDemoLeaseState("checking");
+        } else {
+          demoTransportRef.current = null;
+          setDemoConfig(null);
+          setDemoLeaseState("inactive");
         }
         setAuth({ status: "authenticated", session: payload });
         await loadBoard(initialDate, "initial");
@@ -179,14 +277,57 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
   }, [initialDate, loadBoard]);
 
   useEffect(() => {
-    const desktop = window.matchMedia("(min-width: 768px)");
-    if (window.matchMedia("(max-width: 1279px)").matches && desktop.matches) {
+    if (
+      auth.status !== "authenticated"
+      || authMode !== "demo"
+      || !demoConfig
+      || !demoTransportRef.current
+    ) {
+      return;
+    }
+    let cancelled = false;
+    const renew = async () => {
+      const transport = demoTransportRef.current;
+      if (!transport) return;
+      const result = await transport.renewLease();
+      if (cancelled) return;
+      if (result.ok) {
+        setDemoLeaseState("active");
+        setOffline(false);
+        return;
+      }
+      if (result.status === 410) {
+        setDemoLeaseState("expired");
+        try {
+          transport.purgeExpired();
+        } catch {
+          // The expiry boundary remains fail-closed if browser storage is unavailable.
+        }
+      } else {
+        setDemoLeaseState("read_only");
+      }
+    };
+    void renew();
+    const interval = window.setInterval(
+      () => void renew(),
+      Math.min(demoConfig.leaseIntervalMs, 60_000),
+    );
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [auth.status, authMode, demoConfig]);
+
+  useEffect(() => {
+    const paneLayout = window.matchMedia("(min-width: 768px)");
+    if (window.matchMedia("(max-width: 1279px)").matches && paneLayout.matches) {
       dispatch({ type: "queueCollapsed", collapsed: true });
       dispatch({ type: "inspectorCollapsed", collapsed: true });
     }
 
     const markOffline = () => {
       setOffline(true);
+      if (demoTransportRef.current) setDemoLeaseState("read_only");
       dispatch({
         type: "globalState",
         state: "stale",
@@ -196,7 +337,15 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
     };
     const markOnline = () => {
       setOffline(false);
-      if (auth.status === "authenticated") void loadBoard(businessDate);
+      if (auth.status === "authenticated") {
+        if (auth.session.mode === "demo" && demoTransportRef.current) {
+          setDemoLeaseState("checking");
+          void demoTransportRef.current.renewLease().then((result) => {
+            setDemoLeaseState(result.ok ? "active" : result.status === 410 ? "expired" : "read_only");
+          });
+        }
+        void loadBoard(businessDate);
+      }
     };
     window.addEventListener("offline", markOffline);
     window.addEventListener("online", markOnline);
@@ -204,11 +353,12 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
       window.removeEventListener("offline", markOffline);
       window.removeEventListener("online", markOnline);
     };
-  }, [auth.status, businessDate, loadBoard]);
+  }, [auth, businessDate, loadBoard]);
 
   useEffect(() => {
     if (
       auth.status !== "authenticated"
+      || authMode === "demo"
       || typeof EventSource === "undefined"
       || state.board.businessDay.businessDate !== businessDate
     ) {
@@ -276,11 +426,25 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
     return () => events.close();
   }, [
     auth.status,
+    authMode,
     businessDate,
     loadBoard,
     state.board.boardRevision,
     state.board.businessDay.businessDate,
   ]);
+
+  useEffect(() => {
+    if (authMode !== "demo" || !demoTransportRef.current) return;
+    return demoTransportRef.current.subscribe(businessDate, () => {
+      dispatch({
+        type: "globalState",
+        state: "reconnecting",
+        description: "別タブのdemo revisionを検知したため、ローカル台帳を再取得しています。",
+        message: "DEMO · revision同期中",
+      });
+      void loadBoard(businessDate);
+    });
+  }, [authMode, businessDate, loadBoard]);
 
   const login = useCallback(async (pin: string) => {
     dispatch({ type: "pending", pending: true });
@@ -292,6 +456,9 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
       });
       const payload = await response.json().catch(() => ({})) as Session & Record<string, unknown>;
       if (!response.ok || !payload.ok) {
+        const publicDemoConfig = readDemoConfig(payload);
+        if (publicDemoConfig) setDemoConfig(publicDemoConfig);
+        if (response.status === 410 && publicDemoConfig) setDemoLeaseState("expired");
         dispatch({
           type: "commandOutcome",
           outcome: {
@@ -304,6 +471,17 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
           },
         });
         return false;
+      }
+      const publicDemoConfig = readDemoConfig(payload);
+      if (payload.mode === "demo") {
+        if (!publicDemoConfig || payload.role !== "owner-compatible-demo") return false;
+        setDemoConfig(publicDemoConfig);
+        demoTransportRef.current = createDemoTransport(publicDemoConfig);
+        setDemoLeaseState("checking");
+      } else {
+        setDemoConfig(null);
+        demoTransportRef.current = null;
+        setDemoLeaseState("inactive");
       }
       setAuth({ status: "authenticated", session: payload });
       dispatch({ type: "commandOutcome", outcome: { ok: true, message: "ログインしました" } });
@@ -326,6 +504,8 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
     try {
       await fetch("/api/admin/session", { method: "DELETE" });
     } finally {
+      demoTransportRef.current = null;
+      setDemoLeaseState(demoConfig ? "checking" : "inactive");
       setAuth({ status: "unauthenticated", session: null });
       dispatch({
         type: "globalState",
@@ -334,7 +514,7 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
         message: "ログアウトしました",
       });
     }
-  }, []);
+  }, [demoConfig]);
 
   const setBusinessDate = useCallback((date: string) => {
     setBusinessDateState(date);
@@ -358,7 +538,13 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
     }
     dispatch({ type: "pending", pending: true });
     try {
-      if (!auth.session || !canExecuteVipCommand(auth.session.role ?? null, draft.kind)) {
+      if (
+        !auth.session
+        || (
+          auth.session.role !== "owner-compatible-demo"
+          && !canExecuteVipCommand((auth.session.role as VipAdminRole | undefined) ?? null, draft.kind)
+        )
+      ) {
         dispatch({
           type: "commandOutcome",
           outcome: {
@@ -368,6 +554,46 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
             recovery: "Owner専用PINでログインしてください。",
           },
         });
+        return;
+      }
+
+      const demoTransport = demoTransportRef.current;
+      if (demoTransport) {
+        const result = await demoTransport.runCommand(draft, crypto.randomUUID());
+        if (!result.ok) {
+          const payload = result.payload as unknown as Record<string, unknown>;
+          if (result.status === 410) setDemoLeaseState("expired");
+          else if (payload.read_only === true) setDemoLeaseState("read_only");
+          dispatch({
+            type: "commandOutcome",
+            outcome: {
+              ok: false,
+              code: String(payload.code ?? result.status),
+              message: typeof payload.message === "string" ? payload.message : "合成予約を保存できませんでした。",
+              recovery: "DEMO台帳を再読込してrevisionとleaseを確認してください。",
+            },
+          });
+          if (result.status === 409) await loadBoard(businessDate);
+          return;
+        }
+        dispatch({
+          type: "commandOutcome",
+          outcome: {
+            ok: true,
+            message: `DEMO · 合成予約を保存しました（監査ID ${result.payload.auditLogId}）`,
+          },
+        });
+        dispatch({
+          type: "history",
+          entry: {
+            id: crypto.randomUUID(),
+            at: new Date().toISOString(),
+            actor: "Demo Operator",
+            label: result.payload.action,
+            detail: `${draft.reservationId} / 監査ID ${result.payload.auditLogId}`,
+          },
+        });
+        await loadBoard(businessDate);
         return;
       }
 
@@ -437,9 +663,27 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
   }, [auth.session, businessDate, loadBoard, mutationBlocked, offline]);
 
   const loadOperationOptions = useCallback(async () => {
-    if (mutationBlocked || auth.session?.role !== "owner") return null;
+    if (mutationBlocked || !operatorAuthorized) return null;
 
     try {
+      const demoTransport = demoTransportRef.current;
+      if (demoTransport) {
+        const result = await demoTransport.loadOperationOptions(businessDate);
+        if (!result.ok) {
+          const payload = result.payload as unknown as Record<string, unknown>;
+          dispatch({
+            type: "commandOutcome",
+            outcome: {
+              ok: false,
+              code: String(payload.code ?? result.status),
+              message: typeof payload.message === "string" ? payload.message : "合成候補を取得できません。",
+              recovery: "DEMO営業日を確認してください。",
+            },
+          });
+          return null;
+        }
+        return result.payload;
+      }
       const response = await fetch(
         `/api/admin/vip-floor/options?date=${encodeURIComponent(businessDate)}`,
         { cache: "no-store" },
@@ -472,10 +716,10 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
       });
       return null;
     }
-  }, [auth.session?.role, businessDate, mutationBlocked]);
+  }, [businessDate, mutationBlocked, operatorAuthorized]);
 
   const runOperation = useCallback(async (draft: OperationDraft) => {
-    if (mutationBlocked || auth.session?.role !== "owner") {
+    if (mutationBlocked || !operatorAuthorized) {
       dispatch({
         type: "commandOutcome",
         outcome: {
@@ -501,6 +745,34 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
     dispatch({ type: "pending", pending: true });
 
     try {
+      const demoTransport = demoTransportRef.current;
+      if (demoTransport) {
+        const result = await demoTransport.runOperation(draft, crypto.randomUUID());
+        if (!result.ok) {
+          const payload = result.payload as unknown as Record<string, unknown>;
+          if (result.status === 410) setDemoLeaseState("expired");
+          dispatch({
+            type: "commandOutcome",
+            outcome: {
+              ok: false,
+              code: String(payload.code ?? result.status),
+              message: typeof payload.message === "string" ? payload.message : "合成オペレーションを保存できません。",
+              recovery: "入力、卓競合、version、leaseを確認してください。",
+            },
+          });
+          if (result.status === 409) await loadBoard(businessDate);
+          return false;
+        }
+        const createdCount = result.payload.createdCount
+          ? `（${result.payload.createdCount}日分）`
+          : "";
+        dispatch({
+          type: "commandOutcome",
+          outcome: { ok: true, message: `DEMO · 合成オペレーションを保存しました${createdCount}` },
+        });
+        await loadBoard(businessDate);
+        return true;
+      }
       const response = await fetch("/api/admin/vip-floor/operations", {
         method: "POST",
         headers: {
@@ -557,11 +829,16 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
       });
       return false;
     }
-  }, [auth.session?.role, businessDate, loadBoard, mutationBlocked, offline]);
+  }, [businessDate, loadBoard, mutationBlocked, offline, operatorAuthorized]);
 
   const loadWaitlist = useCallback(async () => {
-    if (offline || auth.session?.role !== "owner") return null;
+    if (offline || !operatorAuthorized) return null;
     try {
+      const demoTransport = demoTransportRef.current;
+      if (demoTransport) {
+        const result = await demoTransport.loadWaitlist(businessDate);
+        return result.ok ? result.payload.entries : null;
+      }
       const response = await fetch(
         `/api/admin/vip-floor/waitlist?date=${encodeURIComponent(businessDate)}`,
         { cache: "no-store" },
@@ -592,10 +869,10 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
       });
       return null;
     }
-  }, [auth.session?.role, businessDate, offline]);
+  }, [businessDate, offline, operatorAuthorized]);
 
   const runWaitlistAction = useCallback(async (draft: WaitlistAction) => {
-    if (mutationBlocked || auth.session?.role !== "owner") {
+    if (mutationBlocked || !operatorAuthorized) {
       dispatch({
         type: "commandOutcome",
         outcome: {
@@ -609,6 +886,34 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
     }
     dispatch({ type: "pending", pending: true });
     try {
+      const demoTransport = demoTransportRef.current;
+      if (demoTransport) {
+        const result = await demoTransport.runWaitlist(
+          businessDate,
+          draft,
+          crypto.randomUUID(),
+        );
+        if (!result.ok) {
+          const payload = result.payload as unknown as Record<string, unknown>;
+          if (result.status === 410) setDemoLeaseState("expired");
+          dispatch({
+            type: "commandOutcome",
+            outcome: {
+              ok: false,
+              code: String(payload.code ?? result.status),
+              message: typeof payload.message === "string" ? payload.message : "合成Waitlistを保存できません。",
+              recovery: "Waitlistのversion、状態、leaseを確認してください。",
+            },
+          });
+          return false;
+        }
+        dispatch({
+          type: "commandOutcome",
+          outcome: { ok: true, message: `DEMO · Waitlist ${draft.action} を保存しました` },
+        });
+        await loadBoard(businessDate);
+        return true;
+      }
       const response = await fetch("/api/admin/vip-floor/waitlist", {
         method: "POST",
         headers: {
@@ -657,11 +962,16 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
       });
       return false;
     }
-  }, [auth.session?.role, businessDate, loadBoard, mutationBlocked]);
+  }, [businessDate, loadBoard, mutationBlocked, operatorAuthorized]);
 
   const loadStaff = useCallback(async () => {
-    if (offline || auth.session?.role !== "owner") return null;
+    if (offline || !operatorAuthorized) return null;
     try {
+      const demoTransport = demoTransportRef.current;
+      if (demoTransport) {
+        const result = await demoTransport.loadStaff(businessDate);
+        return result.ok ? result.payload : null;
+      }
       const response = await fetch(
         `/api/admin/vip-floor/staff?date=${encodeURIComponent(businessDate)}`,
         { cache: "no-store" },
@@ -679,12 +989,30 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
     } catch {
       return null;
     }
-  }, [auth.session?.role, businessDate, offline]);
+  }, [businessDate, offline, operatorAuthorized]);
 
   const runStaffAction = useCallback(async (draft: StaffAction) => {
-    if (mutationBlocked || auth.session?.role !== "owner") return false;
+    if (mutationBlocked || !operatorAuthorized) return false;
     dispatch({ type: "pending", pending: true });
     try {
+      const demoTransport = demoTransportRef.current;
+      if (demoTransport) {
+        const result = await demoTransport.runStaff(
+          businessDate,
+          draft,
+          crypto.randomUUID(),
+        );
+        if (!result.ok) {
+          if (result.status === 410) setDemoLeaseState("expired");
+          return false;
+        }
+        dispatch({
+          type: "commandOutcome",
+          outcome: { ok: true, message: `DEMO · スタッフ ${draft.action} を保存しました` },
+        });
+        await loadBoard(businessDate);
+        return true;
+      }
       const response = await fetch("/api/admin/vip-floor/staff", {
         method: "POST",
         headers: {
@@ -728,7 +1056,162 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
       });
       return false;
     }
-  }, [auth.session?.role, businessDate, loadBoard, mutationBlocked]);
+  }, [businessDate, loadBoard, mutationBlocked, operatorAuthorized]);
+
+  const loadCustomer = useCallback(async (customerId: string) => {
+    const demoTransport = demoTransportRef.current;
+    if (demoTransport) {
+      const result = await demoTransport.loadCustomer(businessDate, customerId);
+      return result.ok ? result.payload.customer : null;
+    }
+    try {
+      const response = await fetch(
+        `/api/admin/vip-floor/customers/${encodeURIComponent(customerId)}`,
+        { cache: "no-store" },
+      );
+      const payload = await response.json().catch(() => ({})) as Record<string, unknown>;
+      return response.ok && payload.ok === true && payload.customer
+        ? payload.customer as CustomerDetail
+        : null;
+    } catch {
+      return null;
+    }
+  }, [businessDate]);
+
+  const updateCustomer = useCallback(async (
+    customerId: string,
+    patch: DemoCustomerPatch & { eventDayId: string; reservationId: string },
+  ) => {
+    if (mutationBlocked || !operatorAuthorized) return false;
+    const demoTransport = demoTransportRef.current;
+    if (demoTransport) {
+      const {
+        expectedVersion,
+        nationalityCode,
+        birthDate,
+        anniversaryDate,
+        vipRank,
+      } = patch;
+      const result = await demoTransport.updateCustomer(
+        businessDate,
+        customerId,
+        { expectedVersion, nationalityCode, birthDate, anniversaryDate, vipRank },
+        crypto.randomUUID(),
+      );
+      if (result.status === 410) setDemoLeaseState("expired");
+      return result.ok;
+    }
+    try {
+      const response = await fetch(
+        `/api/admin/vip-floor/customers/${encodeURIComponent(customerId)}`,
+        {
+          method: "PATCH",
+          headers: {
+            "content-type": "application/json",
+            "idempotency-key": crypto.randomUUID(),
+          },
+          body: JSON.stringify(patch),
+        },
+      );
+      return response.ok;
+    } catch {
+      return false;
+    }
+  }, [businessDate, mutationBlocked, operatorAuthorized]);
+
+  const relinkCustomer = useCallback(async (draft: DemoCustomerLinkDraft) => {
+    if (mutationBlocked || !operatorAuthorized) return false;
+    const demoTransport = demoTransportRef.current;
+    if (demoTransport) {
+      const result = await demoTransport.relinkCustomer(
+        businessDate,
+        draft,
+        crypto.randomUUID(),
+      );
+      if (result.status === 410) setDemoLeaseState("expired");
+      return result.ok;
+    }
+    try {
+      const response = await fetch(
+        `/api/admin/vip-floor/reservations/${encodeURIComponent(draft.reservationId)}/customer-link`,
+        {
+          method: "PATCH",
+          headers: {
+            "content-type": "application/json",
+            "idempotency-key": crypto.randomUUID(),
+          },
+          body: JSON.stringify({
+            expectedVersion: draft.expectedVersion,
+            customerId: draft.customerId,
+          }),
+        },
+      );
+      return response.ok;
+    } catch {
+      return false;
+    }
+  }, [businessDate, mutationBlocked, operatorAuthorized]);
+
+  const loadObservability = useCallback(async (): Promise<SloPayload | null> => {
+    const demoTransport = demoTransportRef.current;
+    if (demoTransport) {
+      const result = await demoTransport.loadObservability(businessDate);
+      if (!result.ok) return null;
+      const auditEventCount = Number(result.payload.auditEventCount ?? 0);
+      return {
+        generatedAt: new Date().toISOString(),
+        windowMinutes: 60,
+        metrics: {
+          commandCount: auditEventCount,
+          commandErrorRate: 0,
+          commandP95Ms: 0,
+          boardReadP95Ms: 0,
+          outboxDeadCount: 0,
+          realtimeGapCount: 0,
+          realtimeUnavailableCount: 0,
+        },
+        targets: {},
+        alerts: {},
+      };
+    }
+    try {
+      const response = await fetch("/api/admin/vip-floor/observability?windowMinutes=60", {
+        cache: "no-store",
+      });
+      const payload = await response.json().catch(() => ({})) as Record<string, unknown>;
+      return response.ok && payload.ok === true && payload.metrics && payload.alerts
+        ? payload as unknown as SloPayload
+        : null;
+    } catch {
+      return null;
+    }
+  }, [businessDate]);
+
+  const resetDemo = useCallback(async () => {
+    const demoTransport = demoTransportRef.current;
+    if (!demoTransport || mutationBlocked) return false;
+    dispatch({ type: "pending", pending: true });
+    const result = await demoTransport.reset(businessDate);
+    if (!result.ok) {
+      if (result.status === 410) setDemoLeaseState("expired");
+      dispatch({
+        type: "commandOutcome",
+        outcome: {
+          ok: false,
+          code: String(result.status),
+          message: "合成台帳を初期化できませんでした。",
+          recovery: "leaseとbrowser-local storageを確認してください。",
+        },
+      });
+      return false;
+    }
+    dispatch({
+      type: "commandOutcome",
+      outcome: { ok: true, message: "DEMO · 合成台帳を初期状態へ戻しました" },
+    });
+    await loadBoard(businessDate);
+    return true;
+  }, [businessDate, loadBoard, mutationBlocked]);
 
   return {
     state,
@@ -740,7 +1223,17 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
     runWaitlistAction,
     loadStaff,
     runStaffAction,
+    loadCustomer,
+    updateCustomer,
+    relinkCustomer,
+    loadObservability,
+    resetDemo,
     auth,
+    demo: {
+      enabled: Boolean(demoConfig),
+      config: demoConfig,
+      leaseState: demoLeaseState,
+    },
     businessDate,
     offline,
     login,

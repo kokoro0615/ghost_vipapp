@@ -17,6 +17,7 @@ import type {
   StaffWorkspaceData,
   UiReservation,
 } from "../contract/uiTypes";
+import { DemoCue, useDemoMode } from "../demo/DemoMode";
 import { ReservationWizard } from "./ReservationWizard";
 import styles from "../VipFloorWorkspace.module.css";
 
@@ -45,6 +46,7 @@ export function OperationCenter({
   onClose,
   onRun,
 }: Props) {
+  const demoMode = useDemoMode();
   const [kind, setKind] = useState<OperationKind>("walk_in");
   const [venueWide, setVenueWide] = useState(false);
   const [editingBlockId, setEditingBlockId] = useState<string | null>(null);
@@ -181,6 +183,7 @@ export function OperationCenter({
             <X size={19} />
           </button>
         </header>
+        <DemoCue compact className={styles.dialogDemoCue} />
 
         {!editReservation ? <div className={styles.operationTabs} role="tablist" aria-label="作成種別">
           <button
@@ -286,12 +289,12 @@ export function OperationCenter({
                     </label>
                   </div>
                   <label>
-                    ゲスト表示名（任意）
-                    <input name="guestLabel" maxLength={80} placeholder="例: 入口ゲスト / 連絡先は入力しない" />
+                    ゲスト表示名{demoMode.enabled ? "（デモ cue必須）" : "（任意）"}
+                    <input name="guestLabel" maxLength={80} required={demoMode.enabled} placeholder={demoMode.enabled ? "例: デモゲストWalk-in001" : "例: 入口ゲスト / 連絡先は入力しない"} />
                   </label>
                   <label>
                     現場メモ（任意）
-                    <textarea name="operatorNote" maxLength={500} placeholder="到着時の共有事項" />
+                    <textarea name="operatorNote" maxLength={500} placeholder={demoMode.enabled ? "例: デモ：入口で到着確認済み" : "到着時の共有事項"} />
                   </label>
                 </>
               ) : (
@@ -345,7 +348,7 @@ export function OperationCenter({
                       name="memo"
                       maxLength={1000}
                       defaultValue={editingBlock?.memo ?? ""}
-                      placeholder="現場に必要な理由・解除条件"
+                      placeholder={demoMode.enabled ? "例: デモ：機材確認のため一時停止" : "現場に必要な理由・解除条件"}
                     />
                   </label>
                 </>

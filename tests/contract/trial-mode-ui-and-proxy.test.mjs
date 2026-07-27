@@ -45,7 +45,8 @@ test("trial form constraints disable phone capture and limit generated email dom
     read("src/components/admin/vip-floor-v2/waitlist/WaitlistPanel.tsx"),
   ]);
 
-  assert.match(wizard, /disabled=\{trialMode\}/u);
+  assert.match(wizard, /const syntheticMode = trialMode \|\| demoMode\.enabled/u);
+  assert.match(wizard, /disabled=\{syntheticMode\}/u);
   assert.match(wizard, /@example\\\\\.com/u);
   assert.match(waitlist, /@example\\\\\.com/u);
   assert.match(wizard, /TRIALでは電話番号は入力できません/u);

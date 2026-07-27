@@ -1,42 +1,56 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
-function safeEqual(left: string, right: string) {
-  if (left.length !== right.length) return false;
-  let mismatch = 0;
-  for (let index = 0; index < left.length; index += 1) {
-    mismatch |= left.charCodeAt(index) ^ right.charCodeAt(index);
-  }
-  return mismatch === 0;
+import {
+  DEMO_SESSION_COOKIE,
+  OWNER_SESSION_COOKIE,
+  resolveBasicAccessLane,
+  TRUSTED_ACCESS_LANE_HEADER,
+  type AccessLane,
+} from "@/lib/demo/accessContract";
+
+function withoutCookie(cookieHeader: string | null, cookieName: string) {
+  if (!cookieHeader) return null;
+  const retained = cookieHeader
+    .split(";")
+    .map((value) => value.trim())
+    .filter((value) => value && !value.startsWith(`${cookieName}=`));
+  return retained.length > 0 ? retained.join("; ") : null;
 }
 
-function parseBasicAuthorization(value: string | null) {
-  if (!value?.startsWith("Basic ")) return null;
-
-  try {
-    const decoded = Buffer.from(value.slice(6), "base64").toString("utf8");
-    const separator = decoded.indexOf(":");
-    if (separator < 0) return null;
-    return {
-      username: decoded.slice(0, separator),
-      password: decoded.slice(separator + 1),
-    };
-  } catch {
-    return null;
-  }
+function expireOppositeSessionCookie(response: NextResponse, lane: AccessLane) {
+  const cookieName = lane === "owner" ? DEMO_SESSION_COOKIE : OWNER_SESSION_COOKIE;
+  response.cookies.set(cookieName, "", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+    path: "/api",
+    maxAge: 0,
+  });
 }
 
 export function proxy(request: NextRequest) {
-  const expectedUsername = process.env.VIPAPP_BASIC_USER;
-  const expectedPassword = process.env.VIPAPP_BASIC_PASSWORD;
-  const credentials = parseBasicAuthorization(request.headers.get("authorization"));
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.delete(TRUSTED_ACCESS_LANE_HEADER);
+  const lane = resolveBasicAccessLane(request.headers.get("authorization"), {
+    ownerUsername: process.env.VIPAPP_BASIC_USER,
+    ownerPassword: process.env.VIPAPP_BASIC_PASSWORD,
+    demoEnabled: process.env.VIPAPP_DEMO_ENABLED === "true",
+    demoUsername: process.env.VIPAPP_DEMO_BASIC_USER,
+    demoPassword: process.env.VIPAPP_DEMO_BASIC_PASSWORD,
+  });
 
-  const authenticated =
-    Boolean(expectedUsername && expectedPassword && credentials) &&
-    safeEqual(credentials?.username ?? "", expectedUsername ?? "") &&
-    safeEqual(credentials?.password ?? "", expectedPassword ?? "");
+  if (lane) {
+    requestHeaders.set(TRUSTED_ACCESS_LANE_HEADER, lane);
+    const oppositeCookie = lane === "owner" ? DEMO_SESSION_COOKIE : OWNER_SESSION_COOKIE;
+    const sanitizedCookie = withoutCookie(requestHeaders.get("cookie"), oppositeCookie);
+    if (sanitizedCookie) requestHeaders.set("cookie", sanitizedCookie);
+    else requestHeaders.delete("cookie");
 
-  if (authenticated) return NextResponse.next();
+    const response = NextResponse.next({ request: { headers: requestHeaders } });
+    expireOppositeSessionCookie(response, lane);
+    return response;
+  }
 
   return new NextResponse("Authentication required.", {
     status: 401,

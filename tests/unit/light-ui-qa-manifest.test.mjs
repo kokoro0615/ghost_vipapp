@@ -8,10 +8,27 @@ import {
   safeArtifactName,
 } from "../../scripts/light-ui-qa-manifest.mjs";
 
-test("light UI QA freezes six required viewports and complete operational states", () => {
-  assert.deepEqual(QA_VIEWPORTS.map(({ width }) => width), [320, 375, 768, 1024, 1194, 1366]);
+test("light UI QA freezes the exact Chromium and WebKit release matrix", () => {
+  assert.deepEqual(
+    QA_VIEWPORTS.map(({ browser, width, height }) => `${browser}-${width}x${height}`),
+    [
+      "chromium-1440x900",
+      "chromium-1366x768",
+      "chromium-1194x834",
+      "chromium-1024x768",
+      "chromium-768x1024",
+      "chromium-390x844",
+      "chromium-375x812",
+      "chromium-320x800",
+      "webkit-1194x834",
+    ],
+  );
   for (const state of [
     "login",
+    "demo-login",
+    "demo-reset",
+    "demo-near-expiry",
+    "demo-expired",
     "list",
     "floor",
     "chart",
@@ -41,21 +58,22 @@ test("light UI QA freezes six required viewports and complete operational states
 });
 
 test("light UI QA summary fails closed when a state or viewport is absent", () => {
-  const results = QA_VIEWPORTS.flatMap(({ width, height }) =>
+  const results = QA_VIEWPORTS.flatMap(({ browser, width, height }) =>
     QA_REQUIRED_STATES.map((state) => ({
       state,
-      viewport: `${width}x${height}`,
-      screenshot: `${width}x${height}/${safeArtifactName(state)}.jpg`,
+      viewport: `${browser}-${width}x${height}`,
+      screenshot: `${browser}-${width}x${height}/${safeArtifactName(state)}.jpg`,
     })));
   const complete = buildQaSummary(results, "/tmp/evidence");
   assert.equal(complete.ok, true);
   assert.equal(complete.screenshots, QA_VIEWPORTS.length * QA_REQUIRED_STATES.length);
 
   const incomplete = buildQaSummary(
-    results.filter((result) => result.state !== "conflict" && result.viewport !== "375x812"),
+    results.filter((result) =>
+      result.state !== "conflict" && result.viewport !== "chromium-375x812"),
     "/tmp/evidence",
   );
   assert.equal(incomplete.ok, false);
   assert.deepEqual(incomplete.missingStates, ["conflict"]);
-  assert.deepEqual(incomplete.missingViewports, ["375x812"]);
+  assert.deepEqual(incomplete.missingViewports, ["chromium-375x812"]);
 });

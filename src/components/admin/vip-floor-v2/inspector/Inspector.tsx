@@ -6,6 +6,7 @@ import type { VipFloorBoardV2 } from "@/lib/vipFloorV2Contract";
 
 import { getStatusMeta } from "../contract/statusModel";
 import type { CommandKind, HistoryEntry, UiReservation } from "../contract/uiTypes";
+import { useDemoMode } from "../demo/DemoMode";
 import styles from "../VipFloorWorkspace.module.css";
 
 export const INSPECTOR_TABS = [
@@ -59,6 +60,7 @@ export function Inspector({
   onEdit,
   onCustomerDetails,
 }: Props) {
+  const demoMode = useDemoMode();
   const table = board.tables.find((item) => item.id === selectedTableId) ?? null;
   const meta = getStatusMeta(reservation?.serviceStatus);
   const StatusIcon = meta.icon;
@@ -130,7 +132,7 @@ export function Inspector({
               <div><dt><ShieldCheck size={14} /> 版</dt><dd>v{reservation.version}</dd></div>
               <div><dt><ClipboardList size={14} /> 例外</dt><dd>{reservation.exceptionLabel ?? "なし"}</dd></div>
             </dl> : null}
-            {activeTab === "guest" ? <div className={styles.detailStack}><p className={styles.maskedName}><UserRound size={17} />{reservation.guestLabel}</p><p>Ownerは暗号化profileを必要時だけ復号できます。</p><small>閲覧、属性変更、解除・再紐付けはすべて監査対象です。</small><button type="button" className={styles.secondaryButton} onClick={onCustomerDetails} disabled={readOnly}>顧客詳細を開く</button></div> : null}
+            {activeTab === "guest" ? <div className={styles.detailStack}><p className={styles.maskedName}><UserRound size={17} />{reservation.guestLabel}</p><p>{demoMode.enabled ? "合成profileはこのbrowser-local workspaceだけで利用します。" : "Ownerは暗号化profileを必要時だけ復号できます。"}</p><small>閲覧、属性変更、解除・再紐付けはすべて監査対象です。</small><button type="button" className={styles.secondaryButton} onClick={onCustomerDetails} disabled={readOnly}>顧客詳細を開く</button></div> : null}
             {activeTab === "service" ? <div className={styles.detailStack}><p><StatusIcon size={16} /> {meta.label}</p><p>元データ: {reservation.sourceLabel}</p><p>席ロック: {table?.operationalLocked ? table.lockReason : "なし"}</p><p>フラグ: {visibleFlags.join(", ") || "なし"}</p></div> : null}
             {activeTab === "notes" ? <div className={styles.noteList}>{notes.length ? notes.map((note) => <article key={note.id}><strong><NotebookPen size={14} />{note.pinned ? "固定メモ" : "メモ"}</strong><p>{note.body}</p><small>v{note.version} / {note.kind}</small></article>) : <p>メモはありません。</p>}</div> : null}
             {activeTab === "history" ? <ol className={styles.historyList}>{history.map((item) => <li key={item.id}><span>{new Intl.DateTimeFormat("ja-JP", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Tokyo" }).format(new Date(item.at))}</span><div><strong>{item.label}</strong><p>{item.detail}</p><small>{item.actor}</small></div></li>)}</ol> : null}

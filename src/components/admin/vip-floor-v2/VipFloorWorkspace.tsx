@@ -22,6 +22,7 @@ import {
   ShieldCheck,
   WifiOff,
   X,
+  RotateCcw,
 } from "lucide-react";
 
 import { CommandCenter } from "./commands/CommandCenter";
@@ -36,6 +37,9 @@ import { ExceptionRail } from "./shell/ExceptionRail";
 import { useVipFloorWorkspace } from "./state/useVipFloorWorkspace";
 import { StaffPanel } from "./staff/StaffPanel";
 import { WaitlistPanel } from "./waitlist/WaitlistPanel";
+import { DemoCue, DemoModeProvider } from "./demo/DemoMode";
+import { DemoExpiryBoundary } from "./demo/DemoExpiryBoundary";
+import { DemoResetDialog } from "./demo/DemoResetDialog";
 import styles from "./VipFloorWorkspace.module.css";
 import { canExecuteVipCommand } from "@/lib/adminPermissions";
 import type { OperationOptions } from "./contract/uiTypes";
@@ -101,7 +105,13 @@ export default function VipFloorWorkspace() {
     runWaitlistAction,
     loadStaff,
     runStaffAction,
+    loadCustomer,
+    updateCustomer,
+    relinkCustomer,
+    loadObservability,
+    resetDemo,
     auth,
+    demo,
     businessDate,
     offline,
     login,
@@ -121,6 +131,8 @@ export default function VipFloorWorkspace() {
   const [staffFilter, setStaffFilter] = useState("");
   const [customerOpen, setCustomerOpen] = useState(false);
   const [observabilityOpen, setObservabilityOpen] = useState(false);
+  const [resetOpen, setResetOpen] = useState(false);
+  const [queueOpen, setQueueOpen] = useState(false);
   const menuRef = useRef<HTMLElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const mobileSheetRef = useRef<HTMLDivElement>(null);
@@ -135,12 +147,17 @@ export default function VipFloorWorkspace() {
   }), [allReservations, deferredQuery, state.statusFilter]);
   const queueGroups = useMemo(() => buildQueueGroups(reservations), [reservations]);
   const selectedReservation = allReservations.find((item) => item.id === state.selectedReservationId) ?? null;
-  const isOwner = auth.status === "authenticated" && auth.session.role === "owner";
+  const isDemo = auth.status === "authenticated" && auth.session.mode === "demo";
+  const isOwner = auth.status === "authenticated"
+    && (auth.session.role === "owner" || auth.session.role === "owner-compatible-demo");
   const canMutate = isOwner;
   const canCommand = (kind: CommandKind) => canMutate
     && auth.status === "authenticated"
     && !!auth.session?.role
-    && canExecuteVipCommand(auth.session.role, kind);
+    && (
+      auth.session.role === "owner-compatible-demo"
+      || canExecuteVipCommand(auth.session.role, kind)
+    );
 
   useEffect(() => {
     if (!isOwner) return;
@@ -264,36 +281,75 @@ export default function VipFloorWorkspace() {
   }
 
   if (auth.status !== "authenticated") {
+    if (demo.leaseState === "expired" && demo.config) {
+      return (
+        <DemoModeProvider value={{
+          enabled: true,
+          expiresAt: demo.config.expiresAt,
+          leaseState: "expired",
+        }}>
+          <DemoExpiryBoundary onLogout={logout} />
+        </DemoModeProvider>
+      );
+    }
     return (
-      <main className={styles.loginShell}>
-        <form className={styles.loginPanel} onSubmit={submitPin}>
-          <div className={styles.loginMark}><span>G</span></div>
-          <p className={styles.loginEyebrow}>GHOST OSAKA · OWNER ACCESS</p>
-          <h1>現場オペレーション</h1>
-          <p className={styles.loginMessage} role="status">{state.message}</p>
-          <label>
-            Owner専用PIN
-            <input
-              value={pin}
-              onChange={(event) => setPin(event.target.value.replace(/\D/gu, "").slice(0, 8))}
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              minLength={4}
-              maxLength={8}
-              aria-describedby="pin-security"
-            />
-          </label>
-          <p id="pin-security" className={styles.loginHint}>Owner PINは端末へ保存されません。</p>
-          <button type="submit" disabled={state.pending || pin.length < 4}>
-            <ShieldCheck size={17} />
-            {state.pending || auth.status === "checking" ? "確認中…" : "ログイン"}
-          </button>
-        </form>
-      </main>
+      <DemoModeProvider value={{
+        enabled: Boolean(demo.config),
+        expiresAt: demo.config?.expiresAt ?? null,
+        leaseState: demo.leaseState,
+      }}>
+        <main className={styles.loginShell}>
+          <form className={styles.loginPanel} onSubmit={submitPin}>
+            <div className={styles.loginMark}><span>G</span></div>
+            <p className={styles.loginEyebrow}>
+              GHOST OSAKA · {demo.config ? "CUSTOMER DEMO" : "OWNER ACCESS"}
+            </p>
+            <h1>{demo.config ? "VIP予約デモ" : "現場オペレーション"}</h1>
+            <DemoCue />
+            <p className={styles.loginMessage} role="status">{state.message}</p>
+            <label>
+              {demo.config ? "デモ専用PIN" : "Owner専用PIN"}
+              <input
+                value={pin}
+                onChange={(event) => setPin(event.target.value.replace(/\D/gu, "").slice(0, 8))}
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                minLength={4}
+                maxLength={8}
+                aria-describedby="pin-security"
+              />
+            </label>
+            <p id="pin-security" className={styles.loginHint}>
+              {demo.config ? "デモPINと合成データはProduction予約へ送信されません。" : "Owner PINは端末へ保存されません。"}
+            </p>
+            <button type="submit" disabled={state.pending || pin.length < 4}>
+              <ShieldCheck size={17} />
+              {state.pending || auth.status === "checking" ? "確認中…" : "ログイン"}
+            </button>
+          </form>
+        </main>
+      </DemoModeProvider>
+    );
+  }
+
+  if (isDemo && demo.leaseState === "expired") {
+    return (
+      <DemoModeProvider value={{
+        enabled: true,
+        expiresAt: demo.config?.expiresAt ?? null,
+        leaseState: "expired",
+      }}>
+        <DemoExpiryBoundary onLogout={logout} />
+      </DemoModeProvider>
     );
   }
 
   return (
+    <DemoModeProvider value={{
+      enabled: isDemo,
+      expiresAt: demo.config?.expiresAt ?? null,
+      leaseState: demo.leaseState,
+    }}>
     <main className={styles.workspace} data-state={state.globalState}>
       <a href="#vip-workspace-main" className={styles.skipLink}>メイン作業領域へ</a>
 
@@ -302,6 +358,7 @@ export default function VipFloorWorkspace() {
           <span>GHOST OSAKA</span>
             <strong>VIP MANAGER</strong>
         </div>
+        <DemoCue compact className={styles.ribbonDemoCue} />
         <label className={styles.ribbonControl}>
           <CalendarDays size={15} />
           <span>営業日</span>
@@ -323,7 +380,7 @@ export default function VipFloorWorkspace() {
           <strong>22:00–05:00</strong>
         </div>
         <div className={styles.operatorIdentity}>
-          <span>{auth.session.displayName ?? "Owner"} · {isOwner ? "Owner" : "閲覧のみ"}</span>
+          <span>{auth.session.displayName ?? "Owner"} · {isDemo ? "DEMO" : isOwner ? "Owner" : "閲覧のみ"}</span>
           <button type="button" onClick={() => void logout()}><LogOut size={14} />ログアウト</button>
         </div>
         <div className={styles.syncStatus} data-state={state.globalState}>
@@ -370,6 +427,26 @@ export default function VipFloorWorkspace() {
         onSelect={selectReservation}
         onCollapse={(collapsed) => dispatch({ type: "queueCollapsed", collapsed })}
       />
+
+      <section className={styles.mobileQueue} data-open={queueOpen || undefined} aria-label="例外キュー">
+        <header>
+          <div><span>GHOST OSAKA</span><strong>例外キュー</strong></div>
+          <button type="button" onClick={() => setQueueOpen(false)} aria-label="例外キューを閉じる"><X size={18} /></button>
+        </header>
+        <ExceptionRail
+          groups={queueGroups}
+          reservations={reservations}
+          selectedId={state.selectedReservationId}
+          collapsed={false}
+          query={state.query}
+          onQuery={(query) => dispatch({ type: "query", query })}
+          onSelect={(id) => {
+            selectReservation(id);
+            setQueueOpen(false);
+          }}
+          onCollapse={() => setQueueOpen(false)}
+        />
+      </section>
 
       <section className={styles.primaryArea} id="vip-workspace-main">
         <div className={styles.workspaceToolbar} role="toolbar" aria-label="表示と絞り込み">
@@ -466,7 +543,13 @@ export default function VipFloorWorkspace() {
               reservations={reservations}
               selectedReservationId={state.selectedReservationId}
               selectedTableId={state.selectedTableId}
-              onSelectTable={(tableId, reservationId) => dispatch({ type: "selectTable", tableId, reservationId })}
+              onSelectTable={(tableId, reservationId) => {
+                dispatch({ type: "selectTable", tableId, reservationId });
+                if (window.matchMedia("(max-width: 767px)").matches) {
+                  dispatch({ type: "mobileInspector", open: true });
+                }
+              }}
+              onSelectReservation={selectReservation}
               onOpenAssignment={() => openCommand("assignment")}
               staffData={staffData}
               staffFilter={staffFilter}
@@ -544,6 +627,17 @@ export default function VipFloorWorkspace() {
             </button>
             <button type="button" onClick={() => {
               setMenuOpen(false);
+              if (window.matchMedia("(max-width: 767px)").matches) {
+                dispatch({ type: "mobileInspector", open: false });
+                setQueueOpen(true);
+              } else {
+                dispatch({ type: "queueCollapsed", collapsed: false });
+              }
+            }}>
+              <AlertTriangle size={18} /><span>例外Queue</span><small>未割当・遅延</small>
+            </button>
+            <button type="button" onClick={() => {
+              setMenuOpen(false);
               setObservabilityOpen(true);
             }}>
               <Activity size={18} /><span>SLO</span><small>Metric / Alert</small>
@@ -551,14 +645,22 @@ export default function VipFloorWorkspace() {
             <button type="button" onClick={() => void openStaff()}>
               <ShieldCheck size={18} /><span>担当卓</span><small>スタッフMaster</small>
             </button>
+            {isDemo ? (
+              <button type="button" onClick={() => {
+                setMenuOpen(false);
+                setResetOpen(true);
+              }}>
+                <RotateCcw size={18} /><span>デモ初期化</span><small>合成台帳のみ</small>
+              </button>
+            ) : null}
             <button type="button" onClick={() => void logout()}>
-              <LogOut size={18} /><span>ログアウト</span><small>Owner session</small>
+              <LogOut size={18} /><span>ログアウト</span><small>{isDemo ? "Demo session" : "Owner session"}</small>
             </button>
           </div>
         </section>
       ) : null}
 
-      <nav className={styles.bottomNav} aria-label="主要ナビゲーション">
+      <nav className={styles.primaryNav} aria-label="主要ナビゲーション">
         <button
           type="button"
           disabled={readOnly || !isOwner}
@@ -681,6 +783,9 @@ export default function VipFloorWorkspace() {
         reservation={selectedReservation}
         pending={state.pending}
         onClose={() => setCustomerOpen(false)}
+        onLoadCustomer={loadCustomer}
+        onSaveCustomer={updateCustomer}
+        onRelinkCustomer={relinkCustomer}
         onChanged={async () => {
           await loadBoard();
         }}
@@ -689,8 +794,20 @@ export default function VipFloorWorkspace() {
       <ObservabilityPanel
         open={observabilityOpen}
         onClose={() => setObservabilityOpen(false)}
+        onLoad={loadObservability}
+      />
+      <DemoResetDialog
+        open={resetOpen}
+        pending={state.pending}
+        businessDate={businessDate}
+        onCancel={() => setResetOpen(false)}
+        onConfirm={async () => {
+          const reset = await resetDemo();
+          if (reset) setResetOpen(false);
+        }}
       />
     </main>
+    </DemoModeProvider>
   );
 }
 
