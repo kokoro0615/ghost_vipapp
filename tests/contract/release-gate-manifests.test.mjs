@@ -16,7 +16,7 @@ async function writeMode600(filePath, value) {
   await chmod(filePath, 0o600);
 }
 
-test("backup/restore Gate binds exact 24 migration checksums and restore evidence", async (t) => {
+test("backup/restore Gate binds exact 25 migration checksums and restore evidence", async (t) => {
   const directory = await mkdtemp(path.join(tmpdir(), "ghost-backup-gate-"));
   t.after(() => rm(directory, { recursive: true, force: true }));
   const websiteRoot = path.join(directory, "website");
@@ -29,6 +29,7 @@ test("backup/restore Gate binds exact 24 migration checksums and restore evidenc
     "20260726150000", "20260726160000", "20260726161000", "20260726161500",
     "20260726170000", "20260726171000", "20260726172000", "20260726173000",
     "20260726174000", "20260726174100", "20260726174200", "20260726175000",
+    "20260726205147",
   ];
   const migrations = [];
   for (const version of versions) {
@@ -49,7 +50,8 @@ test("backup/restore Gate binds exact 24 migration checksums and restore evidenc
       evidenceSha256: "d".repeat(64),
       checks: {
         schema: true, roles: true, criticalRpcs: true, rowCounts: true,
-        hashes: true, foreignKeys: true, rls: true,
+        hashes: true, foreignKeys: true, rls: true, migrationHistory: true,
+        storageObjectBodiesExcluded: true,
       },
     },
     migrations,
@@ -58,7 +60,13 @@ test("backup/restore Gate binds exact 24 migration checksums and restore evidenc
       trialSeatsZero: true,
       trialSectionsZero: true,
       inactiveHistoryPreserved: true,
+      inactiveReservationReferencesPreserved: true,
+      inactiveOfferingReferencesPreserved: true,
       orphansZero: true,
+      foreignKeysValidated: true,
+      rlsAllPublicTables: true,
+      criticalRpcs: true,
+      providerSentDeltaZero: true,
       apiContract: true,
       publicBookingRegression: true,
     },
@@ -69,7 +77,7 @@ test("backup/restore Gate binds exact 24 migration checksums and restore evidenc
     ["--manifest", manifestPath, "--website-root", websiteRoot],
   );
   assert.equal(pass.code, 0, pass.stderr);
-  assert.match(pass.stdout, /"migrationCount":24/u);
+  assert.match(pass.stdout, /"migrationCount":25/u);
   await writeFile(path.join(migrationsDir, migrations[0].file), "-- checksum drift\nSELECT 2;\n");
   const reject = await runNodeScript(
     "scripts/verify-backup-restore-manifest.mjs",

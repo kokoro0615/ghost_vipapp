@@ -7,8 +7,15 @@ import path from "node:path";
 import process from "node:process";
 
 const SHA256 = /^[a-f0-9]{64}$/u;
-const ALLOWED_START = "20260714090000";
-const ALLOWED_END = "20260726175000";
+const PRODUCTION_ALLOWLIST = new Set([
+  "20260714090000", "20260714090500", "20260714091500", "20260714093000",
+  "20260714094500", "20260714095000", "20260714100000", "20260714103000",
+  "20260714110000", "20260714120000", "20260714120500", "20260714121000",
+  "20260726150000", "20260726160000", "20260726161000", "20260726161500",
+  "20260726170000", "20260726171000", "20260726172000", "20260726173000",
+  "20260726174000", "20260726174100", "20260726174200", "20260726175000",
+  "20260726205147",
+]);
 const FORBIDDEN = new Set(["20260726180000", "20260726181000"]);
 
 function readArgument(name) {
@@ -30,9 +37,14 @@ async function migrationManifest() {
   const files = (await readdir(directory))
     .filter((file) => file.endsWith(".sql"))
     .map((file) => ({ file, version: file.slice(0, 14) }))
-    .filter(({ version }) => version >= ALLOWED_START && version <= ALLOWED_END)
+    .filter(({ version }) => PRODUCTION_ALLOWLIST.has(version))
     .sort((left, right) => left.file.localeCompare(right.file));
-  assert.equal(files.length, 24, "production migration allowlist must contain exact 24 files");
+  assert.equal(files.length, 25, "production migration allowlist must contain exact 25 files");
+  assert.deepEqual(
+    new Set(files.map(({ version }) => version)),
+    PRODUCTION_ALLOWLIST,
+    "production migration version drift",
+  );
   assert.equal(files.some(({ version }) => FORBIDDEN.has(version)), false, "trial migration entered allowlist");
   return Promise.all(files.map(async ({ file, version }) => ({
     version,
@@ -62,7 +74,17 @@ async function main() {
   assert.match(manifest.restore?.evidenceSha256 ?? "", SHA256);
   assertBooleanChecks(
     manifest.restore?.checks,
-    ["schema", "roles", "criticalRpcs", "rowCounts", "hashes", "foreignKeys", "rls"],
+    [
+      "schema",
+      "roles",
+      "criticalRpcs",
+      "rowCounts",
+      "hashes",
+      "foreignKeys",
+      "rls",
+      "migrationHistory",
+      "storageObjectBodiesExcluded",
+    ],
     "restore",
   );
   assert.deepEqual(manifest.migrations, await migrationManifest(), "migration allowlist/checksum drift");
@@ -73,7 +95,13 @@ async function main() {
       "trialSeatsZero",
       "trialSectionsZero",
       "inactiveHistoryPreserved",
+      "inactiveReservationReferencesPreserved",
+      "inactiveOfferingReferencesPreserved",
       "orphansZero",
+      "foreignKeysValidated",
+      "rlsAllPublicTables",
+      "criticalRpcs",
+      "providerSentDeltaZero",
       "apiContract",
       "publicBookingRegression",
     ],
