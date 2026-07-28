@@ -64,7 +64,7 @@ test("proxy overwrites spoofed lane claims and derives the internal header only 
     readRequired(PATHS.proxy),
   ]);
 
-  assert.match(proxy, /resolveBasicAccessLane/u);
+  assert.match(proxy, /resolveBasicAccessRequest/u);
   assert.match(proxy, /TRUSTED_ACCESS_LANE_HEADER/u);
   assertContainsAll(proxy, [
     /VIPAPP_BASIC_USER/u,
@@ -83,7 +83,7 @@ test("proxy overwrites spoofed lane claims and derives the internal header only 
     /NextResponse\.next\(\s*\{[\s\S]*request\s*:\s*\{[\s\S]*headers/u,
     "verified lane must be forwarded as an internal request header",
   );
-  const resolveIndex = proxy.indexOf("resolveBasicAccessLane");
+  const resolveIndex = proxy.indexOf("resolveBasicAccessRequest");
   const forwardIndex = indexOfMatch(
     proxy,
     /NextResponse\.next\(\s*\{[\s\S]*request\s*:\s*\{[\s\S]*headers/u,
@@ -93,6 +93,34 @@ test("proxy overwrites spoofed lane claims and derives the internal header only 
     access,
     /(?:x-access-lane|x-ghost-[\w-]*lane)\s*\?\?/u,
     "client lane claims must not be a fallback input to Basic resolution",
+  );
+});
+
+test("proxy converts verified Basic auth into a signed HttpOnly access cookie for subrequests without Authorization", async () => {
+  const [access, proxy] = await Promise.all([
+    readRequired(PATHS.access),
+    readRequired(PATHS.proxy),
+  ]);
+  const boundary = `${access}\n${proxy}`;
+
+  assertContainsAll(boundary, [
+    /BASIC_ACCESS_COOKIE/u,
+    /BASIC_ACCESS_MAX_AGE_SECONDS/u,
+    /createBasicAccessSession/u,
+    /resolveBasicAccessRequest/u,
+    /createHmac/u,
+    /timingSafeEqual/u,
+    /request\.cookies\.get\(\s*BASIC_ACCESS_COOKIE\s*\)/u,
+    /httpOnly\s*:\s*true/iu,
+    /sameSite\s*:\s*["']strict["']/iu,
+    /path\s*:\s*["']\/["']/iu,
+    /maxAge\s*:\s*BASIC_ACCESS_MAX_AGE_SECONDS/u,
+  ], "Basic access session boundary");
+  assert.doesNotMatch(boundary, /NEXT_PUBLIC_/u);
+  assert.match(
+    proxy,
+    /WWW-Authenticate[\s\S]*Basic realm=/u,
+    "the initial Basic challenge must remain fail-closed",
   );
 });
 

@@ -70,6 +70,78 @@ test("runtime Basic resolver isolates owner, demo, disabled and ambiguous creden
   }), null);
 });
 
+test("runtime Basic access session survives missing subrequest Authorization without weakening fail-closed checks", async () => {
+  const api = await loadTypeScriptModule("src/lib/demo/accessContract.ts");
+  const config = {
+    ownerUsername: "owner-runtime",
+    ownerPassword: "owner-password-runtime",
+    demoEnabled: true,
+    demoUsername: "demo-runtime",
+    demoPassword: "demo-password-runtime",
+  };
+  const now = Date.parse("2026-07-28T12:00:00+09:00");
+
+  const ownerSession = api.createBasicAccessSession("owner", config, now);
+  const demoSession = api.createBasicAccessSession("demo", config, now);
+  assert.ok(ownerSession?.token);
+  assert.ok(demoSession?.token);
+  assert.equal(ownerSession.expiresAt - now, api.BASIC_ACCESS_MAX_AGE_SECONDS * 1000);
+
+  const ownerAuthorization = api.resolveBasicAccessRequest(
+    basic(config.ownerUsername, config.ownerPassword),
+    null,
+    config,
+    now,
+  );
+  assert.equal(ownerAuthorization?.lane, "owner");
+  assert.equal(ownerAuthorization?.source, "authorization");
+  const demoCookie = api.resolveBasicAccessRequest(null, demoSession.token, config, now);
+  assert.equal(demoCookie?.lane, "demo");
+  assert.equal(demoCookie?.source, "cookie");
+
+  assert.equal(
+    api.resolveBasicAccessRequest(
+      basic(config.demoUsername, "wrong-password"),
+      demoSession.token,
+      config,
+      now,
+    ),
+    null,
+    "an invalid Authorization header must never fall back to a valid cookie",
+  );
+  assert.equal(
+    api.resolveBasicAccessRequest(null, `${demoSession.token}tampered`, config, now),
+    null,
+  );
+  assert.equal(
+    api.resolveBasicAccessRequest(
+      null,
+      demoSession.token,
+      { ...config, demoEnabled: false },
+      now,
+    ),
+    null,
+  );
+  assert.equal(
+    api.resolveBasicAccessRequest(
+      null,
+      ownerSession.token,
+      { ...config, ownerPassword: "rotated-owner-password" },
+      now,
+    ),
+    null,
+  );
+  assert.equal(
+    api.resolveBasicAccessRequest(
+      null,
+      demoSession.token,
+      config,
+      demoSession.expiresAt + 1,
+    ),
+    null,
+  );
+});
+
 test("runtime demo PIN and HMAC session verify only inside the exact bounded workspace", async () => {
   const pin = "24681357";
   const salt = "runtime-demo-salt";
