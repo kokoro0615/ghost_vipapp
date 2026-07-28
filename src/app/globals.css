@@ -1,20 +1,20 @@
 :root {
-  --canvas: oklch(0.975 0.008 85);
+  --canvas: oklch(0.985 0 0);
   --surface: oklch(1 0 0);
-  --surface-sunken: oklch(0.955 0.01 85);
-  --surface-hover: oklch(0.94 0.014 85);
-  --surface-selected: oklch(0.965 0.018 82);
-  --text-primary: oklch(0.22 0.012 65);
-  --text-secondary: oklch(0.4 0.014 65);
-  --text-tertiary: oklch(0.52 0.016 65);
-  --border: oklch(0.88 0.018 82);
-  --border-strong: oklch(0.78 0.026 80);
-  --action: oklch(0.22 0.012 65);
-  --action-hover: oklch(0.29 0.016 65);
+  --surface-sunken: oklch(0.965 0 0);
+  --surface-hover: oklch(0.945 0 0);
+  --surface-selected: oklch(0.955 0.012 82);
+  --text-primary: oklch(0.18 0.006 70);
+  --text-secondary: oklch(0.35 0.006 70);
+  --text-tertiary: oklch(0.46 0.006 70);
+  --border: oklch(0.86 0.004 75);
+  --border-strong: oklch(0.67 0.008 75);
+  --action: oklch(0.18 0.006 70);
+  --action-hover: oklch(0.25 0.008 70);
   --action-text: oklch(0.99 0 0);
-  --champagne: oklch(0.48 0.07 82);
-  --champagne-soft: oklch(0.94 0.025 82);
-  --focus: oklch(0.42 0.09 75);
+  --champagne: oklch(0.56 0.06 82);
+  --champagne-soft: oklch(0.965 0.012 82);
+  --focus: oklch(0.42 0.07 78);
   --success: oklch(0.4 0.1 150);
   --success-soft: oklch(0.95 0.025 150);
   --warning: oklch(0.48 0.12 78);
@@ -24,14 +24,7 @@
   background: var(--canvas);
   color: var(--text-primary);
   color-scheme: light;
-  font-family:
-    ui-sans-serif,
-    -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    "Noto Sans JP",
-    "Hiragino Sans",
-    sans-serif;
+  font-family: var(--font-operator), "Yu Gothic UI", "Hiragino Sans", sans-serif;
 }
 
 html,

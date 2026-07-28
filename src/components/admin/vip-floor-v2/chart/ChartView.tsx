@@ -79,8 +79,8 @@ export default function ChartView({ board, reservations, selectedReservationId, 
     <section className={styles.timelineView} aria-labelledby="chart-view-title">
       <div className={styles.viewHeading}>
         <div>
-          <h2 id="chart-view-title">Chart</h2>
-          <p>15分単位の滞在、入替、ブロック、競合を空間で確認します。</p>
+          <h2 id="chart-view-title">席の時間軸</h2>
+          <p>滞在、入替、ブロックを時刻順で確認します。</p>
         </div>
         <div className={styles.zoomControl} role="group" aria-label="時間軸ズーム">
           <button type="button" onClick={() => onZoom(zoom === 60 ? 30 : 15)} aria-label="時間軸を拡大"><Plus size={15} /></button>

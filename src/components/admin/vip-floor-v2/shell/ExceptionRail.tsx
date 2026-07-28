@@ -22,7 +22,7 @@ export function ExceptionRail({ groups, reservations, selectedId, collapsed, que
   return (
     <aside className={styles.exceptionRail} data-collapsed={collapsed || undefined} aria-label="例外と到着queue">
       <div className={styles.railHeader}>
-        <div><strong>EXCEPTION QUEUE</strong><span>{reservations.length} RESERVATIONS</span></div>
+        <div><strong>要対応・来店予定</strong><span>本日の予約 {reservations.length}件</span></div>
         <button type="button" onClick={() => onCollapse(!collapsed)} aria-label={collapsed ? "例外queueを開く" : "例外queueを閉じる"}>
           {collapsed ? <ChevronRight size={17} /> : <ChevronLeft size={17} />}
         </button>
@@ -34,7 +34,7 @@ export function ExceptionRail({ groups, reservations, selectedId, collapsed, que
           <label className={styles.searchField}>
             <span className="sr-only">予約を検索</span>
             <Search size={15} aria-hidden />
-            <input value={query} onChange={(event) => onQuery(event.target.value)} placeholder="番号 / ゲスト / 席" />
+            <input value={query} onChange={(event) => onQuery(event.target.value)} placeholder="予約番号・ゲスト・席" />
           </label>
           <div className={styles.queueScroll}>
             {groups.map((group) => (

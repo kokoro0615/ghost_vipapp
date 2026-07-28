@@ -19,11 +19,11 @@ export default function ReservationListView({ reservations, selectedReservationI
     <section className={styles.listView} aria-labelledby="list-view-title" data-density={density}>
       <div className={styles.viewHeading}>
         <div>
-          <h2 id="list-view-title">予約台帳</h2>
-          <p>{reservations.length}件を時刻順で表示。固定列から例外へ素早く移動できます。</p>
+          <h2 id="list-view-title">本日の予約</h2>
+          <p>{reservations.length}件 / 来店時刻順</p>
         </div>
         <button type="button" className={styles.secondaryButton} onClick={() => onDensity(density === "compact" ? "comfortable" : "compact")}>
-          <ArrowDownAZ size={16} aria-hidden /> {density === "compact" ? "行を広げる" : "行を詰める"}
+          <ArrowDownAZ size={16} aria-hidden /> {density === "compact" ? "ゆったり表示" : "コンパクト表示"}
         </button>
       </div>
       <div className={styles.listScroller} tabIndex={0}>

@@ -57,8 +57,8 @@ export default function FloorView({
     <section className={styles.floorView} aria-labelledby="floor-view-title">
       <div className={styles.viewHeading}>
         <div>
-          <h2 id="floor-view-title">フロア図</h2>
-          <p>座席を選択すると、キュー・Chart・一覧・インスペクタが同一予約へ同期します。</p>
+          <h2 id="floor-view-title">VIPフロア</h2>
+          <p>席を選ぶと予約詳細と操作を表示します。</p>
         </div>
         <button type="button" className={styles.secondaryButton} onClick={onOpenAssignment} disabled={!selectedReservationId}>
           <MoveRight aria-hidden size={16} /> 席割当先を選択
@@ -118,7 +118,7 @@ export default function FloorView({
               );
             })}
             {(taskMode === "blocks" ? board.blocks.length === 0 : railReservations.length === 0) ? (
-              <p>この条件の合成タスクはありません。</p>
+              <p>この条件に一致する項目はありません。</p>
             ) : null}
           </div>
         </aside>

@@ -1,9 +1,18 @@
 import type { Metadata, Viewport } from "next";
+import { BIZ_UDPGothic } from "next/font/google";
 import type { ReactNode } from "react";
 
 import { isGhostVipMaintenanceMode } from "@/lib/server/maintenanceMode";
 
 import "./globals.css";
+
+const operatorFont = BIZ_UDPGothic({
+  weight: ["400", "700"],
+  display: "swap",
+  variable: "--font-operator",
+  preload: false,
+  fallback: ["Yu Gothic UI", "Hiragino Sans", "sans-serif"],
+});
 
 export function generateMetadata(): Metadata {
   const maintenanceMode = isGhostVipMaintenanceMode();
@@ -31,7 +40,7 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
     <html lang="ja">
-      <body>{children}</body>
+      <body className={operatorFont.variable}>{children}</body>
     </html>
   );
 }

@@ -89,7 +89,7 @@ export function Inspector({
   return (
     <aside className={styles.inspector} aria-label="予約インスペクター" data-instance={instance}>
       <div className={styles.inspectorHeader}>
-        <div><span>インスペクター</span><strong>{reservation?.publicCode ?? table?.displayCode ?? "選択なし"}</strong></div>
+        <div><span>予約詳細</span><strong>{reservation?.publicCode ?? table?.displayCode ?? "予約を選択"}</strong></div>
         {onCollapse ? <button type="button" onClick={() => onCollapse(true)} aria-label="インスペクターを閉じる"><ChevronRight size={17} /></button> : null}
       </div>
 
@@ -165,7 +165,7 @@ export function Inspector({
       ) : table ? (
         <div className={styles.noSelection}><MapPin size={24} /><h2>{table.displayCode}</h2><p>{table.name} / {table.capacityMin}-{table.capacityMax}名</p><p>{table.operationalLocked ? table.lockReason : "空席。予約を選択すると、この卓へ割り当てできます。"}</p></div>
       ) : (
-        <div className={styles.noSelection}><MapPin size={24} /><h2>席または予約を選択</h2><p>フロアノード、Chartバー、一覧行、キュー項目のいずれからでも同じインスペクターを開けます。</p></div>
+        <div className={styles.noSelection}><MapPin size={24} /><h2>予約を選択してください</h2><p>一覧、要対応、フロアのいずれからでも詳細と操作を開けます。</p></div>
       )}
     </aside>
   );
