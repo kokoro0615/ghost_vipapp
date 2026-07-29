@@ -27,6 +27,10 @@ function parseBasicAuthorization(value: string | null) {
 }
 
 export function proxy(request: NextRequest) {
+  // TEMP-UI-PREVIEW-BYPASS
+  if (process.env.NODE_ENV !== "production" && request.nextUrl.pathname.startsWith("/zz-ui-preview")) {
+    return NextResponse.next();
+  }
   const expectedUsername = process.env.VIPAPP_BASIC_USER;
   const expectedPassword = process.env.VIPAPP_BASIC_PASSWORD;
   const credentials = parseBasicAuthorization(request.headers.get("authorization"));
