@@ -238,6 +238,9 @@ export default function VipFloorWorkspace() {
   function selectReservation(id: string) {
     dispatch({ type: "selectReservation", reservationId: id });
     dispatch({ type: "inspectorCollapsed", collapsed: false });
+    if (window.matchMedia("(max-width: 767px)").matches) {
+      dispatch({ type: "mobileInspector", open: true });
+    }
   }
 
   function openCommand(kind: CommandKind) {
@@ -391,10 +394,6 @@ export default function VipFloorWorkspace() {
           <span>営業枠</span>
           <strong>22:00–05:00</strong>
         </div>
-        <div className={styles.operatorIdentity}>
-          <span>{auth.session.displayName ?? "Owner"} / {isDemo ? "デモ" : isOwner ? "Owner" : "閲覧のみ"}</span>
-          <button type="button" onClick={() => void logout()}><LogOut size={14} />ログアウト</button>
-        </div>
         <div className={styles.syncStatus} data-state={state.globalState}>
           {offline ? <WifiOff size={14} /> : <RefreshCw size={14} />}
           <span>{state.globalState === "healthy"
@@ -415,6 +414,10 @@ export default function VipFloorWorkspace() {
               timeZone: "Asia/Tokyo",
             }).format(new Date(state.board.generatedAt))}
           </strong>
+        </div>
+        <div className={styles.operatorIdentity}>
+          <span>{auth.session.displayName ?? "Owner"} / {isDemo ? "デモ" : isOwner ? "Owner" : "閲覧のみ"}</span>
+          <button type="button" onClick={() => void logout()}><LogOut size={14} />ログアウト</button>
         </div>
       </header>
 
@@ -458,6 +461,15 @@ export default function VipFloorWorkspace() {
             <span>未割当</span>
             <strong>{state.board.totals.unassignedReservationCount}</strong>
           </div>
+          <button
+            type="button"
+            className={styles.summaryRefresh}
+            onClick={() => void loadBoard()}
+            disabled={state.pending}
+          >
+            <RefreshCw size={16} aria-hidden />
+            更新
+          </button>
         </section>
 
         <div className={styles.workspaceToolbar} role="toolbar" aria-label="表示と絞り込み">
@@ -566,8 +578,8 @@ export default function VipFloorWorkspace() {
               selectedTableId={state.selectedTableId}
               onSelectTable={(tableId, reservationId) => {
                 dispatch({ type: "selectTable", tableId, reservationId });
-                if (window.matchMedia("(max-width: 767px)").matches) {
-                  dispatch({ type: "mobileInspector", open: true });
+                if (reservationId && window.matchMedia("(max-width: 767px)").matches) {
+                  selectReservation(reservationId);
                 }
               }}
               onSelectReservation={selectReservation}

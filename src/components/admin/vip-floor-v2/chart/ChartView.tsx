@@ -1,7 +1,7 @@
 "use client";
 
 import { type CSSProperties, useState } from "react";
-import { Clock3, Minus, Plus, TriangleAlert } from "lucide-react";
+import { Clock3, Minus, Plus } from "lucide-react";
 
 import type { VipFloorBoardV2 } from "@/lib/vipFloorV2Contract";
 
@@ -56,6 +56,13 @@ export default function ChartView({ board, reservations, selectedReservationId, 
     board.businessDay.operatingEndAt,
   );
   const unassigned = reservations.filter((item) => item.tableIds.length === 0);
+  const delayed = reservations.filter((item) => item.serviceStatus === "late");
+  const conflicts = reservations.filter((item, index) => reservations.some((other, otherIndex) =>
+    otherIndex > index
+    && item.tableIds.some((tableId) => other.tableIds.includes(tableId))
+    && new Date(item.startAt).getTime() < new Date(other.endAt).getTime()
+    && new Date(other.startAt).getTime() < new Date(item.endAt).getTime(),
+  ));
   const mobileWindow = (() => {
     const start = new Date(operatingStart.getTime() + mobileWindowStart * 60_000);
     const end = new Date(Math.min(
@@ -170,7 +177,12 @@ export default function ChartView({ board, reservations, selectedReservationId, 
                   {board.blocks.filter((block) => block.targets.tableIds.includes(table.id)).map((block) => (
                   <span key={block.id} className={styles.timelineBlock} style={positionStyle(block.startAt, block.endAt, board.businessDay.operatingStartAt, board.businessDay.operatingEndAt)}>ブロック</span>
                   ))}
-                  <span className={styles.nowLine} style={nowStyle} aria-hidden="true" />
+                  <span
+                    className={styles.nowLine}
+                    style={nowStyle}
+                    data-label={`現在 ${timeFormatter.format(renderedAt)}`}
+                    aria-hidden="true"
+                  />
                 </div>
               </div>
             );
@@ -178,10 +190,20 @@ export default function ChartView({ board, reservations, selectedReservationId, 
         </div>
       </div>
 
-      <div className={styles.unassignedTray}>
-        <span><TriangleAlert size={15} aria-hidden /> 未割当 {unassigned.length}</span>
-        <div>{unassigned.map((item) => <button type="button" key={item.id} onClick={() => onSelect(item.id)}>{item.startLabel} {item.publicCode}</button>)}</div>
-      </div>
+      <section className={styles.chartExceptions} aria-label="時間軸の要対応">
+        <div>
+          <header><strong>未割当</strong><span>{unassigned.length}</span></header>
+          {unassigned.map((item) => <button type="button" key={item.id} onClick={() => onSelect(item.id)}>{item.startLabel} {item.publicCode}<small>席を割当</small></button>)}
+        </div>
+        <div>
+          <header><strong>処理競合</strong><span>{conflicts.length}</span></header>
+          {conflicts.map((item) => <button type="button" key={item.id} onClick={() => onSelect(item.id)}>{item.startLabel} {item.publicCode}<small>競合</small></button>)}
+        </div>
+        <div>
+          <header><strong>到着遅延</strong><span>{delayed.length}</span></header>
+          {delayed.map((item) => <button type="button" key={item.id} onClick={() => onSelect(item.id)}>{item.startLabel} {item.publicCode}<small>遅延</small></button>)}
+        </div>
+      </section>
     </section>
   );
 }

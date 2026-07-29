@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarClock, ChevronLeft, ChevronRight, ClipboardList, MapPin, NotebookPen, Pencil, ShieldCheck, UserRound, UsersRound } from "lucide-react";
+import { Armchair, BellRing, CalendarClock, ChevronLeft, ChevronRight, ClipboardList, Clock3, MapPin, NotebookPen, Pencil, ShieldCheck, TimerReset, UserRound, UsersRound } from "lucide-react";
 
 import type { VipFloorBoardV2 } from "@/lib/vipFloorV2Contract";
 
@@ -18,13 +18,13 @@ export const INSPECTOR_TABS = [
 ] as const;
 export type InspectorTab = (typeof INSPECTOR_TABS)[number]["key"];
 
-const commandButtons: Array<{ kind: CommandKind; label: string }> = [
-  { kind: "check_in", label: "チェックイン" },
-  { kind: "arrival_time", label: "到着時刻" },
-  { kind: "service_status", label: "接客状態" },
-  { kind: "assignment", label: "席割当" },
-  { kind: "seat_extension", label: "利用延長" },
-  { kind: "note", label: "メモ" },
+const commandButtons: Array<{ kind: CommandKind; label: string; icon: typeof Clock3 }> = [
+  { kind: "check_in", label: "チェックイン", icon: ShieldCheck },
+  { kind: "arrival_time", label: "到着時刻", icon: Clock3 },
+  { kind: "service_status", label: "接客状態", icon: BellRing },
+  { kind: "assignment", label: "席割当", icon: Armchair },
+  { kind: "seat_extension", label: "利用延長", icon: TimerReset },
+  { kind: "note", label: "メモ", icon: NotebookPen },
 ];
 
 type Props = {
@@ -147,6 +147,7 @@ export function Inspector({
               <Pencil size={14} />予約編集
             </button>
             {commandButtons.map((command) => {
+              const CommandIcon = command.icon;
               const unavailableForState =
                 (command.kind === "check_in" && reservation.lifecycleStatus === "checked_in")
                 || (command.kind === "seat_extension" && reservation.lifecycleStatus !== "checked_in")
@@ -157,7 +158,7 @@ export function Inspector({
                 onClick={() => onCommand(command.kind)}
                 disabled={readOnly || unavailableForState || !canCommand(command.kind)}
               >
-                {command.label}
+                <CommandIcon size={14} aria-hidden />{command.label}
               </button>;
             })}
           </div>

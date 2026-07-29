@@ -168,7 +168,7 @@ export function OperationCenter({
     >
       <div
         ref={panelRef}
-        className={styles.commandDialog}
+        className={`${styles.commandDialog} ${styles.operationDialog}`}
         role="dialog"
         aria-modal="true"
         aria-labelledby="operation-title"

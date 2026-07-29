@@ -52,6 +52,11 @@ export default function FloorView({
       ].join(" ").toLocaleLowerCase("ja-JP").includes(normalized);
     });
   }, [query, reservations, taskMode]);
+  const selectedReservation = reservations.find((item) => item.id === selectedReservationId) ?? null;
+  const finishedCount = reservations.filter(
+    (item) => item.serviceStatus === "completed" || item.lifecycleStatus === "cancelled",
+  ).length;
+  const unassignedCount = reservations.filter((item) => item.tableIds.length === 0).length;
 
   return (
     <section className={styles.floorView} aria-labelledby="floor-view-title">
@@ -67,11 +72,11 @@ export default function FloorView({
 
       <div className={styles.floorTaskTabs} role="tablist" aria-label="Floorタスク">
         {([
-          ["reservations", "予約"],
-          ["waitlist", "未割当"],
-          ["finished", "完了"],
-          ["blocks", "ブロック"],
-        ] as const).map(([key, label]) => (
+          ["reservations", "予約", reservations.length - finishedCount],
+          ["waitlist", "未割当", unassignedCount],
+          ["finished", "完了", finishedCount],
+          ["blocks", "ブロック", board.blocks.length],
+        ] as const).map(([key, label, count]) => (
           <button
             key={key}
             type="button"
@@ -80,10 +85,25 @@ export default function FloorView({
             data-active={taskMode === key || undefined}
             onClick={() => setTaskMode(key)}
           >
-            {label}
+            {label} <span>{count}</span>
           </button>
         ))}
       </div>
+
+      {selectedReservation ? (
+        <section className={styles.floorMobileFocus} aria-label="席割当対象">
+          <div>
+            <strong>{selectedReservation.publicCode}</strong>
+            <span>{selectedReservation.guestLabel}</span>
+            <small>{selectedReservation.startLabel}–{selectedReservation.endLabel} · {selectedReservation.guestCount}名</small>
+          </div>
+          <dl>
+            <div><dt>現在席</dt><dd>{selectedReservation.tableCodes.join(" + ") || "未割当"}</dd></div>
+            <span aria-hidden>→</span>
+            <div><dt>移動先</dt><dd>{board.tables.find((table) => table.id === selectedTableId)?.displayCode ?? "未選択"}</dd></div>
+          </dl>
+        </section>
+      ) : null}
 
       <div className={styles.floorWorkArea}>
         <aside className={styles.floorTaskRail} aria-label="Floor予約タスク">
@@ -192,7 +212,9 @@ export default function FloorView({
         ))}
       </div>
       <div className={styles.floorContextAction}>
-        <span>{selectedTableId ? `${selectedTableId} を選択中` : "VIP席を選択してください"}</span>
+        <span>{selectedTableId
+          ? `${board.tables.find((table) => table.id === selectedTableId)?.displayCode ?? "VIP席"} を選択中`
+          : "VIP席を選択してください"}</span>
         <button type="button" className={styles.primaryButton} onClick={onOpenAssignment} disabled={!selectedReservationId}>
           <MoveRight aria-hidden size={16} />割当を確認
         </button>

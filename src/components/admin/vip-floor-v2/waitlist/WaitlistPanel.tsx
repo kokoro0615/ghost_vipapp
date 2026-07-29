@@ -122,10 +122,10 @@ export function WaitlistPanel({
   }
 
   return (
-    <div className={styles.dialogBackdrop} role="presentation">
+    <div className={`${styles.dialogBackdrop} ${styles.operationsBackdrop}`} role="presentation">
       <div
         ref={panelRef}
-        className={styles.commandDialog}
+        className={`${styles.commandDialog} ${styles.operationsDialog}`}
         role="dialog"
         aria-modal="true"
         aria-labelledby="waitlist-title"

@@ -1,7 +1,8 @@
 "use client";
 
+import Image from "next/image";
 import { useMemo, useState } from "react";
-import { ArrowLeft, ArrowRight, Check, Mail, ShieldCheck } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, CheckCircle2, Clock3, Mail, MapPin, ShieldCheck, UsersRound } from "lucide-react";
 
 import type { VipFloorBoardV2, VipServiceStatus } from "@/lib/vipFloorV2Contract";
 
@@ -156,6 +157,28 @@ export function ReservationWizard({
         ))}
       </ol>
       <div className={styles.wizardBody}>
+        <aside className={styles.wizardContext} aria-label="予約コンテキスト">
+          <header>
+            <span>DATE / TABLE</span>
+            <strong>日時・席</strong>
+          </header>
+          <dl>
+            <div><dt><Clock3 size={14} />営業日</dt><dd>{board.businessDay.businessDate}</dd></div>
+            <div><dt>時間</dt><dd>{draft.startAt.slice(11)}–{draft.endAt.slice(11)}</dd></div>
+            <div><dt><UsersRound size={14} />人数</dt><dd>{draft.guestCount}名</dd></div>
+            <div><dt><MapPin size={14} />卓</dt><dd>{selectedTables.map((table) => table.displayCode).join(" + ") || "未選択"}</dd></div>
+          </dl>
+          <div className={styles.wizardMap}>
+            <Image
+              src="/media/images/vipmapv3.9239fd2174.webp"
+              alt="選択中のVIP席を確認するGHOST Osakaフロア図"
+              fill
+              sizes="300px"
+            />
+          </div>
+          <p>正式卓はVIP-1〜VIP-8のみ。保存時に版と席競合を再検証します。</p>
+        </aside>
+        <div className={styles.wizardActive}>
         {step === 0 ? (
           <div className={styles.wizardStatement}>
             <span>BUSINESS DATE</span>
@@ -291,6 +314,39 @@ export function ReservationWizard({
             {draft.notificationPreference === "email" && !reservation && !draft.email ? <p className={styles.wizardWarning}>Eメール送信には顧客Eメールが必要です。</p> : null}
           </div>
         ) : null}
+        </div>
+        <aside className={styles.wizardChecks} aria-label="保存前チェック">
+          <header>
+            <span>PRE-SAVE CHECK</span>
+            <strong>保存前チェック</strong>
+          </header>
+          <ul>
+            <li data-ok={Boolean(draft.startAt && draft.endAt && draft.startAt < draft.endAt) || undefined}>
+              <CheckCircle2 size={15} />日時
+              <strong>{draft.startAt && draft.endAt && draft.startAt < draft.endAt ? "OK" : "要確認"}</strong>
+            </li>
+            <li data-ok={draft.guestCount > 0 || undefined}>
+              <CheckCircle2 size={15} />人数
+              <strong>{draft.guestCount > 0 ? "OK" : "要確認"}</strong>
+            </li>
+            <li data-ok={draft.tableIds.length > 0 || undefined}>
+              <CheckCircle2 size={15} />席選択
+              <strong>{draft.tableIds.length > 0 ? "OK" : "未選択"}</strong>
+            </li>
+            <li data-ok={syntheticMode || undefined}>
+              <CheckCircle2 size={15} />データ境界
+              <strong>{syntheticMode ? "合成のみ" : "Owner"}</strong>
+            </li>
+          </ul>
+          <section>
+            <span>版情報</span>
+            <strong>{reservation ? `v${reservation.version}を更新` : "新規"}</strong>
+          </section>
+          <section>
+            <span>監査プレビュー</span>
+            <p>{reservation ? "予約変更を監査へ記録" : "新規予約作成を監査へ記録"}</p>
+          </section>
+        </aside>
       </div>
       <footer className={styles.wizardFooter}>
         <button type="button" className={styles.secondaryButton} disabled={step === 0 || pending} onClick={() => setStep((current) => current - 1)}>
