@@ -319,12 +319,6 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
   }, [auth.status, authMode, demoConfig]);
 
   useEffect(() => {
-    const paneLayout = window.matchMedia("(min-width: 768px)");
-    if (window.matchMedia("(max-width: 1279px)").matches && paneLayout.matches) {
-      dispatch({ type: "queueCollapsed", collapsed: true });
-      dispatch({ type: "inspectorCollapsed", collapsed: true });
-    }
-
     const markOffline = () => {
       setOffline(true);
       if (demoTransportRef.current) setDemoLeaseState("read_only");

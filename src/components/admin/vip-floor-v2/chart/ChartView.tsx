@@ -31,24 +31,18 @@ function positionStyle(startAt: string, endAt: string, operatingStartAt: string,
 
 export default function ChartView({ board, reservations, selectedReservationId, zoom, onZoom, onSelect }: ChartProps) {
   const [renderedAt] = useState(() => Date.now());
-  const selectedReservation = reservations.find((item) => item.id === selectedReservationId);
-  const [mobileTableId, setMobileTableId] = useState(
-    selectedReservation?.tableIds[0] ?? board.tables[0]?.id ?? "",
-  );
-  const [mobileWindowStart, setMobileWindowStart] = useState(0);
   const operatingStart = new Date(board.businessDay.operatingStartAt);
   const operatingEnd = new Date(board.businessDay.operatingEndAt);
   const totalMinutes = Math.max(60, (operatingEnd.getTime() - operatingStart.getTime()) / 60_000);
   const tickCount = Math.floor(totalMinutes / 30) + 1;
-  const ticks = Array.from({ length: tickCount }, (_, index) => {
-    const value = new Date(operatingStart.getTime() + index * 30 * 60_000);
-    return new Intl.DateTimeFormat("ja-JP", {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-      timeZone: "Asia/Tokyo",
-    }).format(value);
+  const timeFormatter = new Intl.DateTimeFormat("ja-JP", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: "Asia/Tokyo",
   });
+  const ticks = Array.from({ length: tickCount }, (_, index) =>
+    timeFormatter.format(new Date(operatingStart.getTime() + index * 30 * 60_000)));
   const nowStyle = positionStyle(
     new Date(renderedAt).toISOString(),
     new Date(renderedAt + 60_000).toISOString(),
@@ -63,32 +57,14 @@ export default function ChartView({ board, reservations, selectedReservationId, 
     && new Date(item.startAt).getTime() < new Date(other.endAt).getTime()
     && new Date(other.startAt).getTime() < new Date(item.endAt).getTime(),
   ));
-  const mobileWindow = (() => {
-    const start = new Date(operatingStart.getTime() + mobileWindowStart * 60_000);
-    const end = new Date(Math.min(
-      operatingEnd.getTime(),
-      start.getTime() + 120 * 60_000,
-    ));
-    const items = reservations.filter((item) =>
-      item.tableIds.includes(mobileTableId)
-      && new Date(item.endAt).getTime() > start.getTime()
-      && new Date(item.startAt).getTime() < end.getTime());
-    return { start, end, items };
-  })();
-  const timeFormatter = new Intl.DateTimeFormat("ja-JP", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-    timeZone: "Asia/Tokyo",
-  });
 
   return (
     <section className={styles.timelineView} aria-labelledby="chart-view-title">
-      <div className={styles.viewHeading}>
-        <div>
-          <h2 id="chart-view-title">席の時間軸</h2>
-          <p>滞在、入替、ブロックを時刻順で確認します。</p>
-        </div>
+      <div className={styles.viewStrip}>
+        <h2 id="chart-view-title">席の時間軸</h2>
+        <span className="tabular-nums">{board.tables.length}席 / {reservations.length}件</span>
+        {conflicts.length > 0 ? <span className={styles.exceptionText}>競合 {conflicts.length}</span> : null}
+        <span className={styles.stripSpacer} />
         <div className={styles.zoomControl} role="group" aria-label="時間軸ズーム">
           <button type="button" onClick={() => onZoom(zoom === 60 ? 30 : 15)} aria-label="時間軸を拡大"><Plus size={15} /></button>
           <span className="tabular-nums">{zoom}m</span>
@@ -96,53 +72,12 @@ export default function ChartView({ board, reservations, selectedReservationId, 
         </div>
       </div>
 
-      <section className={styles.chartMobileFocus} aria-label="モバイルChartフォーカス">
-        <div>
-          <label>
-            <span>VIP席</span>
-            <select value={mobileTableId} onChange={(event) => setMobileTableId(event.target.value)}>
-              {board.tables.map((table) => <option key={table.id} value={table.id}>{table.displayCode}</option>)}
-            </select>
-          </label>
-          <label>
-            <span>時間帯</span>
-            <select value={mobileWindowStart} onChange={(event) => setMobileWindowStart(Number(event.target.value))}>
-              {Array.from({ length: Math.max(1, Math.ceil(totalMinutes / 120)) }, (_, index) => {
-                const minute = index * 120;
-                const at = new Date(operatingStart.getTime() + minute * 60_000);
-                return <option key={minute} value={minute}>{timeFormatter.format(at)}から</option>;
-              })}
-            </select>
-          </label>
-        </div>
-        <header>
-          <strong>{board.tables.find((table) => table.id === mobileTableId)?.displayCode ?? "VIP席"}</strong>
-          <span>{timeFormatter.format(mobileWindow.start)}–{timeFormatter.format(mobileWindow.end)}</span>
-        </header>
-        <div className={styles.chartMobileItems}>
-          {mobileWindow.items.map((reservation) => {
-            const meta = getStatusMeta(reservation.serviceStatus);
-            const Icon = meta.icon;
-            return (
-              <button
-                key={reservation.id}
-                type="button"
-                data-selected={reservation.id === selectedReservationId || undefined}
-                onClick={() => onSelect(reservation.id)}
-              >
-                <Icon size={15} aria-hidden />
-                <span><strong>{reservation.startLabel}–{reservation.endLabel}</strong><small>{reservation.publicCode} · {reservation.guestLabel}</small></span>
-              </button>
-            );
-          })}
-          {mobileWindow.items.length === 0 ? <p>このVIP席・時間帯に予約はありません。</p> : null}
-        </div>
-      </section>
-
       <div className={styles.timelineScroller} tabIndex={0} aria-label="VIP席の時間軸。左右にスクロールできます。" data-zoom={zoom}>
         <div className={styles.timelineGrid}>
-          <div className={styles.timelineCorner}><Clock3 size={14} aria-hidden /> 席 / 時刻</div>
-          <div className={styles.timelineTicks} style={{ gridTemplateColumns: `repeat(${tickCount}, 1fr)` }}>{ticks.map((tick) => <span key={tick}>{tick}</span>)}</div>
+          <div className={styles.timelineCorner}><Clock3 size={13} aria-hidden /> 席 / 時刻</div>
+          <div className={styles.timelineTicks} style={{ gridTemplateColumns: `repeat(${tickCount}, 1fr)` }}>
+            {ticks.map((tick) => <span key={tick}>{tick}</span>)}
+          </div>
           {board.tables.map((table) => {
             const items = reservations.filter((reservation) => reservation.tableIds.includes(table.id));
             return (
@@ -155,7 +90,6 @@ export default function ChartView({ board, reservations, selectedReservationId, 
                 <div className={styles.timelineTrack}>
                   {items.map((reservation) => {
                     const meta = getStatusMeta(reservation.serviceStatus);
-                    const Icon = meta.icon;
                     return (
                       <button
                         key={reservation.id}
@@ -168,14 +102,19 @@ export default function ChartView({ board, reservations, selectedReservationId, 
                         onClick={() => onSelect(reservation.id)}
                         aria-label={`${reservation.publicCode}、${reservation.guestLabel}、${reservation.startLabel}から${reservation.endLabel}、${meta.label}`}
                       >
-                        <Icon size={12} aria-hidden />
-                        <span>{reservation.publicCode}</span>
-                        <small>{reservation.startLabel}</small>
+                        <span>{reservation.startLabel}</span>
+                        <small>{reservation.publicCode}</small>
                       </button>
                     );
                   })}
                   {board.blocks.filter((block) => block.targets.tableIds.includes(table.id)).map((block) => (
-                  <span key={block.id} className={styles.timelineBlock} style={positionStyle(block.startAt, block.endAt, board.businessDay.operatingStartAt, board.businessDay.operatingEndAt)}>ブロック</span>
+                    <span
+                      key={block.id}
+                      className={styles.timelineBlock}
+                      style={positionStyle(block.startAt, block.endAt, board.businessDay.operatingStartAt, board.businessDay.operatingEndAt)}
+                    >
+                      ブロック
+                    </span>
                   ))}
                   <span
                     className={styles.nowLine}
@@ -191,18 +130,23 @@ export default function ChartView({ board, reservations, selectedReservationId, 
       </div>
 
       <section className={styles.chartExceptions} aria-label="時間軸の要対応">
-        <div>
-          <header><strong>未割当</strong><span>{unassigned.length}</span></header>
-          {unassigned.map((item) => <button type="button" key={item.id} onClick={() => onSelect(item.id)}>{item.startLabel} {item.publicCode}<small>席を割当</small></button>)}
-        </div>
-        <div>
-          <header><strong>処理競合</strong><span>{conflicts.length}</span></header>
-          {conflicts.map((item) => <button type="button" key={item.id} onClick={() => onSelect(item.id)}>{item.startLabel} {item.publicCode}<small>競合</small></button>)}
-        </div>
-        <div>
-          <header><strong>到着遅延</strong><span>{delayed.length}</span></header>
-          {delayed.map((item) => <button type="button" key={item.id} onClick={() => onSelect(item.id)}>{item.startLabel} {item.publicCode}<small>遅延</small></button>)}
-        </div>
+        {([
+          ["未割当", unassigned, "席を割当"],
+          ["処理競合", conflicts, "競合"],
+          ["到着遅延", delayed, "遅延"],
+        ] as const).map(([label, items, cue]) => (
+          <div key={label}>
+            <header><strong>{label}</strong><span className="tabular-nums">{items.length}</span></header>
+            <div role="group" aria-label={`${label} ${items.length}件`} tabIndex={0}>
+              {items.map((item) => (
+                <button type="button" key={item.id} onClick={() => onSelect(item.id)}>
+                  {item.startLabel} {item.publicCode}<small>{cue}</small>
+                </button>
+              ))}
+              {items.length === 0 ? <p>対象なし</p> : null}
+            </div>
+          </div>
+        ))}
       </section>
     </section>
   );

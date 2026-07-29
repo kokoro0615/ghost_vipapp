@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { usePathname, useSearchParams } from "next/navigation";
-import { type FormEvent, type KeyboardEvent, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { type FormEvent, type KeyboardEvent, type ReactNode, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   Activity,
@@ -52,8 +52,27 @@ const ReservationListView = dynamic(() => import("./list/ReservationListView"), 
 });
 
 const ROUTE_VIEWS = new Set(["floor", "list", "chart"]);
-const STATUS_FILTERS = new Set(["all", "attention", "expected", "late", "arrived", "seated", "bill_requested"]);
+const STATUS_FILTERS = new Set([
+  "all",
+  "attention",
+  "unassigned",
+  "expected",
+  "late",
+  "arrived",
+  "seated",
+  "bill_requested",
+]);
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/u;
+
+const SYNC_LABEL: Record<string, string> = {
+  healthy: "同期済み",
+  loading: "読込中",
+  stale: "オフライン",
+  reconnecting: "再接続中",
+  error: "読込失敗",
+  read_only: "閲覧のみ",
+  empty: "予約なし",
+};
 
 function parseWorkspaceView(value: string | null): WorkspaceView {
   if (!value || !ROUTE_VIEWS.has(value)) return "list";
@@ -118,6 +137,7 @@ export default function VipFloorWorkspace() {
     setBusinessDate,
   } = useVipFloorWorkspace(initialBusinessDate);
   const [pin, setPin] = useState("");
+  const [loginFailed, setLoginFailed] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [operationOpen, setOperationOpen] = useState(false);
   const [editingReservationId, setEditingReservationId] = useState<string | null>(null);
@@ -140,7 +160,8 @@ export default function VipFloorWorkspace() {
   const reservations = useMemo(() => allReservations.filter((item) => {
     const statusMatch = state.statusFilter === "all"
       || item.serviceStatus === state.statusFilter
-      || (state.statusFilter === "attention" && Boolean(item.exceptionLabel));
+      || (state.statusFilter === "attention" && Boolean(item.exceptionLabel))
+      || (state.statusFilter === "unassigned" && item.tableIds.length === 0);
     return statusMatch && matchesReservation(item, deferredQuery);
   }), [allReservations, deferredQuery, state.statusFilter]);
   const queueGroups = useMemo(() => buildQueueGroups(reservations), [reservations]);
@@ -231,6 +252,12 @@ export default function VipFloorWorkspace() {
     updateRoute({ view: view === "timeline" ? "chart" : view });
   }
 
+  function applyStatusFilter(status: string) {
+    const next = state.statusFilter === status ? "all" : status;
+    dispatch({ type: "statusFilter", status: next });
+    updateRoute({ filter: next === "all" ? null : next });
+  }
+
   function changeInspectorTab(tab: InspectorTab) {
     updateRoute({ detail: tab === "overview" ? null : tab });
   }
@@ -238,7 +265,7 @@ export default function VipFloorWorkspace() {
   function selectReservation(id: string) {
     dispatch({ type: "selectReservation", reservationId: id });
     dispatch({ type: "inspectorCollapsed", collapsed: false });
-    if (window.matchMedia("(max-width: 767px)").matches) {
+    if (window.matchMedia("(max-width: 1023px)").matches) {
       dispatch({ type: "mobileInspector", open: true });
     }
   }
@@ -286,9 +313,20 @@ export default function VipFloorWorkspace() {
     await refreshStaff();
   }
 
+  function openQueue() {
+    setMenuOpen(false);
+    if (window.matchMedia("(max-width: 1023px)").matches) {
+      dispatch({ type: "mobileInspector", open: false });
+      setQueueOpen(true);
+    } else {
+      applyStatusFilter("attention");
+    }
+  }
+
   async function submitPin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const success = await login(pin);
+    setLoginFailed(!success);
     if (success) setPin("");
   }
 
@@ -312,16 +350,19 @@ export default function VipFloorWorkspace() {
       }}>
         <main className={styles.loginShell}>
           <form className={styles.loginPanel} onSubmit={submitPin}>
+            <span className={styles.loginMark} aria-hidden>G</span>
             <div className={styles.loginBrand}>
-              <strong>GHOST OSAKA</strong>
-              <span>VIP MANAGER</span>
+              <span>GHOST OSAKA</span>
+              <strong>VIP MANAGER</strong>
             </div>
-            <h1>{demo.config ? "VIP予約デモに入る" : "VIP Managerにログイン"}</h1>
+            <h1>{demo.config ? "VIP予約デモに入る" : "今夜のフロアを開く"}</h1>
             <p className={styles.loginLead}>
-              予約、来店、VIP席の状況をひとつの画面で確認できます。
+              予約・来店・VIP席をひとつの台帳で。
             </p>
             <DemoCue />
-            <p className={styles.loginMessage} role="status">{state.message}</p>
+            <p className={styles.loginMessage} role="status" data-tone={loginFailed ? "danger" : undefined}>
+              {state.message}
+            </p>
             <label>
               {demo.config ? "デモ専用PIN" : "Owner専用PIN"}
               <input
@@ -338,7 +379,7 @@ export default function VipFloorWorkspace() {
               {demo.config ? "デモPINと合成データはProduction予約へ送信されません。" : "Owner PINは端末へ保存されません。"}
             </p>
             <button type="submit" disabled={state.pending || pin.length < 4}>
-              <ShieldCheck size={17} />
+              <ShieldCheck size={17} aria-hidden />
               {state.pending || auth.status === "checking" ? "確認中…" : "ログイン"}
             </button>
           </form>
@@ -359,6 +400,28 @@ export default function VipFloorWorkspace() {
     );
   }
 
+  const busy = state.pending || ["loading", "reconnecting"].includes(state.globalState);
+  const showNotice = ["stale", "read_only"].includes(state.globalState) || !isOwner;
+  const pulseItems: Array<{
+    key: string;
+    label: string;
+    value: ReactNode;
+    filter?: string;
+    alert?: boolean;
+    optional?: boolean;
+  }> = [
+    { key: "total", label: "予約", value: state.board.totals.reservationCount },
+    { key: "next", label: "次の来店", value: nextArrival, optional: true },
+    { key: "attention", label: "要対応", value: attentionCount, filter: "attention", alert: attentionCount > 0 },
+    {
+      key: "unassigned",
+      label: "未割当",
+      value: state.board.totals.unassignedReservationCount,
+      filter: "unassigned",
+      alert: state.board.totals.unassignedReservationCount > 0,
+    },
+  ];
+
   return (
     <DemoModeProvider value={{
       enabled: isDemo,
@@ -371,11 +434,11 @@ export default function VipFloorWorkspace() {
       <header className={styles.serviceRibbon}>
         <div className={styles.venueIdentity}>
           <span>GHOST OSAKA</span>
-            <strong>VIP MANAGER</strong>
+          <strong>VIP MANAGER</strong>
         </div>
         <DemoCue compact className={styles.ribbonDemoCue} />
         <label className={styles.ribbonControl}>
-          <CalendarDays size={15} />
+          <CalendarDays size={15} aria-hidden />
           <span>営業日</span>
           <input
             type="date"
@@ -389,24 +452,37 @@ export default function VipFloorWorkspace() {
             }}
           />
         </label>
-        <div className={styles.ribbonControl} aria-label="営業枠">
-          <Radio size={15} />
+        <div className={styles.ribbonControl} data-optional aria-label="営業枠">
+          <Radio size={15} aria-hidden />
           <span>営業枠</span>
           <strong>22:00–05:00</strong>
         </div>
+
+        <div className={styles.pulseCluster} aria-label="本日の稼働状況">
+          {pulseItems.map((item) => (item.filter ? (
+            <button
+              key={item.key}
+              type="button"
+              data-alert={item.alert || undefined}
+              data-active={state.statusFilter === item.filter || undefined}
+              data-optional={item.optional || undefined}
+              aria-pressed={state.statusFilter === item.filter}
+              onClick={() => applyStatusFilter(item.filter as string)}
+            >
+              <span>{item.label}</span>
+              <strong>{item.value}</strong>
+            </button>
+          ) : (
+            <div key={item.key} data-optional={item.optional || undefined}>
+              <span>{item.label}</span>
+              <strong>{item.value}</strong>
+            </div>
+          )))}
+        </div>
+
         <div className={styles.syncStatus} data-state={state.globalState}>
-          {offline ? <WifiOff size={14} /> : <RefreshCw size={14} />}
-          <span>{state.globalState === "healthy"
-            ? "同期済み"
-            : state.globalState === "loading"
-              ? "読込中"
-              : state.globalState === "stale"
-                ? "オフライン"
-                : state.globalState === "error"
-                  ? "読込失敗"
-                  : state.globalState === "read_only"
-                    ? "閲覧のみ"
-                    : "予約なし"}</span>
+          {offline ? <WifiOff size={14} aria-hidden /> : <RefreshCw size={14} aria-hidden />}
+          <span>{SYNC_LABEL[state.globalState] ?? "同期済み"}</span>
           <strong className="tabular-nums">
             {new Intl.DateTimeFormat("ja-JP", {
               hour: "2-digit",
@@ -417,20 +493,9 @@ export default function VipFloorWorkspace() {
         </div>
         <div className={styles.operatorIdentity}>
           <span>{auth.session.displayName ?? "Owner"} / {isDemo ? "デモ" : isOwner ? "Owner" : "閲覧のみ"}</span>
-          <button type="button" onClick={() => void logout()}><LogOut size={14} />ログアウト</button>
+          <button type="button" onClick={() => void logout()}><LogOut size={14} aria-hidden />ログアウト</button>
         </div>
       </header>
-
-      <ExceptionRail
-        groups={queueGroups}
-        reservations={reservations}
-        selectedId={state.selectedReservationId}
-        collapsed={state.queueCollapsed}
-        query={state.query}
-        onQuery={(query) => dispatch({ type: "query", query })}
-        onSelect={selectReservation}
-        onCollapse={(collapsed) => dispatch({ type: "queueCollapsed", collapsed })}
-      />
 
       <section className={styles.mobileQueue} data-open={queueOpen || undefined} aria-label="例外キュー">
         <header>
@@ -443,6 +508,7 @@ export default function VipFloorWorkspace() {
           selectedId={state.selectedReservationId}
           collapsed={false}
           query={state.query}
+          showSearch
           onQuery={(query) => dispatch({ type: "query", query })}
           onSelect={(id) => {
             selectReservation(id);
@@ -454,21 +520,33 @@ export default function VipFloorWorkspace() {
 
       <section className={styles.primaryArea} id="vip-workspace-main">
         <section className={styles.mobileSummary} aria-label="本日のVIP予約サマリー">
-          <div><span>予約</span><strong>{state.board.totals.reservationCount}</strong></div>
-          <div><span>次の来店</span><strong>{nextArrival}</strong></div>
-          <div data-alert={attentionCount > 0 || undefined}><span>要対応</span><strong>{attentionCount}</strong></div>
-          <div data-alert={state.board.totals.unassignedReservationCount > 0 || undefined}>
-            <span>未割当</span>
-            <strong>{state.board.totals.unassignedReservationCount}</strong>
-          </div>
+          {pulseItems.map((item) => (item.filter ? (
+            <button
+              key={item.key}
+              type="button"
+              data-alert={item.alert || undefined}
+              data-active={state.statusFilter === item.filter || undefined}
+              data-optional={item.optional || undefined}
+              aria-pressed={state.statusFilter === item.filter}
+              onClick={() => applyStatusFilter(item.filter as string)}
+            >
+              <span>{item.label}</span>
+              <strong>{item.value}</strong>
+            </button>
+          ) : (
+            <div key={item.key} data-optional={item.optional || undefined}>
+              <span>{item.label}</span>
+              <strong>{item.value}</strong>
+            </div>
+          )))}
           <button
             type="button"
             className={styles.summaryRefresh}
             onClick={() => void loadBoard()}
             disabled={state.pending}
+            aria-label="台帳を再読込"
           >
-            <RefreshCw size={16} aria-hidden />
-            更新
+            <RefreshCw size={17} aria-hidden />
           </button>
         </section>
 
@@ -480,21 +558,21 @@ export default function VipFloorWorkspace() {
             disabled={readOnly || !isOwner}
             aria-label={`新規オペレーション（${isOwner ? "Walk-inまたは受付ブロック" : "Owner専用"}）`}
           >
-            <CalendarPlus size={17} />新規受付
+            <CalendarPlus size={17} aria-hidden />新規受付
           </button>
           <div className={styles.viewSwitcher} role="group" aria-label="表示切替">
             <button type="button" aria-label="List" data-active={state.view === "list" || undefined} onClick={() => switchView("list")}>
-              <ClipboardList size={16} /><span>予約一覧</span>
+              <ClipboardList size={16} aria-hidden /><span>予約一覧</span>
             </button>
             <button type="button" aria-label="Floor" data-active={state.view === "floor" || undefined} onClick={() => switchView("floor")}>
-              <LayoutGrid size={16} /><span>フロア</span>
+              <LayoutGrid size={16} aria-hidden /><span>フロア</span>
             </button>
             <button type="button" aria-label="Chart" data-active={state.view === "timeline" || undefined} onClick={() => switchView("timeline")}>
-              <ChartNoAxesGantt size={16} /><span>時間軸</span>
+              <ChartNoAxesGantt size={16} aria-hidden /><span>時間軸</span>
             </button>
           </div>
           <label className={styles.toolbarSearch}>
-            <Search size={14} />
+            <Search size={14} aria-hidden />
             <span className="sr-only">予約検索</span>
             <input
               value={state.query}
@@ -517,6 +595,7 @@ export default function VipFloorWorkspace() {
             >
               <option value="all">全て</option>
               <option value="attention">要確認</option>
+              <option value="unassigned">未割当</option>
               <option value="expected">来店予定</option>
               <option value="late">遅延</option>
               <option value="arrived">到着</option>
@@ -552,16 +631,16 @@ export default function VipFloorWorkspace() {
           </button>
         </div>
 
-        {["stale", "read_only"].includes(state.globalState) || !isOwner ? (
-          <div className={styles.stateBanner} role="status" data-tone="warning">
-            {offline ? <WifiOff size={16} /> : <AlertTriangle size={16} />}
+        {showNotice ? (
+          <div className={styles.stateBanner} role="status" data-tone={offline ? "danger" : "warning"}>
+            {offline ? <WifiOff size={16} aria-hidden /> : <AlertTriangle size={16} aria-hidden />}
             <strong>{offline ? "オフライン" : !isOwner ? "Owner専用・閲覧のみ" : "閲覧のみ"}</strong>
             <span>{!isOwner ? "更新操作と個人情報の閲覧はOwnerだけが実行できます。" : state.stateDescription}</span>
           </div>
         ) : null}
 
-        <div className={styles.liveMessage} aria-live="polite">
-          <span data-pending={state.pending || undefined}>{state.pending ? "処理中" : "更新中"}</span>
+        <div className={styles.liveMessage} aria-live="polite" data-visible={busy || undefined}>
+          <span>{state.pending ? "処理中" : "更新中"}</span>
           <p>{state.message}</p>
           <strong className="tabular-nums">REV {state.board.boardRevision}</strong>
         </div>
@@ -578,7 +657,7 @@ export default function VipFloorWorkspace() {
               selectedTableId={state.selectedTableId}
               onSelectTable={(tableId, reservationId) => {
                 dispatch({ type: "selectTable", tableId, reservationId });
-                if (reservationId && window.matchMedia("(max-width: 767px)").matches) {
+                if (reservationId && window.matchMedia("(max-width: 1023px)").matches) {
                   selectReservation(reservationId);
                 }
               }}
@@ -610,7 +689,24 @@ export default function VipFloorWorkspace() {
         </div>
       </section>
 
+      {/* The right column is either the selected reservation or what needs
+          attention — never a second copy of the ledger. */}
       <div className={styles.desktopInspector}>
+        {!selectedReservation && !state.selectedTableId && !state.inspectorCollapsed ? (
+          <ExceptionRail
+            groups={queueGroups}
+            reservations={reservations}
+            selectedId={state.selectedReservationId}
+            collapsed={false}
+            query={state.query}
+            onQuery={(query) => {
+              dispatch({ type: "query", query });
+              updateRoute({ q: query || null });
+            }}
+            onSelect={selectReservation}
+            onCollapse={() => dispatch({ type: "inspectorCollapsed", collapsed: true })}
+          />
+        ) : (
         <Inspector
           board={state.board}
           reservation={selectedReservation}
@@ -630,6 +726,7 @@ export default function VipFloorWorkspace() {
             setCustomerOpen(true);
           }}
         />
+        )}
       </div>
 
       {menuOpen ? (
@@ -653,41 +750,33 @@ export default function VipFloorWorkspace() {
           </header>
           <div className={styles.shellMenuGrid}>
             <button type="button" onClick={() => void loadBoard()} disabled={state.pending}>
-              <RefreshCw size={18} /><span>再読込</span><small>台帳同期</small>
+              <RefreshCw size={18} aria-hidden /><span>再読込</span><small>台帳同期</small>
             </button>
             <button type="button" aria-label="Waitlist" onClick={() => void openWaitlist()}>
-              <BellRing size={18} /><span>待機リスト</span><small>呼出と期限</small>
+              <BellRing size={18} aria-hidden /><span>待機リスト</span><small>呼出と期限</small>
             </button>
-            <button type="button" onClick={() => {
-              setMenuOpen(false);
-              if (window.matchMedia("(max-width: 767px)").matches) {
-                dispatch({ type: "mobileInspector", open: false });
-                setQueueOpen(true);
-              } else {
-                dispatch({ type: "queueCollapsed", collapsed: false });
-              }
-            }}>
-              <AlertTriangle size={18} /><span>要対応</span><small>未割当と遅延</small>
+            <button type="button" onClick={openQueue}>
+              <AlertTriangle size={18} aria-hidden /><span>要対応</span><small>未割当と遅延</small>
             </button>
             <button type="button" aria-label="SLO 稼働状況" onClick={() => {
               setMenuOpen(false);
               setObservabilityOpen(true);
             }}>
-              <Activity size={18} /><span>稼働状況</span><small>SLO / Alert</small>
+              <Activity size={18} aria-hidden /><span>稼働状況</span><small>SLO / Alert</small>
             </button>
             <button type="button" onClick={() => void openStaff()}>
-              <ShieldCheck size={18} /><span>担当卓</span><small>スタッフ設定</small>
+              <ShieldCheck size={18} aria-hidden /><span>担当卓</span><small>スタッフ設定</small>
             </button>
             {isDemo ? (
               <button type="button" onClick={() => {
                 setMenuOpen(false);
                 setResetOpen(true);
               }}>
-                <RotateCcw size={18} /><span>デモ初期化</span><small>合成台帳のみ</small>
+                <RotateCcw size={18} aria-hidden /><span>デモ初期化</span><small>合成台帳のみ</small>
               </button>
             ) : null}
             <button type="button" onClick={() => void logout()}>
-              <LogOut size={18} /><span>ログアウト</span><small>{isDemo ? "Demo session" : "Owner session"}</small>
+              <LogOut size={18} aria-hidden /><span>ログアウト</span><small>{isDemo ? "Demo session" : "Owner session"}</small>
             </button>
           </div>
         </section>
@@ -700,25 +789,26 @@ export default function VipFloorWorkspace() {
           aria-label={`新規オペレーション（${isOwner ? "Walk-inまたは受付ブロック" : "Owner専用"}）`}
           onClick={() => void openOperation()}
         >
-          <CalendarPlus size={19} /><span>受付</span><small>{isOwner ? "予約・Walk-in" : "Ownerのみ"}</small>
+          <CalendarPlus size={19} aria-hidden /><span>受付</span><small>{isOwner ? "予約・Walk-in" : "Ownerのみ"}</small>
         </button>
         <button type="button" aria-label="List" aria-current={state.view === "list" ? "page" : undefined} data-active={state.view === "list" || undefined} onClick={() => switchView("list")}>
-          <ClipboardList size={19} /><span>一覧</span>
+          <ClipboardList size={19} aria-hidden /><span>一覧</span>
         </button>
         <button type="button" aria-label="Floor" aria-current={state.view === "floor" ? "page" : undefined} data-active={state.view === "floor" || undefined} onClick={() => switchView("floor")}>
-          <LayoutGrid size={19} /><span>フロア</span>
+          <LayoutGrid size={19} aria-hidden /><span>フロア</span>
         </button>
         <button type="button" aria-label="Chart" aria-current={state.view === "timeline" ? "page" : undefined} data-active={state.view === "timeline" || undefined} onClick={() => switchView("timeline")}>
-          <ChartNoAxesGantt size={19} /><span>時間軸</span>
+          <ChartNoAxesGantt size={19} aria-hidden /><span>時間軸</span>
         </button>
         <button
           ref={menuButtonRef}
           type="button"
+          aria-label="メニュー"
           aria-expanded={menuOpen}
           data-active={menuOpen || undefined}
           onClick={() => setMenuOpen((open) => !open)}
         >
-          <Menu size={19} /><span>メニュー</span>
+          <Menu size={19} aria-hidden /><span>メニュー</span>
         </button>
       </nav>
 
@@ -736,7 +826,7 @@ export default function VipFloorWorkspace() {
           className={styles.sheetClose}
           onClick={() => dispatch({ type: "mobileInspector", open: false })}
         >
-          <X size={17} />閉じる
+          <X size={17} aria-hidden />閉じる
         </button>
         <Inspector
           board={state.board}
@@ -855,11 +945,11 @@ function WorkspaceSkeleton({ label }: { label: string }) {
 function ErrorState({ description, onRetry }: { description: string; onRetry: () => void }) {
   return (
     <div className={styles.centerState} role="alert">
-      <AlertTriangle size={30} />
+      <AlertTriangle size={28} aria-hidden />
       <h2>予約状態を読み込めません</h2>
       <p>{description}</p>
       <button type="button" className={styles.primaryButton} onClick={onRetry}>
-        <RefreshCw size={16} />再読込
+        <RefreshCw size={16} aria-hidden />再読込
       </button>
     </div>
   );
@@ -868,11 +958,11 @@ function ErrorState({ description, onRetry }: { description: string; onRetry: ()
 function EmptyState({ businessDate, onRetry }: { businessDate: string; onRetry: () => void }) {
   return (
     <div className={styles.centerState}>
-      <LayoutGrid size={30} />
+      <LayoutGrid size={28} aria-hidden />
       <h2>この営業日の予約はありません</h2>
       <p>{businessDate} のGHOST予約台帳は空です。営業日を切り替えるか、最新状態を再読込してください。</p>
       <button type="button" className={styles.primaryButton} onClick={onRetry}>
-        <RefreshCw size={16} />再読込
+        <RefreshCw size={16} aria-hidden />再読込
       </button>
     </div>
   );

@@ -1,6 +1,6 @@
 "use client";
 
-import { Armchair, BellRing, CalendarClock, ChevronLeft, ChevronRight, ClipboardList, Clock3, MapPin, NotebookPen, Pencil, ShieldCheck, TimerReset, UserRound, UsersRound } from "lucide-react";
+import { Armchair, BellRing, CalendarClock, ChevronLeft, ChevronRight, ClipboardList, Clock3, MapPin, NotebookPen, Pencil, Route, ShieldCheck, Ticket, TimerReset, UserRound, UsersRound } from "lucide-react";
 
 import type { VipFloorBoardV2 } from "@/lib/vipFloorV2Contract";
 
@@ -101,6 +101,33 @@ export function Inspector({
             <span className={styles.focusTable}>{reservation.tableCodes.join(" + ") || "未割当"}</span>
           </div>
 
+          {/* Actions sit directly under the identity block so they never strand
+              below the fold on a short laptop screen. */}
+          <div className={styles.commandGrid} aria-label="予約操作">
+            <button
+              type="button"
+              onClick={onEdit}
+              disabled={readOnly || reservation.sourceChannel === "walk_in"}
+            >
+              <Pencil size={14} aria-hidden />予約編集
+            </button>
+            {commandButtons.map((command) => {
+              const CommandIcon = command.icon;
+              const unavailableForState =
+                (command.kind === "check_in" && reservation.lifecycleStatus === "checked_in")
+                || (command.kind === "seat_extension" && reservation.lifecycleStatus !== "checked_in")
+                || (command.kind === "assignment" && reservation.lifecycleStatus === "checked_in");
+              return <button
+                key={command.kind}
+                type="button"
+                onClick={() => onCommand(command.kind)}
+                disabled={readOnly || unavailableForState || !canCommand(command.kind)}
+              >
+                <CommandIcon size={14} aria-hidden />{command.label}
+              </button>;
+            })}
+          </div>
+
           <div className={styles.inspectorTabs} role="tablist" aria-label="予約詳細" onKeyDown={moveTabFocus}>
             {INSPECTOR_TABS.map((item) => (
               <button
@@ -125,42 +152,30 @@ export function Inspector({
             aria-labelledby={`${instance}-${activeTab}-tab`}
             tabIndex={0}
           >
-            {activeTab === "overview" ? <dl className={styles.detailList}>
-              <div><dt><CalendarClock size={14} /> 時間</dt><dd>{reservation.startLabel}-{reservation.endLabel}</dd></div>
-              <div><dt><UsersRound size={14} /> 人数</dt><dd>{reservation.guestCount}名</dd></div>
-              <div><dt><MapPin size={14} /> 席</dt><dd>{reservation.tableCodes.join(" + ") || "未割当"}</dd></div>
-              <div><dt><ShieldCheck size={14} /> 版</dt><dd>v{reservation.version}</dd></div>
-              <div><dt><ClipboardList size={14} /> 例外</dt><dd>{reservation.exceptionLabel ?? "なし"}</dd></div>
-            </dl> : null}
+            {activeTab === "overview" ? <>
+              <dl className={styles.detailList}>
+                <div><dt><CalendarClock size={14} aria-hidden /> 時間</dt><dd>{reservation.startLabel}–{reservation.endLabel}</dd></div>
+                <div><dt><UsersRound size={14} aria-hidden /> 人数</dt><dd>{reservation.guestCount}名</dd></div>
+                <div><dt><MapPin size={14} aria-hidden /> 席</dt><dd>{reservation.tableCodes.join(" + ") || "未割当"}</dd></div>
+                <div><dt><UserRound size={14} aria-hidden /> ゲスト</dt><dd>{reservation.guestLabel}</dd></div>
+                <div><dt><Ticket size={14} aria-hidden /> 予約番号</dt><dd>{reservation.publicCode}</dd></div>
+                <div><dt><Route size={14} aria-hidden /> 経路</dt><dd>{reservation.sourceLabel}</dd></div>
+                <div><dt><ShieldCheck size={14} aria-hidden /> 版</dt><dd>v{reservation.version}</dd></div>
+                <div><dt><ClipboardList size={14} aria-hidden /> 例外</dt><dd>{reservation.exceptionLabel ?? "なし"}</dd></div>
+              </dl>
+              {reservation.operatorNote ? (
+                <div className={styles.noteList}>
+                  <article>
+                    <strong><NotebookPen size={14} aria-hidden />現場メモ</strong>
+                    <p>{reservation.operatorNote}</p>
+                  </article>
+                </div>
+              ) : null}
+            </> : null}
             {activeTab === "guest" ? <div className={styles.detailStack}><p className={styles.maskedName}><UserRound size={17} />{reservation.guestLabel}</p><p>{demoMode.enabled ? "合成profileはこのbrowser-local workspaceだけで利用します。" : "Ownerは暗号化profileを必要時だけ復号できます。"}</p><small>閲覧、属性変更、解除・再紐付けはすべて監査対象です。</small><button type="button" className={styles.secondaryButton} onClick={onCustomerDetails} disabled={readOnly}>顧客詳細を開く</button></div> : null}
             {activeTab === "service" ? <div className={styles.detailStack}><p><StatusIcon size={16} /> {meta.label}</p><p>元データ: {reservation.sourceLabel}</p><p>席ロック: {table?.operationalLocked ? table.lockReason : "なし"}</p><p>フラグ: {visibleFlags.join(", ") || "なし"}</p></div> : null}
             {activeTab === "notes" ? <div className={styles.noteList}>{notes.length ? notes.map((note) => <article key={note.id}><strong><NotebookPen size={14} />{note.pinned ? "固定メモ" : "メモ"}</strong><p>{note.body}</p><small>v{note.version} / {note.kind}</small></article>) : <p>メモはありません。</p>}</div> : null}
             {activeTab === "history" ? <ol className={styles.historyList}>{history.map((item) => <li key={item.id}><span>{new Intl.DateTimeFormat("ja-JP", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Tokyo" }).format(new Date(item.at))}</span><div><strong>{item.label}</strong><p>{item.detail}</p><small>{item.actor}</small></div></li>)}</ol> : null}
-          </div>
-
-          <div className={styles.commandGrid} aria-label="予約操作">
-            <button
-              type="button"
-              onClick={onEdit}
-              disabled={readOnly || reservation.sourceChannel === "walk_in"}
-            >
-              <Pencil size={14} />予約編集
-            </button>
-            {commandButtons.map((command) => {
-              const CommandIcon = command.icon;
-              const unavailableForState =
-                (command.kind === "check_in" && reservation.lifecycleStatus === "checked_in")
-                || (command.kind === "seat_extension" && reservation.lifecycleStatus !== "checked_in")
-                || (command.kind === "assignment" && reservation.lifecycleStatus === "checked_in");
-              return <button
-                key={command.kind}
-                type="button"
-                onClick={() => onCommand(command.kind)}
-                disabled={readOnly || unavailableForState || !canCommand(command.kind)}
-              >
-                <CommandIcon size={14} aria-hidden />{command.label}
-              </button>;
-            })}
           </div>
         </>
       ) : table ? (

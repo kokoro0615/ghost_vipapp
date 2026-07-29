@@ -11,6 +11,7 @@ GHOST OsakaのVIPフロア現場オペレーション画面を、公開サイト
 - [本番完成コード＋Staging DB 顧客Trial一気通貫プロンプト](docs/GHOST_VIP_MANAGER_CUSTOMER_TRIAL_DEPLOYMENT_PROMPT.md)
 - [長時間化収束・残作業限定・Production完遂プロンプト](docs/GHOST_VIP_MANAGER_PRODUCTION_COMPLETION_EXECUTION_PROMPT.md)
 - [本番URL・期限付き顧客デモ・TableCheck-informed白UI 一気通貫プロンプト](docs/GHOST_VIP_MANAGER_PRODUCTION_CUSTOMER_DEMO_TABLECHECK_UI_EXECUTION_PROMPT.md)
+- [オペレーターUIデザインシステム「OPERATIONS PAPER」](docs/ui/OPERATIONS_PAPER.md)
 
 旧TableCheck関連文書は`docs/archive/tablecheck-legacy-2026-07/`の履歴資料であり、
 現行の実装指示として使用しません。

@@ -325,7 +325,9 @@ async function openReservationDetail(page, viewport) {
   const details = page.getByRole("button", { name: /の詳細を開く/u }).first();
   await details.waitFor();
   await details.click();
-  if (viewport.width < 768) {
+  // Below 1024 the workspace is a single column and detail opens as a sheet;
+  // the docked desktop inspector only exists at 1024 and above.
+  if (viewport.width < 1024) {
     await page.getByRole("dialog", { name: "予約詳細" }).waitFor();
   } else {
     await page.locator('[data-instance="desktop"]').waitFor();
