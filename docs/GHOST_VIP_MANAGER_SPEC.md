@@ -1,8 +1,8 @@
 # GHOST VIP Manager 正本仕様書
 
 > 文書ID: GHOST-VIP-MANAGER-SPEC  
-> 版: 1.1（Trial終了・Production light UI決定反映）
-> 基準日: 2026-07-27 JST
+> 版: 1.2（卓回転ワンタップ操作決定反映）
+> 基準日: 2026-07-30 JST
 > 正本所有者: GHOST Osaka Owner  
 > 実装リポジトリ: `ghost_vipapp`  
 > 公開予約リポジトリ: `ghost/website`
@@ -16,7 +16,8 @@
 旧文書と本書が矛盾する場合は本書を優先する。旧文書のGate名、TableCheck API接続、fixture前提、
 Stripe管理操作、旧UI-first合格条件は現行要件ではない。
 
-本書のD-01〜D-08は2026-07-26、D-09〜D-12は2026-07-27のOwner決定で確定済みとする。
+本書のD-01〜D-08は2026-07-26、D-09〜D-12は2026-07-27、
+D-13は2026-07-30のOwner決定で確定済みとする。
 変更はOwner承認、版更新、仕様書と実装計画の同時更新を必要とする。
 
 ## 2. 製品の目的
@@ -167,6 +168,9 @@ GHOSTの状態集合は次の13状態だけとする。TableCheckで確認した
 - 無断キャンセルはOwner操作だけで設定する。
 - キャンセル・返金操作は対象外。無断キャンセル状態だけを残す。
 - 状態遷移はサーバー側で検証し、不正遷移は`INVALID_STATE_TRANSITION`で拒否する。
+- 会計済みかつ配席中の予約は、Owner用の`退店・席を開放`から`completed`へ直接進められる。
+  この短縮操作は退店時刻・完了状態・active assignment解放・監査・board revisionを
+  同一mutationで確定し、予約記録は削除しない。
 - 状態は色だけでなくアイコン、線種、短縮ラベルでも示す。
 
 ## 8. 現場操作
@@ -185,6 +189,12 @@ GHOSTの状態集合は次の13状態だけとする。TableCheckで確認した
 - 操作理由は画面入力させず、サーバーで`管理画面操作`を記録する。
 - 同一予約を2端末で編集した場合、`expectedUpdatedAt`またはversionで競合を検知し、後勝ちにしない。
 - mutation kill switchがOFFの場合は全mutationを拒否し、画面を閲覧専用にする。
+- `paid`かつ配席中の予約詳細では、主要操作として`退店・席を開放`を1タップで実行できる。
+  成功後は解放した卓に割当済みの次の`confirmed`予約を開始時刻順で自動選択する。
+- 自動選択した次予約には`次のお客様をチェックイン`を主要操作として表示し、1タップで
+  到着・着席を記録する。汎用check-in操作は同時に重複表示しない。
+- 両短縮操作もOwner権限、expected version、idempotency、監査、kill switch、
+  409競合時の最新board再読込を既存commandと同じ条件で適用する。
 
 ## 9. Waitlist
 
@@ -281,6 +291,8 @@ GHOSTの状態集合は次の13状態だけとする。TableCheckで確認した
 - 既存6操作と店頭Walk-in取消、Walk-in、Waitlist、ブロック、受付停止、担当卓がOwner権限で動作する。
 - Walk-in取消は店頭予約だけに表示し、理由・影響の2段階確認、expectedVersion、
   idempotency、監査ID、席解放を満たす。返金・顧客通知・物理削除は行わない。
+- 会計済み予約は`退店・席を開放`の1操作で完了・退店時刻・active assignment解放を反映し、
+  同卓の次予約がある場合は自動選択後の`次のお客様をチェックイン`を1操作で完了できる。
 - 競合、kill switch、realtime切断、stale閲覧をE2Eで確認する。
 - 3解像度で主要操作が見切れず、44px target、focus、非色覚依存状態を満たす。
 - login、shell、List、Floor、Chart、queue、Inspector、全作成/編集/command/customer/staff/SLO dialogとloading/empty/error/offline/stale/reconnecting/conflict/read-only stateがlight semantic tokensへ移行し、UI chromeの旧purple/black-violet raw colorが0件である。
@@ -304,3 +316,4 @@ GHOSTの状態集合は次の13状態だけとする。TableCheckで確認した
 | D-10 | active/UI卓は`VIP-1`〜`VIP-8`だけ。Trial `T1`〜`T8`は移行せずexact run cleanupする |
 | D-11 | VIP Managerだけをwarm-white/graphite/限定champagneのlight UIへ全面改修し、公開website paletteは維持する |
 | D-12 | TableCheckは公開情報の業務文法だけを参照し、brand/asset/code/private dataを複製しない |
+| D-13 | 会計済み予約の退店・席解放と、同卓の次予約チェックインをそれぞれ1操作で実行できるようにする |

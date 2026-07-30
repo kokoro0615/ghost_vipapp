@@ -1,6 +1,6 @@
 "use client";
 
-import { Armchair, BellRing, CalendarClock, ChevronLeft, ChevronRight, CircleX, ClipboardList, Clock3, MapPin, NotebookPen, Pencil, Route, ShieldCheck, Ticket, TimerReset, UserRound, UsersRound } from "lucide-react";
+import { Armchair, BellRing, CalendarClock, ChevronLeft, ChevronRight, CircleX, ClipboardList, Clock3, DoorOpen, MapPin, NotebookPen, Pencil, Route, ShieldCheck, Ticket, TimerReset, UserRound, UserRoundCheck, UsersRound } from "lucide-react";
 
 import type { VipFloorBoardV2 } from "@/lib/vipFloorV2Contract";
 
@@ -35,11 +35,14 @@ type Props = {
   collapsed?: boolean;
   instance: "desktop" | "mobile";
   readOnly: boolean;
+  pending: boolean;
+  quickAction: "release" | "next_check_in" | null;
   activeTab: InspectorTab;
   canCommand: (kind: CommandKind) => boolean;
   onTabChange: (tab: InspectorTab) => void;
   onCollapse?: (value: boolean) => void;
   onCommand: (kind: CommandKind) => void;
+  onQuickAction: () => void;
   onEdit: () => void;
   onCustomerDetails: () => void;
 };
@@ -52,11 +55,14 @@ export function Inspector({
   collapsed = false,
   instance,
   readOnly,
+  pending,
+  quickAction,
   activeTab,
   canCommand,
   onTabChange,
   onCollapse,
   onCommand,
+  onQuickAction,
   onEdit,
   onCustomerDetails,
 }: Props) {
@@ -101,6 +107,37 @@ export function Inspector({
             <span className={styles.focusTable}>{reservation.tableCodes.join(" + ") || "未割当"}</span>
           </div>
 
+          {quickAction ? (
+            <div className={styles.turnoverAction} data-kind={quickAction}>
+              <button
+                type="button"
+                onClick={onQuickAction}
+                disabled={readOnly || pending}
+                aria-label={
+                  quickAction === "release"
+                    ? `${reservation.tableCodes.join("と") || "割当席"}から退店し、席を開放`
+                    : `${reservation.guestLabel}様を次のお客様としてチェックイン`
+                }
+              >
+                {quickAction === "release"
+                  ? <DoorOpen size={18} aria-hidden />
+                  : <UserRoundCheck size={18} aria-hidden />}
+                <span>
+                  <strong>
+                    {quickAction === "release"
+                      ? "退店・席を開放"
+                      : "次のお客様をチェックイン"}
+                  </strong>
+                  <small>
+                    {quickAction === "release"
+                      ? "会計済み · 完了と席解放を同時反映"
+                      : `${reservation.tableCodes.join(" + ")} · 現在時刻で着席開始`}
+                  </small>
+                </span>
+              </button>
+            </div>
+          ) : null}
+
           {/* Actions sit directly under the identity block so they never strand
               below the fold on a short laptop screen. */}
           <div className={styles.commandGrid} aria-label="予約操作">
@@ -111,7 +148,9 @@ export function Inspector({
             >
               <Pencil size={14} aria-hidden />予約編集
             </button>
-            {commandButtons.map((command) => {
+            {commandButtons.filter((command) => (
+              !(quickAction === "next_check_in" && command.kind === "check_in")
+            )).map((command) => {
               const CommandIcon = command.icon;
               const unavailableForState =
                 (command.kind === "check_in" && reservation.lifecycleStatus === "checked_in")

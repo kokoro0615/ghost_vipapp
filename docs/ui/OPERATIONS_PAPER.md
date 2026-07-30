@@ -169,6 +169,12 @@ Walk-in取消はInspectorの店頭予約だけに現れる危険操作とし、�
 ではなく`--alert`で区別する。取消は割当席を解放するが物理削除ではなく、元記録・
 version・監査履歴を残す。返金ケースと顧客通知はこの導線から作らない。
 
+卓回転はfocus identity直下の単一graphite actionで扱う。会計済みかつ配席中だけ
+`退店・席を開放`を表示し、完了後は同卓の次予約へ選択を移して同じ位置を
+`次のお客様をチェックイン`へ置き換える。これは2つの明確な業務段階であり、
+各段階は1タップ、56px高、説明付きとする。汎用check-inを同時に重複表示せず、
+予約がない空席では次客操作を推測表示しない。
+
 ### ≤1023px
 
 Single column. The inspector becomes a full sheet, the counters become a 52px
@@ -204,7 +210,7 @@ below the final table.
 npm run ci     # lint · typecheck · unit+contract+PII · build · maintenance · a11y
 ```
 
-`npm run test:a11y` audits **41 states × 9 viewports** and asserts zero axe
+`npm run test:a11y` audits **44 states × 9 viewports** and asserts zero axe
 violations, zero horizontal overflow, zero controls under 44×44, zero legacy
 purple chrome, zero console errors and zero 5xx.
 

@@ -1,12 +1,12 @@
 # GHOST VIP Manager 正本実装計画
 
 > 文書ID: GHOST-VIP-MANAGER-PLAN  
-> 版: 1.2（Trial終了・Production light UI実行版）
-> 基準日: 2026-07-27 JST
-> 対応仕様: `GHOST_VIP_MANAGER_SPEC.md` v1.1
+> 版: 1.3（卓回転ワンタップ操作実行版）
+> 基準日: 2026-07-30 JST
+> 対応仕様: `GHOST_VIP_MANAGER_SPEC.md` v1.2
 > 現況証拠: `GHOST_VIP_MANAGER_IMPLEMENTATION_AUDIT_2026-07-26.md`
 
-## 0. 実行進捗（2026-07-26 JST）
+## 0. 実行進捗（2026-07-30 JST）
 
 | Task | 状態 | 証拠 / 残り |
 |---|---|---|
@@ -23,6 +23,7 @@
 | T-026 | done | PII-free durable metrics、p95/error/outbox/realtime SLO・alert・retention |
 | T-027 | done | synthetic logical restore、partial fault、interrupted DDL rollback、v8/v14 dual-readをtransaction内で再演 |
 | T-028 | done | exact SHAのpreview candidate 2件をREADY化。production aliasは旧READYのまま保持しrollback地点を固定 |
+| T-029 | done (local) | `paid`予約の1タップ退店・席解放、同卓次予約の自動選択と1タップcheck-inをstandalone正本へ実装。lint/typecheck、unit17、contract75、PII、build、maintenance、Chromium 1440/390の44-state visual/a11y PASS |
 
 G0〜G3、G5〜G7とG4自動品質GateはPASS。実Safari機によるT-025の外部確認だけを
 promotion前のhuman/device witnessとして残す。production mutation flagsは引き続きOFFとし、
@@ -307,6 +308,9 @@ Phase 2のactor/session/audit最小schemaを先に固定し、そのactor IDを�
 - 対象外の決済tabは非表示にし、GHOSTで使用する情報だけを残す。
 - PIIはOwner sessionでのみ表示する。
 - version conflict時は変更前後を示し、再読込または再適用を選択させる。
+- `paid`かつ配席中の予約では、focus identity直下に`退店・席を開放`を主要操作として表示する。
+  成功後は解放卓に割当済みの次の`confirmed`予約を開始時刻順で自動選択し、
+  同じ位置へ`次のお客様をチェックイン`を表示する。
 
 ### 完了条件
 
@@ -353,6 +357,11 @@ Phase 2のactor/session/audit最小schemaを先に固定し、そのactor IDを�
 - サービス状態は仕様書で確定したGHOST 13状態の遷移表に従う。
 - operation registryで表示/権限/ラベルを後から変更できるようにする。
 - 操作理由入力欄を削除し、serverで`管理画面操作`を固定記録する。
+- `退店・席を開放`は既存service-status commandへ`completed`を直接送り、
+  canonical RPC内で完了・退店時刻・active assignment解放・監査・revisionをatomicに更新する。
+- `次のお客様をチェックイン`は既存check-in commandを再利用し、別dialogを挟まず実行する。
+- 両短縮操作は二重送信防止、expected version、idempotency、kill switch、
+  競合時のboard再読込を既存commandと共通化する。Demo completionも卓参照を解放する。
 
 ### スタッフ担当卓
 
@@ -363,7 +372,8 @@ Phase 2のactor/session/audit最小schemaを先に固定し、そのactor IDを�
 
 ### 完了条件
 
-- 6操作と担当卓のhappy path、権限拒否、競合、kill switch、idempotency testが通る。
+- 6操作、卓回転2短縮操作、担当卓のhappy path、権限拒否、競合、kill switch、
+  idempotency testが通る。
 
 ## 12. Phase 8 — リアルタイム・性能・障害耐性
 
@@ -437,7 +447,7 @@ Phase 2のactor/session/audit最小schemaを先に固定し、そのactor IDを�
 | G2 Security | Basic/PIN/role/PII/kill switch test合格 |
 | G3 Booking bridge | 公開確定→Manager→顧客確認E2E合格 |
 | G4 UI parity | 4主要画面、3解像度、visual/a11y合格 |
-| G5 Operations | 6操作、Walk-in、Waitlist、block、担当卓合格 |
+| G5 Operations | 6操作、卓回転2短縮操作、Walk-in、Waitlist、block、担当卓合格 |
 | G6 Resilience | realtime/offline/conflict/SLO合格 |
 | G7 Production | release manifest、backup/restore、rollback rehearsal、隔離test、production read-only smoke |
 | G8 Trial exit / light UI | exact Trial cleanup、active official 8、inactive history保持、全light surface、Chart直接nav、Trial credential/bypass/staging origin失効 |
@@ -509,6 +519,7 @@ W4の各機能はAPI+UI+testを1本ずつ縦切りし、全API完成待ちの大
 | T-026 | P1 | 両方 | metrics/log/alert/SLO | T-013,T-015,T-024 | dashboard/alert test |
 | T-027 | P0 | 両方 | forward compatibility、dual read、rollback | T-007〜T-015 | restore rehearsal |
 | T-028 | P0 | 両方 | release manifest、一括切替、read-only smoke | 全task | G7 evidence pack |
+| T-029 | P0 | `ghost_vipapp` | 1タップ退店・席解放、同卓次予約の自動選択・1タップcheck-in | T-010,T-011,T-017 | contract + desktop/mobile visual E2E |
 
 ## 18. Agent分担
 

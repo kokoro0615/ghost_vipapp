@@ -187,6 +187,47 @@ async function auditViewport(context, viewport) {
   }
 
   await page.close();
+
+  const turnoverPage = await newQaPage(context, {
+    boardPayloads: [turnoverBoard, releasedTurnoverBoard, checkedInTurnoverBoard],
+  });
+  await goToWorkspace(turnoverPage, "list");
+  await turnoverPage.getByRole("button", {
+    name: `${paidTurnoverReservation.publicCode}の詳細を開く`,
+    exact: true,
+  }).click();
+  if (viewport.width < 1024) {
+    await turnoverPage.getByRole("dialog", { name: "予約詳細" }).waitFor();
+  } else {
+    await turnoverPage.locator('[data-instance="desktop"]').waitFor();
+  }
+  const releaseButton = turnoverPage.getByRole("button", {
+    name: /席を開放/u,
+  });
+  await releaseButton.waitFor();
+  await capture(turnoverPage, "turnover-release");
+  await releaseButton.click();
+  const nextCheckInButton = turnoverPage.getByRole("button", {
+    name: /次のお客様.*チェックイン/u,
+  });
+  await nextCheckInButton.waitFor();
+  await capture(turnoverPage, "turnover-next-check-in");
+  await nextCheckInButton.click();
+  await nextCheckInButton.waitFor({ state: "hidden" });
+  await capture(turnoverPage, "turnover-checked-in");
+  assert.deepEqual(
+    turnoverPage.qaCommandPayloads.map(({ kind, payload }) => ({
+      kind,
+      serviceStatus: payload?.serviceStatus ?? null,
+    })),
+    [
+      { kind: "service_status", serviceStatus: "completed" },
+      { kind: "check_in", serviceStatus: null },
+    ],
+    "turnover shortcuts must complete/release before checking in the next guest",
+  );
+  await turnoverPage.close();
+
   const extensionPage = await newQaPage(context, {
     boardPayload: {
       ...board,
@@ -404,6 +445,7 @@ async function newQaPage(context, scenario = {}) {
   page.qaConsoleErrors = [];
   page.qaServerErrors = [];
   page.qaHttpErrors = [];
+  page.qaCommandPayloads = [];
   page.on("console", (message) => {
     if (message.type() === "error") page.qaConsoleErrors.push(message.text());
   });
@@ -613,25 +655,29 @@ async function installSyntheticRoutes(page, scenario = {}) {
     contentType: "application/json",
     body: JSON.stringify(observability),
   }));
-  await page.route("**/api/admin/vip-floor/commands", (route) => route.fulfill({
-    status: scenario.commandStatus ?? 200,
-    contentType: "application/json",
-    body: JSON.stringify(scenario.commandStatus === 409
-      ? {
-          ok: false,
-          code: "version_conflict",
-          error: "version_conflict",
-          message: "別端末の更新を検知しました。",
-          recovery: "最新状態を再読込してから明示的に再試行してください。",
-        }
-      : {
-          ok: true,
-          message: "Synthetic command accepted",
-          boardRevision: 43,
-          entityVersion: 5,
-          auditLogId: "synthetic-audit",
-      }),
-  }));
+  await page.route("**/api/admin/vip-floor/commands", async (route) => {
+    const payload = route.request().postDataJSON();
+    page.qaCommandPayloads.push(payload);
+    await route.fulfill({
+      status: scenario.commandStatus ?? 200,
+      contentType: "application/json",
+      body: JSON.stringify(scenario.commandStatus === 409
+        ? {
+            ok: false,
+            code: "version_conflict",
+            error: "version_conflict",
+            message: "別端末の更新を検知しました。",
+            recovery: "最新状態を再読込してから明示的に再試行してください。",
+          }
+        : {
+            ok: true,
+            message: "Synthetic command accepted",
+            boardRevision: 43,
+            entityVersion: 5,
+            auditLogId: "synthetic-audit",
+        }),
+    });
+  });
   await page.route("**/api/admin/vip-floor/operations", (route) => route.fulfill({
     status: scenario.operationStatus ?? 200,
     contentType: "application/json",
@@ -662,7 +708,9 @@ async function installSyntheticRoutes(page, scenario = {}) {
       contentType: "application/json",
       body: JSON.stringify(scenario.boardStatus && scenario.boardStatus >= 400
         ? { ok: false, error: "synthetic_board_failure" }
-        : scenario.boardPayload ?? board),
+        : scenario.boardPayloads?.[
+            Math.min(boardRequests - 1, scenario.boardPayloads.length - 1)
+          ] ?? scenario.boardPayload ?? board),
     });
   });
 }
@@ -1035,6 +1083,104 @@ const board = {
     adminMutationEnabled: true,
     webhookProcessingEnabled: true,
     publicBookingEnabled: true,
+  },
+};
+
+const nextTurnoverReservation = {
+  ...board.reservations[0],
+  id: "20000000-0000-4000-8000-000000000002",
+  version: 4,
+  publicCode: "GHO-0726-02",
+  lifecycleStatus: "confirmed",
+  serviceStatus: "expected",
+  scheduledStartAt: "2026-07-26T16:00:00.000Z",
+  scheduledEndAt: "2026-07-26T18:00:00.000Z",
+  expectedReleaseAt: "2026-07-26T18:00:00.000Z",
+  actualSeatedAt: null,
+  completedAt: null,
+  guestCount: { total: 3, adults: null, children: null },
+  assignmentIds: ["synthetic-assignment-next"],
+  customer: {
+    customerId: "70000000-0000-4000-8000-000000000002",
+    displayLabel: "NEXT GUEST ••••",
+    masked: false,
+  },
+  operatorNote: "Synthetic next guest",
+};
+
+const paidTurnoverReservation = {
+  ...board.reservations[0],
+  lifecycleStatus: "checked_in",
+  serviceStatus: "paid",
+  scheduledStartAt: "2026-07-26T13:30:00.000Z",
+  scheduledEndAt: "2026-07-26T15:30:00.000Z",
+  expectedReleaseAt: "2026-07-26T15:30:00.000Z",
+  actualSeatedAt: "2026-07-26T13:35:00.000Z",
+  payment: { status: "paid", amountYen: 180000 },
+};
+
+const turnoverBoard = {
+  ...board,
+  tables: board.tables.map((table, index) => ({
+    ...table,
+    reservationIds: index === 0
+      ? [paidTurnoverReservation.id, nextTurnoverReservation.id]
+      : [],
+  })),
+  reservations: [paidTurnoverReservation, nextTurnoverReservation],
+  totals: {
+    ...board.totals,
+    reservationCount: 2,
+    activeReservationCount: 2,
+    assignmentCount: 2,
+    guestCount: 7,
+    serviceStatusCounts: { paid: 1, expected: 1 },
+  },
+};
+
+const releasedTurnoverBoard = {
+  ...turnoverBoard,
+  boardRevision: 43,
+  tables: turnoverBoard.tables.map((table, index) => ({
+    ...table,
+    version: index === 0 ? 4 : table.version,
+    reservationIds: index === 0 ? [nextTurnoverReservation.id] : [],
+  })),
+  reservations: [
+    {
+      ...paidTurnoverReservation,
+      version: 5,
+      serviceStatus: "completed",
+      completedAt: "2026-07-26T15:40:00.000Z",
+      assignmentIds: [],
+      tableIds: [],
+    },
+    nextTurnoverReservation,
+  ],
+  totals: {
+    ...turnoverBoard.totals,
+    activeReservationCount: 1,
+    assignmentCount: 1,
+    serviceStatusCounts: { completed: 1, expected: 1 },
+  },
+};
+
+const checkedInTurnoverBoard = {
+  ...releasedTurnoverBoard,
+  boardRevision: 44,
+  reservations: [
+    releasedTurnoverBoard.reservations[0],
+    {
+      ...nextTurnoverReservation,
+      version: 5,
+      lifecycleStatus: "checked_in",
+      serviceStatus: "seated",
+      actualSeatedAt: "2026-07-26T16:00:00.000Z",
+    },
+  ],
+  totals: {
+    ...releasedTurnoverBoard.totals,
+    serviceStatusCounts: { completed: 1, seated: 1 },
   },
 };
 

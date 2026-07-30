@@ -26,7 +26,7 @@ import {
 import { CommandCenter } from "./commands/CommandCenter";
 import { CustomerPanel } from "./customers/CustomerPanel";
 import { buildQueueGroups, matchesReservation, toUiReservations } from "./contract/viewModel";
-import type { CommandKind, WorkspaceView } from "./contract/uiTypes";
+import type { CommandKind, UiReservation, WorkspaceView } from "./contract/uiTypes";
 import FloorView from "./floor/FloorView";
 import { Inspector, INSPECTOR_TABS, type InspectorTab } from "./inspector/Inspector";
 import { OperationCenter } from "./operations/OperationCenter";
@@ -64,6 +64,12 @@ const STATUS_FILTERS = new Set([
 ]);
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/u;
 
+type TurnoverContext = {
+  businessDate: string;
+  tableId: string;
+  nextReservationId: string;
+};
+
 const SYNC_LABEL: Record<string, string> = {
   healthy: "同期済み",
   loading: "読込中",
@@ -82,6 +88,28 @@ function parseWorkspaceView(value: string | null): WorkspaceView {
 
 function parseInspectorTab(value: string | null): InspectorTab {
   return INSPECTOR_TABS.some((tab) => tab.key === value) ? value as InspectorTab : "overview";
+}
+
+function findNextTurnoverReservation(
+  current: UiReservation,
+  reservations: UiReservation[],
+): Omit<TurnoverContext, "businessDate"> | null {
+  const releasedTableIds = new Set(current.tableIds);
+  if (releasedTableIds.size === 0) return null;
+
+  const next = reservations
+    .filter((item) => (
+      item.id !== current.id
+      && item.lifecycleStatus === "confirmed"
+      && !["completed", "no_show"].includes(item.serviceStatus)
+      && item.startAt >= current.startAt
+      && item.tableIds.some((tableId) => releasedTableIds.has(tableId))
+    ))
+    .sort((left, right) => left.startAt.localeCompare(right.startAt))
+    .at(0);
+  const tableId = next?.tableIds.find((candidate) => releasedTableIds.has(candidate));
+
+  return next && tableId ? { tableId, nextReservationId: next.id } : null;
 }
 
 function trapKeyboardFocus(event: KeyboardEvent<HTMLElement>, onClose: () => void) {
@@ -151,6 +179,7 @@ export default function VipFloorWorkspace() {
   const [observabilityOpen, setObservabilityOpen] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
   const [queueOpen, setQueueOpen] = useState(false);
+  const [turnoverContext, setTurnoverContext] = useState<TurnoverContext | null>(null);
   const menuRef = useRef<HTMLElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const mobileSheetRef = useRef<HTMLDivElement>(null);
@@ -177,6 +206,14 @@ export default function VipFloorWorkspace() {
     [allReservations],
   );
   const selectedReservation = allReservations.find((item) => item.id === state.selectedReservationId) ?? null;
+  const quickAction = selectedReservation?.serviceStatus === "paid"
+      && selectedReservation.tableIds.length > 0
+    ? "release" as const
+    : turnoverContext?.businessDate === businessDate
+        && turnoverContext.nextReservationId === selectedReservation?.id
+        && selectedReservation.lifecycleStatus === "confirmed"
+      ? "next_check_in" as const
+      : null;
   const isDemo = auth.status === "authenticated" && auth.session.mode === "demo";
   const isOwner = auth.status === "authenticated"
     && (auth.session.role === "owner" || auth.session.role === "owner-compatible-demo");
@@ -273,6 +310,53 @@ export default function VipFloorWorkspace() {
   function openCommand(kind: CommandKind) {
     if (!selectedReservation || readOnly || !canCommand(kind)) return;
     dispatch({ type: "openCommand", kind });
+  }
+
+  async function runTurnoverAction() {
+    if (!selectedReservation || readOnly || state.pending) return;
+
+    if (quickAction === "release") {
+      if (!canCommand("service_status")) return;
+      const releasedTableId = selectedReservation.tableIds[0] ?? null;
+      const next = findNextTurnoverReservation(selectedReservation, allReservations);
+      const succeeded = await runCommand({
+        kind: "service_status",
+        reservationId: selectedReservation.id,
+        expectedVersion: selectedReservation.version,
+        payload: {
+          occurredAt: new Date().toISOString(),
+          serviceStatus: "completed",
+        },
+      });
+      if (!succeeded) return;
+
+      setTurnoverContext(next ? { ...next, businessDate } : null);
+      if (next) {
+        dispatch({ type: "selectReservation", reservationId: next.nextReservationId });
+        dispatch({
+          type: "selectTable",
+          tableId: next.tableId,
+          reservationId: next.nextReservationId,
+        });
+      } else if (releasedTableId) {
+        dispatch({ type: "selectTable", tableId: releasedTableId, reservationId: null });
+      }
+      return;
+    }
+
+    if (
+      quickAction === "next_check_in"
+      && turnoverContext
+      && canCommand("check_in")
+    ) {
+      const succeeded = await runCommand({
+        kind: "check_in",
+        reservationId: selectedReservation.id,
+        expectedVersion: selectedReservation.version,
+        payload: { occurredAt: new Date().toISOString() },
+      });
+      if (succeeded) setTurnoverContext(null);
+    }
   }
 
   async function openOperation() {
@@ -719,11 +803,14 @@ export default function VipFloorWorkspace() {
           collapsed={state.inspectorCollapsed}
           instance="desktop"
           readOnly={readOnly}
+          pending={state.pending}
+          quickAction={quickAction}
           activeTab={inspectorTab}
           canCommand={canCommand}
           onTabChange={changeInspectorTab}
           onCollapse={(collapsed) => dispatch({ type: "inspectorCollapsed", collapsed })}
           onCommand={openCommand}
+          onQuickAction={() => void runTurnoverAction()}
           onEdit={() => void openReservationEdit()}
           onCustomerDetails={() => {
             dispatch({ type: "mobileInspector", open: false });
@@ -839,10 +926,13 @@ export default function VipFloorWorkspace() {
           history={state.history}
           instance="mobile"
           readOnly={readOnly}
+          pending={state.pending}
+          quickAction={quickAction}
           activeTab={inspectorTab}
           canCommand={canCommand}
           onTabChange={changeInspectorTab}
           onCommand={openCommand}
+          onQuickAction={() => void runTurnoverAction()}
           onEdit={() => void openReservationEdit()}
           onCustomerDetails={() => {
             dispatch({ type: "mobileInspector", open: false });
