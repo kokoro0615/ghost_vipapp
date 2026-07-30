@@ -20,6 +20,16 @@ accent, status carried by position and word rather than decoration.
 Committed direction: **OPERATIONS PAPER** — a precision instrument printed on
 warm paper.
 
+### Operating-time contract
+
+The floor timeline and every explicit operator clock choice use the business
+date's fixed `22:00–翌05:00` service window in 15-minute increments. Post-midnight
+values are labelled `翌` so the rollover is never implicit. `event_days.sales_open_at`
+is a broader sales/admin-day boundary and must not be used as the floor opening
+time. VIP Manager normalizes that distinction without mutating the canonical
+event-day row. See
+`docs/research/vip-manager-operating-hours-2026-07-30.md`.
+
 ---
 
 ## 2. Root cause of the previous surface

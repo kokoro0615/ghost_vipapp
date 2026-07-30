@@ -4,6 +4,7 @@ import {
   canExecuteVipCommand,
   type VipCommandKind,
 } from "@/lib/adminPermissions";
+import { isGhostOperatingTimestamp } from "@/lib/ghostOperatingHours";
 import { VIP_SERVICE_STATUSES, type VipServiceStatus } from "@/lib/vipFloorV2Contract";
 import {
   copyJson,
@@ -144,6 +145,9 @@ function toCommandPayload(kind: CommandKind, body: CommandBody, expectedVersion:
       }
       try {
         const occurredAt = boundedIsoDate(body.payload.occurredAt, "occurredAt", true);
+        if (!isGhostOperatingTimestamp(occurredAt)) {
+          return { ok: false, error: "outside_operating_hours" as const };
+        }
         return { ok: true, payload: { expectedVersion, arrivedAt: occurredAt } };
       } catch (error) {
         if (error instanceof Error && error.message === "future_occurredAt") {

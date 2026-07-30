@@ -104,6 +104,14 @@ export function readVipOperationFailure(
     };
   }
 
+  if (code === "outside_operating_hours") {
+    return {
+      code,
+      message: "22:00〜翌05:00の営業時間外が含まれるため保存していません。",
+      recovery: "表示されている15分単位の候補から開始・終了時刻を選び直してください。",
+    };
+  }
+
   if (
     field === "eventDayId"
     || field === "scheduledStartAt"

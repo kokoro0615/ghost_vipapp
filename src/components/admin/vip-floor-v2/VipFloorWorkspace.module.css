@@ -1745,6 +1745,8 @@
 .syntheticInputHint { color: var(--ink-3); }
 .fieldError { color: var(--alert); }
 .commandForm input[aria-invalid="true"],
+.commandForm select[aria-invalid="true"],
+.wizardBody select[aria-invalid="true"],
 .commandForm textarea[aria-invalid="true"] {
   border-color: var(--alert);
   box-shadow: 0 0 0 1px var(--alert);
@@ -1806,6 +1808,22 @@
 }
 .assignmentOptions input { width: 24px; min-height: 24px; margin: 0; accent-color: var(--action); }
 .formColumns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s-5); }
+.businessTimeHint, .businessTimeReadout {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: var(--t-micro);
+  line-height: var(--lh-ui);
+}
+.businessTimeHint strong { color: var(--ink); font-weight: 700; }
+.businessTimeReadout {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-4);
+  padding-bottom: var(--s-3);
+  border-bottom: 1px solid var(--rule);
+}
+.businessTimeReadout strong { color: var(--ink); font-size: var(--t-data); font-weight: 600; }
 .checkGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: var(--s-3); }
 .checkGrid label {
   display: flex !important;

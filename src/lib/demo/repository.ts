@@ -45,6 +45,7 @@ import {
   type VipFloorReservationV2,
   type VipServiceStatus,
 } from "@/lib/vipFloorV2Contract";
+import { isGhostOperatingInterval } from "@/lib/ghostOperatingHours";
 
 const REVISION_CHANNEL = "ghost-vip-demo-revision";
 const BLOCK_REPEAT_DAYS = new Set([1, 7, 14]);
@@ -145,7 +146,7 @@ function assertInterval(startAt: string, endAt: string) {
   if (
     !Number.isFinite(Date.parse(startAt))
     || !Number.isFinite(Date.parse(endAt))
-    || Date.parse(startAt) >= Date.parse(endAt)
+    || !isGhostOperatingInterval(startAt, endAt)
   ) {
     throw new DemoRepositoryError(
       "INVALID_SYNTHETIC_INPUT",

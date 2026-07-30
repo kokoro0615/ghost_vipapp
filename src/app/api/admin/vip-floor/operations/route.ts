@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { isGhostOperatingInterval } from "@/lib/ghostOperatingHours";
 import {
   copyJson,
   ghostAdminFetch,
@@ -272,6 +273,9 @@ function parseWalkIn(payload: Record<string, unknown>) {
   ) {
     return { ok: false as const, error: "invalid_walk_in" };
   }
+  if (!isGhostOperatingInterval(scheduledStartAt, scheduledEndAt)) {
+    return { ok: false as const, error: "outside_operating_hours" };
+  }
 
   const versions = expectedTableVersions.map((item) => {
     if (!item || typeof item !== "object" || Array.isArray(item)) return null;
@@ -351,6 +355,9 @@ function parseReservationCreate(payload: Record<string, unknown>) {
   ) {
     return { ok: false as const, error: "invalid_reservation_create" };
   }
+  if (!isGhostOperatingInterval(scheduledStartAt, scheduledEndAt)) {
+    return { ok: false as const, error: "outside_operating_hours" };
+  }
   return {
     ok: true as const,
     value: {
@@ -416,6 +423,9 @@ function parseReservationUpdate(payload: Record<string, unknown>) {
     || (payload.bookingStaffMemberId !== null && !bookingStaffMemberId)
   ) {
     return { ok: false as const, error: "invalid_reservation_update" };
+  }
+  if (!isGhostOperatingInterval(scheduledStartAt, scheduledEndAt)) {
+    return { ok: false as const, error: "outside_operating_hours" };
   }
   return {
     ok: true as const,
@@ -495,6 +505,9 @@ function parseBlock(payload: Record<string, unknown>) {
   ) {
     return { ok: false as const, error: "invalid_block" };
   }
+  if (!isGhostOperatingInterval(startAt, endAt, businessDate)) {
+    return { ok: false as const, error: "outside_operating_hours" };
+  }
 
   return {
     ok: true as const,
@@ -541,6 +554,9 @@ function parseBlockMutation(payload: Record<string, unknown>, requireIdentity: b
     || (venueWide && seatResourceIds.length > 0)
   ) {
     return { ok: false as const, error: "invalid_block_update" };
+  }
+  if (!isGhostOperatingInterval(startAt, endAt)) {
+    return { ok: false as const, error: "outside_operating_hours" };
   }
 
   return {

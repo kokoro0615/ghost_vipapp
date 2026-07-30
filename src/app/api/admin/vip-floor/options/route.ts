@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { normalizeGhostBusinessDay } from "@/lib/ghostOperatingHours";
 import {
   copyJson,
   ghostAdminFetch,
@@ -49,5 +50,30 @@ export async function GET(request: Request) {
   );
   const payload = await copyJson(response);
 
-  return NextResponse.json(payload, { status: response.status });
+  if (
+    response.ok
+    && payload
+    && typeof payload === "object"
+    && typeof payload.businessDay === "object"
+    && payload.businessDay !== null
+    && typeof payload.businessDay.businessDate === "string"
+  ) {
+    const businessDay = payload.businessDay as {
+      businessDate: string;
+      operatingStartAt: string;
+      operatingEndAt: string;
+    };
+    return NextResponse.json({
+      ...payload,
+      businessDay: normalizeGhostBusinessDay(businessDay),
+    }, {
+      status: response.status,
+      headers: { "Cache-Control": "no-store" },
+    });
+  }
+
+  return NextResponse.json(payload, {
+    status: response.status,
+    headers: { "Cache-Control": "no-store" },
+  });
 }

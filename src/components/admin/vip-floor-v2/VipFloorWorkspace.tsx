@@ -1102,6 +1102,7 @@ export default function VipFloorWorkspace() {
       </div>
 
       <CommandCenter
+        key={`${state.command.kind}:${state.command.open ? "open" : "closed"}`}
         open={state.command.open}
         kind={state.command.kind}
         step={state.command.step}

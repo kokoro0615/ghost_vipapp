@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { normalizeGhostBusinessDay } from "@/lib/ghostOperatingHours";
 import { VIP_FLOOR_SCHEMA_VERSION } from "@/lib/vipFloorV2Contract";
 import { copyJson, ghostAdminFetch, readAdminToken } from "@/lib/server/ghostAdminProxy";
 
@@ -29,9 +30,21 @@ export async function GET(request: Request) {
   if (
     versionedResponse.ok
     && typeof versionedPayload === "object"
+    && versionedPayload !== null
     && versionedPayload?.schemaVersion === VIP_FLOOR_SCHEMA_VERSION
+    && typeof versionedPayload.businessDay === "object"
+    && versionedPayload.businessDay !== null
+    && typeof versionedPayload.businessDay.businessDate === "string"
   ) {
-    return NextResponse.json(versionedPayload, {
+    const businessDay = versionedPayload.businessDay as {
+      businessDate: string;
+      operatingStartAt: string;
+      operatingEndAt: string;
+    };
+    return NextResponse.json({
+      ...versionedPayload,
+      businessDay: normalizeGhostBusinessDay(businessDay),
+    }, {
       status: versionedResponse.status,
       headers: { "Cache-Control": "no-store", "X-GHOST-Board-Contract": VIP_FLOOR_SCHEMA_VERSION },
     });

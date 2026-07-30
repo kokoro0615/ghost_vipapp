@@ -10,6 +10,7 @@ import {
   X,
 } from "lucide-react";
 
+import { getGhostOperatingWindow } from "@/lib/ghostOperatingHours";
 import type { VipFloorBoardV2 } from "@/lib/vipFloorV2Contract";
 import {
   getSyntheticTextIssue,
@@ -24,6 +25,7 @@ import type {
   UiReservation,
 } from "../contract/uiTypes";
 import { DemoCue, useDemoMode } from "../demo/DemoMode";
+import { BusinessTimeFormFields } from "./BusinessTimeFields";
 import { ReservationWizard } from "./ReservationWizard";
 import styles from "../VipFloorWorkspace.module.css";
 
@@ -321,26 +323,15 @@ export function OperationCenter({
                   : "競合確認後、対象卓の受付を停止します"}
               </legend>
 
-              <div className={styles.formColumns}>
-                <label>
-                  開始
-                  <input
-                    type="datetime-local"
-                    name="startAt"
-                    defaultValue={editingBlock ? localInputValue(editingBlock.startAt) : defaults.start}
-                    required
-                  />
-                </label>
-                <label>
-                  終了
-                  <input
-                    type="datetime-local"
-                    name="endAt"
-                    defaultValue={editingBlock ? localInputValue(editingBlock.endAt) : defaults.end}
-                    required
-                  />
-                </label>
-              </div>
+              <BusinessTimeFormFields
+                key={`${kind}:${editingBlock?.id ?? "new"}:${options.businessDay.businessDate}`}
+                businessDate={options.businessDay.businessDate}
+                initialValue={{
+                  startAt: editingBlock ? localInputValue(editingBlock.startAt) : defaults.start,
+                  endAt: editingBlock ? localInputValue(editingBlock.endAt) : defaults.end,
+                }}
+                disabled={pending}
+              />
 
               {kind === "walk_in" ? (
                 <>
@@ -559,11 +550,12 @@ export function OperationCenter({
 }
 
 function operationDefaults(board: VipFloorBoardV2) {
-  const openAt = Date.parse(board.businessDay.operatingStartAt);
-  const closeAt = Date.parse(board.businessDay.operatingEndAt);
+  const window = getGhostOperatingWindow(board.businessDay.businessDate);
+  const openAt = Date.parse(window.startAt);
+  const closeAt = Date.parse(window.endAt);
   const now = Date.now();
   const startAt = now >= openAt && now < closeAt
-    ? Math.ceil(now / 900_000) * 900_000
+    ? Math.min(Math.ceil(now / 900_000) * 900_000, closeAt - 900_000)
     : openAt;
   const endAt = Math.min(startAt + 120 * 60_000, closeAt);
   return {

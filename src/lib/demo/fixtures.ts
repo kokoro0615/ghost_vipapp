@@ -466,7 +466,7 @@ export function createDeterministicDemoEnvelope(input: {
       id: `demo-day-${businessDate}`,
       businessDate,
       venueTimezone: DEMO_TIME_ZONE,
-      operatingStartAt: atBusinessTime(businessDate, 21),
+      operatingStartAt: atBusinessTime(businessDate, 22),
       operatingEndAt: atBusinessTime(businessDate, 5),
     },
     capabilities: {

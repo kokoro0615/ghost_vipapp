@@ -134,27 +134,23 @@ function revisionFromReservations(reservations: LegacyVipReservation[]) {
   }, 0);
 }
 
+function legacyGhostOperatingWindow(businessDate: string) {
+  const nextDate = new Date(`${businessDate}T00:00:00.000Z`);
+  nextDate.setUTCDate(nextDate.getUTCDate() + 1);
+  return {
+    startAt: `${businessDate}T22:00:00+09:00`,
+    endAt: `${nextDate.toISOString().slice(0, 10)}T05:00:00+09:00`,
+  };
+}
+
 export function adaptLegacyVipBoard(source: LegacyVipBoard, requestedDate: string): VipFloorBoardV2 {
   const now = new Date().toISOString();
   const businessDate = source.businessDate ?? requestedDate;
-  const slotStart = source.slots?.[0]?.startAt;
-  const slotEnd = source.slots?.at(-1)?.endAt;
-  const operatingStartAt = safeTimestamp(
-    source.eventDay?.salesOpenAt ?? slotStart,
-    `${businessDate}T21:00:00+09:00`,
-  );
-  const nextDate = new Date(`${businessDate}T12:00:00+09:00`);
-  nextDate.setDate(nextDate.getDate() + 1);
-  const nextBusinessDate = new Intl.DateTimeFormat("sv-SE", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    timeZone: "Asia/Tokyo",
-  }).format(nextDate);
-  const operatingEndAt = safeTimestamp(
-    source.eventDay?.salesCloseAt ?? slotEnd,
-    `${nextBusinessDate}T05:00:00+09:00`,
-  );
+  // Keep the read-only compatibility payload on the same explicit service
+  // window as the v2 BFF. event_days.sales_open_at is a broader admin boundary.
+  const operatingWindow = legacyGhostOperatingWindow(businessDate);
+  const operatingStartAt = operatingWindow.startAt;
+  const operatingEndAt = operatingWindow.endAt;
 
   const tableIdByCode = new Map<string, string>();
   const floorPositions = resolveFloorPositions(source.seats);

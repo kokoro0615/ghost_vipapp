@@ -4,6 +4,11 @@ import Image from "next/image";
 import { useMemo, useState } from "react";
 import { ArrowLeft, ArrowRight, Check, Mail } from "lucide-react";
 
+import {
+  formatGhostTimeRange,
+  getGhostOperatingWindow,
+  isGhostOperatingInterval,
+} from "@/lib/ghostOperatingHours";
 import type { VipFloorBoardV2, VipServiceStatus } from "@/lib/vipFloorV2Contract";
 
 import type {
@@ -13,6 +18,7 @@ import type {
   UiReservation,
 } from "../contract/uiTypes";
 import { useDemoMode } from "../demo/DemoMode";
+import { BusinessTimeFields } from "./BusinessTimeFields";
 import styles from "../VipFloorWorkspace.module.css";
 import { useTrialMode } from "../TrialMode";
 
@@ -120,11 +126,10 @@ export function ReservationWizard({
   const capacity = selectedTables.reduce((sum, table) => sum + table.capacityMax, 0);
   const canContinue = !datePending
     && !dateError
-    && stepValid(step, draft, Boolean(reservation));
+    && stepValid(step, draft, Boolean(reservation), options.businessDay.businessDate);
 
   const phase = PHASES.find((entry) => step >= entry.firstStep && step <= entry.lastStep) ?? PHASES[0];
   const tableCodes = selectedTables.map((table) => table.displayCode).join("・");
-  const timeValid = Boolean(draft.startAt && draft.endAt && draft.startAt < draft.endAt);
   const capacityShort = selectedTables.length > 0 && capacity < draft.guestCount;
   const staffName = (staffData?.staffMembers ?? [])
     .find((member) => member.id === draft.bookingStaffMemberId)?.displayName ?? null;
@@ -240,7 +245,9 @@ export function ReservationWizard({
         </div>
         <div>
           <dt>時刻</dt>
-          <dd className="tabular-nums">{draft.startAt.slice(11)}–{draft.endAt.slice(11)}</dd>
+          <dd className="tabular-nums">
+            {formatGhostTimeRange(draft.startAt, draft.endAt, options.businessDay.businessDate)}
+          </dd>
         </div>
         <div>
           <dt>人数</dt>
@@ -288,7 +295,7 @@ export function ReservationWizard({
             <dl className={styles.wizardFacts}>
               <div>
                 <dt>営業枠</dt>
-                <dd className="tabular-nums">22:00–05:00</dd>
+                <dd className="tabular-nums">22:00–翌05:00</dd>
               </div>
               <div>
                 <dt>正式卓</dt>
@@ -300,23 +307,20 @@ export function ReservationWizard({
         {step === 1 ? (
           <fieldset>
             <legend>予約時刻と滞在時間</legend>
-            <div className={styles.formColumns}>
-              <label>開始<input type="datetime-local" value={draft.startAt} onChange={(event) => patch({ startAt: event.target.value })} /></label>
-              <label>終了<input type="datetime-local" value={draft.endAt} onChange={(event) => patch({ endAt: event.target.value })} /></label>
-            </div>
-            {/* The native control follows the browser locale, so the venue's own
-              * 24-hour reading is stated next to it. */}
+            <BusinessTimeFields
+              businessDate={options.businessDay.businessDate}
+              value={{ startAt: draft.startAt, endAt: draft.endAt }}
+              disabled={pending || datePending}
+              onChange={(value) => patch(value)}
+            />
             <p className={styles.wizardReadout}>
               <span>この予約の時間帯</span>
-              <strong className="tabular-nums">{draft.startAt.slice(11)}–{draft.endAt.slice(11)}</strong>
+              <strong className="tabular-nums">
+                {formatGhostTimeRange(draft.startAt, draft.endAt, options.businessDay.businessDate)}
+              </strong>
               <em className="tabular-nums">{stayLabel(draft.startAt, draft.endAt)}</em>
             </p>
-            {timeValid ? null : (
-              <p className={styles.wizardFieldError} role="alert">
-                終了時刻は開始時刻より後にしてください。
-              </p>
-            )}
-            <p className={styles.wizardHint}>保存時に営業日範囲と卓の重複を再検証します。</p>
+            <p className={styles.wizardHint}>保存時にも22:00〜翌05:00の営業範囲と卓の重複を再検証します。</p>
           </fieldset>
         ) : null}
         {step === 2 ? (
@@ -461,7 +465,12 @@ export function ReservationWizard({
             <h3>この内容で{reservation ? "更新" : "作成"}します</h3>
             <dl>
               <div><dt>営業日</dt><dd className="tabular-nums">{board.businessDay.businessDate}</dd></div>
-              <div><dt>時刻</dt><dd className="tabular-nums">{draft.startAt.slice(11)}–{draft.endAt.slice(11)}</dd></div>
+              <div>
+                <dt>時刻</dt>
+                <dd className="tabular-nums">
+                  {formatGhostTimeRange(draft.startAt, draft.endAt, options.businessDay.businessDate)}
+                </dd>
+              </div>
               <div><dt>人数</dt><dd className="tabular-nums">{draft.guestCount}名</dd></div>
               <div>
                 <dt>卓</dt>
@@ -525,21 +534,28 @@ export function ReservationWizard({
   );
 }
 
-function stepValid(step: number, draft: Draft, editing: boolean) {
-  if (step === 1) return Boolean(draft.startAt && draft.endAt && draft.startAt < draft.endAt);
+function stepValid(step: number, draft: Draft, editing: boolean, businessDate: string) {
+  if (step === 1) return isGhostOperatingInterval(draft.startAt, draft.endAt, businessDate);
   if (step === 2) return Boolean(draft.offeringId && draft.guestCount >= 1);
   if (step === 3) return draft.tableIds.length > 0;
   if (step === 7) {
-    return draft.notificationPreference !== "email" || editing || Boolean(draft.email);
+    return isGhostOperatingInterval(draft.startAt, draft.endAt, businessDate)
+      && Boolean(draft.offeringId && draft.guestCount >= 1)
+      && draft.tableIds.length > 0
+      && (draft.notificationPreference !== "email" || editing || Boolean(draft.email));
   }
   return true;
 }
 
 function scheduleDefaults(board: VipFloorBoardV2) {
-  const startAt = Date.parse(board.businessDay.operatingStartAt);
+  const window = getGhostOperatingWindow(board.businessDay.businessDate);
+  const startAt = Date.parse(window.startAt);
   return {
     start: localInput(new Date(startAt).toISOString()),
-    end: localInput(new Date(startAt + 120 * 60_000).toISOString()),
+    end: localInput(new Date(Math.min(
+      startAt + 120 * 60_000,
+      Date.parse(window.endAt),
+    )).toISOString()),
   };
 }
 

@@ -3,6 +3,7 @@
 import { type CSSProperties, useState } from "react";
 import { Clock3, Minus, Plus } from "lucide-react";
 
+import { getGhostOperatingWindow } from "@/lib/ghostOperatingHours";
 import type { VipFloorBoardV2 } from "@/lib/vipFloorV2Contract";
 
 import { getStatusMeta } from "../contract/statusModel";
@@ -19,20 +20,30 @@ type ChartProps = {
 };
 
 function positionStyle(startAt: string, endAt: string, operatingStartAt: string, operatingEndAt: string) {
-  const startMs = new Date(operatingStartAt).getTime();
-  const totalMinutes = Math.max(60, (new Date(operatingEndAt).getTime() - startMs) / 60_000);
-  const offset = Math.max(0, (new Date(startAt).getTime() - startMs) / 60_000);
-  const duration = Math.max(15, (new Date(endAt).getTime() - new Date(startAt).getTime()) / 60_000);
+  const operatingStartMs = new Date(operatingStartAt).getTime();
+  const operatingEndMs = new Date(operatingEndAt).getTime();
+  const totalMinutes = Math.max(60, (operatingEndMs - operatingStartMs) / 60_000);
+  const clippedStartMs = Math.min(
+    operatingEndMs,
+    Math.max(operatingStartMs, new Date(startAt).getTime()),
+  );
+  const clippedEndMs = Math.min(
+    operatingEndMs,
+    Math.max(operatingStartMs, new Date(endAt).getTime()),
+  );
+  const offset = (clippedStartMs - operatingStartMs) / 60_000;
+  const duration = Math.max(0, (clippedEndMs - clippedStartMs) / 60_000);
   return {
     "--bar-start": `${(offset / totalMinutes) * 100}%`,
-    "--bar-width": `${Math.min(100 - (offset / totalMinutes) * 100, (duration / totalMinutes) * 100)}%`,
+    "--bar-width": `${(duration / totalMinutes) * 100}%`,
   } as CSSProperties;
 }
 
 export default function ChartView({ board, reservations, selectedReservationId, zoom, onZoom, onSelect }: ChartProps) {
   const [renderedAt] = useState(() => Date.now());
-  const operatingStart = new Date(board.businessDay.operatingStartAt);
-  const operatingEnd = new Date(board.businessDay.operatingEndAt);
+  const operatingWindow = getGhostOperatingWindow(board.businessDay.businessDate);
+  const operatingStart = new Date(operatingWindow.startAt);
+  const operatingEnd = new Date(operatingWindow.endAt);
   const totalMinutes = Math.max(60, (operatingEnd.getTime() - operatingStart.getTime()) / 60_000);
   const tickCount = Math.floor(totalMinutes / 30) + 1;
   const timeFormatter = new Intl.DateTimeFormat("ja-JP", {
@@ -43,12 +54,16 @@ export default function ChartView({ board, reservations, selectedReservationId, 
   });
   const ticks = Array.from({ length: tickCount }, (_, index) =>
     timeFormatter.format(new Date(operatingStart.getTime() + index * 30 * 60_000)));
-  const nowStyle = positionStyle(
-    new Date(renderedAt).toISOString(),
-    new Date(renderedAt + 60_000).toISOString(),
-    board.businessDay.operatingStartAt,
-    board.businessDay.operatingEndAt,
-  );
+  const showNowLine = renderedAt >= operatingStart.getTime()
+    && renderedAt <= operatingEnd.getTime();
+  const nowStyle = showNowLine
+    ? positionStyle(
+        new Date(renderedAt).toISOString(),
+        new Date(renderedAt + 60_000).toISOString(),
+        operatingWindow.startAt,
+        operatingWindow.endAt,
+      )
+    : null;
   const unassigned = reservations.filter((item) => item.tableIds.length === 0);
   const delayed = reservations.filter((item) => item.serviceStatus === "late");
   const conflicts = reservations.filter((item, index) => reservations.some((other, otherIndex) =>
@@ -95,7 +110,7 @@ export default function ChartView({ board, reservations, selectedReservationId, 
                         key={reservation.id}
                         type="button"
                         className={styles.timelineBar}
-                        style={positionStyle(reservation.startAt, reservation.endAt, board.businessDay.operatingStartAt, board.businessDay.operatingEndAt)}
+                        style={positionStyle(reservation.startAt, reservation.endAt, operatingWindow.startAt, operatingWindow.endAt)}
                         data-tone={meta.tone}
                         data-cue={meta.cue}
                         data-selected={reservation.id === selectedReservationId || undefined}
@@ -111,17 +126,19 @@ export default function ChartView({ board, reservations, selectedReservationId, 
                     <span
                       key={block.id}
                       className={styles.timelineBlock}
-                      style={positionStyle(block.startAt, block.endAt, board.businessDay.operatingStartAt, board.businessDay.operatingEndAt)}
+                      style={positionStyle(block.startAt, block.endAt, operatingWindow.startAt, operatingWindow.endAt)}
                     >
                       ブロック
                     </span>
                   ))}
-                  <span
-                    className={styles.nowLine}
-                    style={nowStyle}
-                    data-label={`現在 ${timeFormatter.format(renderedAt)}`}
-                    aria-hidden="true"
-                  />
+                  {nowStyle ? (
+                    <span
+                      className={styles.nowLine}
+                      style={nowStyle}
+                      data-label={`現在 ${timeFormatter.format(renderedAt)}`}
+                      aria-hidden="true"
+                    />
+                  ) : null}
                 </div>
               </div>
             );

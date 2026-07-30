@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, ArrowLeft, ArrowRight, Check, LockKeyhole, X } from "lucide-react";
 
+import { getGhostTimeOptions } from "@/lib/ghostOperatingHours";
 import type { VipFloorBoardV2, VipServiceStatus } from "@/lib/vipFloorV2Contract";
 
 import type {
@@ -38,20 +39,6 @@ type Props = {
   onRun: (draft: LiveCommandDraft) => void;
 };
 
-function localInputValue(value: string) {
-  const date = new Date(value);
-  const parts = new Intl.DateTimeFormat("sv-SE", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-    timeZone: "Asia/Tokyo",
-  }).format(date);
-  return parts.replace(" ", "T");
-}
-
 function toTokyoTimestamp(value: FormDataEntryValue | null) {
   const text = String(value ?? "").trim();
   return text ? `${text}:00+09:00` : new Date().toISOString();
@@ -71,6 +58,7 @@ export function CommandCenter({
   onRun,
 }: Props) {
   const demoMode = useDemoMode();
+  const [renderedAt] = useState(() => Date.now());
   const panelRef = useRef<HTMLDivElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
   const source = reservation
@@ -79,6 +67,13 @@ export function CommandCenter({
   const existingNote = source
     ? board.notes.find((item) => item.reservationId === source.id) ?? null
     : null;
+  const arrivalOptions = useMemo(() => {
+    if (!open || kind !== "arrival_time") return [];
+    return getGhostTimeOptions(board.businessDay.businessDate)
+      .slice(0, -1)
+      .filter((option) => Date.parse(`${option.value}:00+09:00`) <= renderedAt);
+  }, [board.businessDay.businessDate, kind, open, renderedAt]);
+  const arrivalDefault = arrivalOptions.at(-1)?.value ?? "";
   const impact = useMemo(() => {
     if (kind === "assignment") return demoMode.enabled
       ? "browser-local合成台帳の卓割当を置き換え、この端末の各viewへ反映します。"
@@ -86,7 +81,7 @@ export function CommandCenter({
     if (kind === "check_in") return demoMode.enabled
       ? "合成来店を確定し、着席開始と利用期限をbrowser-local台帳へ記録します。"
       : "来店を確定し、着席開始と利用期限をGHOST予約台帳へ記録します。";
-    if (kind === "arrival_time") return "入力した到着時刻を予約へ記録します。未来時刻は保存できません。";
+    if (kind === "arrival_time") return "22:00〜翌05:00の候補から選んだ到着時刻を予約へ記録します。未来時刻は保存できません。";
     if (kind === "seat_extension") return "現在の利用期限を15分単位、最大120分まで延長します。";
     if (kind === "note") return "500文字以内の現場共有メモを監査付きで保存します。";
     if (kind === "walk_in_cancel") return demoMode.enabled
@@ -277,13 +272,21 @@ export function CommandCenter({
             {kind === "arrival_time" ? (
               <label>
                 到着時刻
-                <input
-                  type="datetime-local"
+                <select
                   name="occurredAt"
-                  max={localInputValue(new Date().toISOString())}
-                  defaultValue={localInputValue(new Date().toISOString())}
+                  defaultValue={arrivalDefault}
+                  disabled={arrivalOptions.length === 0}
                   required
-                />
+                >
+                  {arrivalOptions.length === 0 ? (
+                    <option value="">営業時間内の過去時刻なし</option>
+                  ) : arrivalOptions.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+                <small className={styles.syntheticInputHint}>
+                  営業日 {board.businessDay.businessDate} / 15分単位 / 未来時刻は除外
+                </small>
               </label>
             ) : null}
 
@@ -410,7 +413,7 @@ export function CommandCenter({
                   ? styles.dangerButton
                   : styles.primaryButton
               }
-              disabled={pending}
+              disabled={pending || (kind === "arrival_time" && arrivalOptions.length === 0)}
             >
               {pending ? "反映中" : step === 1
                 ? <>確認へ<ArrowRight size={16} /></>
