@@ -69,6 +69,24 @@ Measured before → after (dense 14-reservation board):
 7. **The idle state costs no pixels.** The live region is visually hidden until
    there is something to say.
 
+### Owner access — Basic credentials, no PIN screen
+
+The Production Owner lane uses the outer username/password challenge as its
+only visible sign-in task. After those credentials pass, the server exchanges
+them for the existing short-lived Owner admin session; the browser never shows
+or submits an Owner PIN.
+
+- While that exchange runs, the warm-white threshold shows only GHOST identity,
+  the real 1F floor geometry and a compact authentication status.
+- Failure stays fail-closed and offers one **再接続** action. It does not fall
+  back to a PIN field or disclose authentication detail.
+- Tablet and phone remove the floor-plan pane and keep brand, state and recovery
+  within a single scroll-free reading path.
+- The isolated synthetic-data demo lane retains its own demo PIN and cannot
+  enter the Production Owner lane.
+- Graphite carries actions; champagne is limited to rules and orientation
+  labels. There are no glass, gradient, floating-card or generic SaaS surfaces.
+
 ---
 
 ## 4. Tokens

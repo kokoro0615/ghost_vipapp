@@ -547,7 +547,7 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
             ok: false,
             code: "INSUFFICIENT_ROLE",
             message: "この操作を実行する権限がありません。",
-            recovery: "Owner専用PINでログインしてください。",
+            recovery: "Ownerのユーザー名とパスワードでページを開き直してください。",
           },
         });
         return false;
@@ -787,7 +787,7 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
               : "この操作はOwner専用です。",
           recovery: offline
             ? "接続復帰後に台帳を再読込してください。"
-            : "Owner専用PINでログインしてください。",
+            : "Ownerのユーザー名とパスワードでページを開き直してください。",
         },
       });
       return false;

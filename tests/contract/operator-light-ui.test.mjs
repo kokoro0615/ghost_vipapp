@@ -85,6 +85,35 @@ test("the wizard never spends alert colour on a state the operator cannot act on
   assert.doesNotMatch(reservationWizard, /data-ok=/u);
 });
 
+test("owner Basic access never renders a PIN field and demo PIN stays isolated", () => {
+  assert.match(workspace, /className=\{styles\.loginFrame\}/u);
+  assert.match(workspace, /GHOST Osaka 1階VIPフロア座席図/u);
+  assert.match(workspace, /if \(!demo\.config\)/u);
+  assert.match(workspace, /ユーザー名とパスワードを確認しています/u);
+  assert.match(workspace, /PIN入力は不要です/u);
+  assert.match(workspace, /window\.location\.reload\(\)/u);
+  assert.match(workspace, /デモ専用PIN/u);
+  assert.match(workspace, /type="password"/u);
+  assert.match(workspace, /aria-invalid=\{loginFailed\}/u);
+  assert.match(workspace, /loginInputRef\.current\?\.focus\(\)/u);
+  assert.match(workspace, /"フロアを開く"/u);
+  const ownerBoundary = workspace.slice(
+    workspace.indexOf("if (!demo.config)"),
+    workspace.indexOf("return (", workspace.indexOf("if (!demo.config)") + 1),
+  );
+  assert.doesNotMatch(ownerBoundary, /<input|専用PIN|type="password"/u);
+  assert.match(workspaceStyles, /\.loginFrame \{[\s\S]*?grid-template-columns:/u);
+  assert.match(workspaceStyles, /vipmapv3\.9239fd2174\.webp/u);
+  assert.match(
+    workspaceStyles,
+    /@media \(max-width: 1023px\) \{[\s\S]*?\.loginFrame \{[\s\S]*?border: 0;[\s\S]*?\.loginIdentityBody, \.loginPlan \{ display: none;/u,
+  );
+  assert.doesNotMatch(
+    workspaceStyles.match(/\.loginPanel \{[\s\S]*?\n\}/u)?.[0] ?? "",
+    /box-shadow/u,
+  );
+});
+
 test("desktop keeps summary, work views, queue and inspector without stacking chrome", () => {
   // Two columns, not three: the focal view is never squeezed between two rails.
   assert.match(workspaceStyles, /grid-template-columns:\s*minmax\(0,\s*1fr\)\s*var\(--inspector-w\)/u);

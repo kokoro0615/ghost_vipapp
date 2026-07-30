@@ -138,7 +138,7 @@ async function main() {
       });
     });
     await page.goto(normal.origin, { waitUntil: "domcontentloaded" });
-    await page.getByLabel("Owner専用PIN").waitFor({ state: "visible" });
+    await page.getByRole("heading", { name: "接続を完了できませんでした" }).waitFor({ state: "visible" });
     assert.equal(
       await page.getByText(/Trial終了・本番移行作業中/u).count(),
       0,

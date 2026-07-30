@@ -11,7 +11,14 @@ import {
   readDemoSessionCookie,
   verifyDemoSession,
 } from "@/lib/demo/session.server";
-import { clearAdminToken, copyJson, ghostAdminFetch, readAdminToken } from "@/lib/server/ghostAdminProxy";
+import {
+  clearAdminToken,
+  copyJson,
+  ghostAdminFetch,
+  loginBasicOwnerSession,
+  readAdminToken,
+  setAdminToken,
+} from "@/lib/server/ghostAdminProxy";
 import { normalizeVipAdminRole } from "@/lib/adminPermissions";
 
 export const runtime = "nodejs";
@@ -37,8 +44,31 @@ function demoFailure(status: 401 | 410, error: string) {
 }
 
 async function getOwnerSession(request: Request) {
-  const token = readAdminToken(request);
-  if (!token) return NextResponse.json({ ok: false, error: "missing_admin_session" }, { status: 401 });
+  let token = readAdminToken(request);
+  let issuedExpiresAt: string | undefined;
+
+  if (!token) {
+    const loginResponse = await loginBasicOwnerSession();
+    if (!loginResponse) {
+      return NextResponse.json(
+        { ok: false, error: "owner_basic_session_unavailable" },
+        { status: 503, headers: { "cache-control": "no-store" } },
+      );
+    }
+    const loginPayload = await copyJson(loginResponse) as {
+      token?: string;
+      expiresAt?: string;
+    } & Record<string, unknown>;
+    if (!loginResponse.ok || !loginPayload.token) {
+      return NextResponse.json(
+        { ok: false, error: "owner_basic_session_unavailable" },
+        { status: 503, headers: { "cache-control": "no-store" } },
+      );
+    }
+    token = loginPayload.token;
+    issuedExpiresAt = loginPayload.expiresAt;
+  }
+
   const response = await ghostAdminFetch("/api/admin/session", {}, token);
   const payload = await copyJson(response);
   if (response.status === 401 || payload?.ok !== true) {
@@ -58,6 +88,7 @@ async function getOwnerSession(request: Request) {
     { ok: true, mode: "owner", role, displayName: payload?.displayName ?? null },
     { status: response.status, headers: { "cache-control": "no-store" } },
   );
+  if (issuedExpiresAt) setAdminToken(local, token, issuedExpiresAt);
   clearDemoSessionCookie(local);
   return local;
 }

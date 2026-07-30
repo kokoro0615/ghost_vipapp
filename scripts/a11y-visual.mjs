@@ -118,7 +118,7 @@ async function auditViewport(context, viewport) {
 
   const loginPage = await newQaPage(context, { authenticated: false });
   await loginPage.goto(origin, { waitUntil: "domcontentloaded" });
-  await loginPage.getByLabel("Owner専用PIN").waitFor();
+  await loginPage.getByRole("heading", { name: "接続を完了できませんでした" }).waitFor();
   await capture(loginPage, "login");
   await loginPage.close();
 

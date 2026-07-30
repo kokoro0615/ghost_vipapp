@@ -1021,11 +1021,13 @@ async function runUiRegression(config, reservationId, uiReservationPlan) {
       if (response.status() >= 500) failures.push(`http_${response.status()}`);
     });
 
+    const pinLogin = await context.request.post(`${config.origin.origin}/api/admin/session/pin`, {
+      data: { pin: config.pin },
+    });
+    assert(pinLogin.ok(), `ui_owner_session_bootstrap_failed:${pinLogin.status()}`);
     await page.goto(`${config.origin.origin}/?view=list&date=${config.businessDate}`, {
       waitUntil: "networkidle",
     });
-    await page.getByLabel("Owner専用PIN").fill(config.pin);
-    await page.getByRole("button", { name: "ログイン" }).click();
     await page.getByRole("navigation", { name: "主要ナビゲーション" }).waitFor();
     authTransitionConsoleExpected = false;
 
@@ -1173,7 +1175,7 @@ async function runUiRegression(config, reservationId, uiReservationPlan) {
       .catch(() => {
         throw new Error("ui_logout_click_failed");
       });
-    await page.getByLabel("Owner専用PIN").waitFor();
+    await page.getByRole("heading", { name: /VIP Managerを開いています|接続を完了できませんでした/u }).waitFor();
 
     assert(failures.length === 0, `ui_runtime_failures:${[...new Set(failures)].join(",")}`);
     await context.close();

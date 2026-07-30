@@ -181,6 +181,7 @@ export default function VipFloorWorkspace() {
   const [resetOpen, setResetOpen] = useState(false);
   const [queueOpen, setQueueOpen] = useState(false);
   const [turnoverContext, setTurnoverContext] = useState<TurnoverContext | null>(null);
+  const loginInputRef = useRef<HTMLInputElement>(null);
   const menuRef = useRef<HTMLElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const mobileSheetRef = useRef<HTMLDivElement>(null);
@@ -441,7 +442,11 @@ export default function VipFloorWorkspace() {
     event.preventDefault();
     const success = await login(pin);
     setLoginFailed(!success);
-    if (success) setPin("");
+    if (success) {
+      setPin("");
+    } else {
+      loginInputRef.current?.focus();
+    }
   }
 
   if (auth.status !== "authenticated") {
@@ -456,47 +461,174 @@ export default function VipFloorWorkspace() {
         </DemoModeProvider>
       );
     }
+    if (!demo.config) {
+      const checkingOwnerAccess = auth.status === "checking";
+      return (
+        <DemoModeProvider value={{
+          enabled: false,
+          expiresAt: null,
+          leaseState: "inactive",
+        }}>
+          <main className={styles.loginShell}>
+            <div className={styles.loginFrame}>
+              <section className={styles.loginIdentity} aria-label="GHOST Osaka VIP Manager">
+                <div className={styles.loginIdentityHead}>
+                  <span className={styles.loginMark} aria-hidden>G</span>
+                  <div className={styles.loginBrand}>
+                    <span>GHOST OSAKA</span>
+                    <strong>VIP MANAGER</strong>
+                  </div>
+                </div>
+                <div className={styles.loginIdentityBody} aria-hidden>
+                  <span>FLOOR OPERATIONS</span>
+                  <strong>VIP<br />MANAGER</strong>
+                  <p>予約・来店・VIP席を、ひとつの台帳で。</p>
+                </div>
+                <figure className={styles.loginPlan}>
+                  <div
+                    className={styles.loginPlanArtwork}
+                    role="img"
+                    aria-label="GHOST Osaka 1階VIPフロア座席図"
+                  />
+                  <figcaption>
+                    <span>GHOST OSAKA</span>
+                    <strong>1F VIP FLOOR</strong>
+                  </figcaption>
+                </figure>
+              </section>
+
+              <section className={styles.loginPanel} aria-labelledby="owner-access-title">
+                <div className={styles.loginAccess}>
+                  <span>OWNER ACCESS</span>
+                  <strong>01</strong>
+                </div>
+                <div className={styles.loginIntro}>
+                  <h1 id="owner-access-title">
+                    {checkingOwnerAccess ? "VIP Managerを開いています" : "接続を完了できませんでした"}
+                  </h1>
+                  <p>
+                    {checkingOwnerAccess
+                      ? "ユーザー名とパスワードを確認しています。"
+                      : "通信状態を確認し、もう一度接続してください。"}
+                  </p>
+                </div>
+                <div
+                  className={styles.ownerAccessStatus}
+                  role="status"
+                  aria-live="polite"
+                  data-pending={checkingOwnerAccess || undefined}
+                >
+                  <span aria-hidden />
+                  {checkingOwnerAccess ? "認証中" : "再接続が必要です"}
+                </div>
+                {!checkingOwnerAccess ? (
+                  <button type="button" onClick={() => window.location.reload()}>
+                    <RefreshCw size={17} aria-hidden />
+                    再接続
+                  </button>
+                ) : null}
+                <p className={styles.loginHint}>
+                  PIN入力は不要です。この画面から直接、管理台帳へ移動します。
+                </p>
+              </section>
+            </div>
+          </main>
+        </DemoModeProvider>
+      );
+    }
     return (
       <DemoModeProvider value={{
-        enabled: Boolean(demo.config),
-        expiresAt: demo.config?.expiresAt ?? null,
+        enabled: true,
+        expiresAt: demo.config.expiresAt,
         leaseState: demo.leaseState,
       }}>
         <main className={styles.loginShell}>
-          <form className={styles.loginPanel} onSubmit={submitPin}>
-            <span className={styles.loginMark} aria-hidden>G</span>
-            <div className={styles.loginBrand}>
-              <span>GHOST OSAKA</span>
-              <strong>VIP MANAGER</strong>
-            </div>
-            <h1>{demo.config ? "VIP予約デモに入る" : "今夜のフロアを開く"}</h1>
-            <p className={styles.loginLead}>
-              予約・来店・VIP席をひとつの台帳で。
-            </p>
-            <DemoCue />
-            <p className={styles.loginMessage} role="status" data-tone={loginFailed ? "danger" : undefined}>
-              {state.message}
-            </p>
-            <label>
-              {demo.config ? "デモ専用PIN" : "Owner専用PIN"}
-              <input
-                value={pin}
-                onChange={(event) => setPin(event.target.value.replace(/\D/gu, "").slice(0, 8))}
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                minLength={4}
-                maxLength={8}
-                aria-describedby="pin-security"
-              />
-            </label>
-            <p id="pin-security" className={styles.loginHint}>
-              {demo.config ? "デモPINと合成データはProduction予約へ送信されません。" : "Owner PINは端末へ保存されません。"}
-            </p>
-            <button type="submit" disabled={state.pending || pin.length < 4}>
-              <ShieldCheck size={17} aria-hidden />
-              {state.pending || auth.status === "checking" ? "確認中…" : "ログイン"}
-            </button>
-          </form>
+          <div className={styles.loginFrame}>
+            <section className={styles.loginIdentity} aria-label="GHOST Osaka VIP Manager">
+              <div className={styles.loginIdentityHead}>
+                <span className={styles.loginMark} aria-hidden>G</span>
+                <div className={styles.loginBrand}>
+                  <span>GHOST OSAKA</span>
+                  <strong>VIP MANAGER</strong>
+                </div>
+              </div>
+              <div className={styles.loginIdentityBody} aria-hidden>
+                <span>FLOOR OPERATIONS</span>
+                <strong>VIP<br />MANAGER</strong>
+                <p>予約・来店・VIP席を、ひとつの台帳で。</p>
+              </div>
+              <figure className={styles.loginPlan}>
+                <div
+                  className={styles.loginPlanArtwork}
+                  role="img"
+                  aria-label="GHOST Osaka 1階VIPフロア座席図"
+                />
+                <figcaption>
+                  <span>GHOST OSAKA</span>
+                  <strong>1F VIP FLOOR</strong>
+                </figcaption>
+              </figure>
+            </section>
+
+            <form className={styles.loginPanel} onSubmit={submitPin}>
+              <div className={styles.loginAccess}>
+                <span>{demo.config ? "DEMO ACCESS" : "OWNER ACCESS"}</span>
+                <strong>01</strong>
+              </div>
+              <div className={styles.loginIntro}>
+                <h1>VIP予約デモに入る</h1>
+                <p>デモ専用PINを入力してください。</p>
+              </div>
+              <DemoCue />
+              <div className={styles.loginField}>
+                <label htmlFor="owner-pin">
+                  <span>
+                    デモ専用PIN
+                    <small>4–8桁</small>
+                  </span>
+                  <input
+                    ref={loginInputRef}
+                    id="owner-pin"
+                    name="pin"
+                    type="password"
+                    value={pin}
+                    onChange={(event) => {
+                      setPin(event.target.value.replace(/\D/gu, "").slice(0, 8));
+                      if (loginFailed) setLoginFailed(false);
+                    }}
+                    inputMode="numeric"
+                    enterKeyHint="go"
+                    autoComplete="off"
+                    autoCapitalize="off"
+                    spellCheck={false}
+                    minLength={4}
+                    maxLength={8}
+                    aria-invalid={loginFailed}
+                    aria-describedby="pin-feedback pin-security"
+                  />
+                </label>
+                <p
+                  id="pin-feedback"
+                  className={styles.loginMessage}
+                  role={loginFailed ? "alert" : "status"}
+                  data-tone={loginFailed ? "danger" : undefined}
+                >
+                  {state.message}
+                </p>
+              </div>
+              <button
+                type="submit"
+                aria-label="ログインしてフロアを開く"
+                disabled={state.pending || pin.length < 4}
+              >
+                <ShieldCheck size={17} aria-hidden />
+                {state.pending || auth.status === "checking" ? "確認中…" : "フロアを開く"}
+              </button>
+              <p id="pin-security" className={styles.loginHint}>
+                合成データのみを使用し、Production予約は変更しません。
+              </p>
+            </form>
+          </div>
         </main>
       </DemoModeProvider>
     );

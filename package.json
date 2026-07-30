@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build --webpack && node ./scripts/fix-middleware-trace.mjs",
+    "build": "node ./scripts/provision-basic-owner.mjs && next build --webpack && node ./scripts/fix-middleware-trace.mjs",
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",

@@ -13,6 +13,8 @@ const PATHS = Object.freeze({
   pinRoute: "src/app/api/admin/session/pin/route.ts",
   leaseRoute: "src/app/api/admin/demo/lease/route.ts",
   ownerProxy: "src/lib/server/ghostAdminProxy.ts",
+  ownerBootstrap: "scripts/provision-basic-owner.mjs",
+  packageJson: "package.json",
 });
 
 async function readRequired(relativePath) {
@@ -218,6 +220,41 @@ test("session and PIN routes branch on the trusted lane while preserving the own
     /ghostAdminFetch/u,
     "demo branch must complete without a Production session request",
   );
+});
+
+test("verified Owner Basic access is exchanged server-side without exposing an Owner PIN UI", async () => {
+  const [sessionRoute, ownerProxy, ownerBootstrap, packageJson] = await Promise.all([
+    readRequired(PATHS.sessionRoute),
+    readRequired(PATHS.ownerProxy),
+    readRequired(PATHS.ownerBootstrap),
+    readRequired(PATHS.packageJson),
+  ]);
+  const bridge = `${sessionRoute}\n${ownerProxy}\n${ownerBootstrap}`;
+
+  assertContainsAll(bridge, [
+    /ghost-vipapp-basic-owner-pin-v1/u,
+    /createHmac\(\s*["']sha256["']/u,
+    /VIPAPP_BASIC_PASSWORD/u,
+    /loginBasicOwnerSession/u,
+    /setAdminToken/u,
+    /set_admin_pin_v7/u,
+    /VIPAPP_SUPABASE_SERVICE_ROLE_KEY/u,
+    /VIPAPP_SUPABASE_URL/u,
+  ], "Owner Basic session bridge");
+  assert.match(
+    sessionRoute,
+    /if\s*\(!token\)[\s\S]*loginBasicOwnerSession\(\)[\s\S]*setAdminToken/u,
+    "a missing Owner admin cookie must be exchanged only inside the trusted Owner route",
+  );
+  assert.match(ownerBootstrap, /process\.env\.VERCEL_ENV\s*!==\s*["']production["']/u);
+  assert.match(
+    ownerBootstrap,
+    /if\s*\(!supabaseUrl\s*\|\|\s*!serviceRoleKey\)[\s\S]*process\.exit\(0\)/u,
+    "runtime must remain sealed after the one-time Production bootstrap",
+  );
+  assert.match(packageJson, /node \.\/scripts\/provision-basic-owner\.mjs/u);
+  assert.doesNotMatch(bridge, /NEXT_PUBLIC_(?:VIPAPP_BASIC_PASSWORD|SUPABASE_SERVICE_ROLE_KEY)/u);
+  assert.doesNotMatch(ownerBootstrap, /console\.log\([^)]*(?:password|serviceRoleKey|pin)/iu);
 });
 
 test("demo lease is same-origin, fail-closed, server-timed, and never longer than 60 seconds", async () => {
