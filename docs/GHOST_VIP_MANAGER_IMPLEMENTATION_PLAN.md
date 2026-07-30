@@ -23,7 +23,7 @@
 | T-026 | done | PII-free durable metrics、p95/error/outbox/realtime SLO・alert・retention |
 | T-027 | done | synthetic logical restore、partial fault、interrupted DDL rollback、v8/v14 dual-readをtransaction内で再演 |
 | T-028 | done | exact SHAのpreview candidate 2件をREADY化。production aliasは旧READYのまま保持しrollback地点を固定 |
-| T-029 | done (local) | `paid`予約の1タップ退店・席解放、同卓次予約の自動選択と1タップcheck-inをstandalone正本へ実装。lint/typecheck、unit17、contract75、PII、build、maintenance、Chromium 1440/390の44-state visual/a11y PASS |
+| T-029 | done (Production) | `paid`予約の1タップ退店・席解放、同卓次予約の自動選択と1タップcheck-inをcommit `dadcc3e`へ固定。lint/typecheck、unit17、contract75、PII、build、maintenance、Chromium 1440/390の44-state visual/a11y PASS。Production `dpl_9PdZJYcNiN1oA6qyeZARn796LBwB`へ反映 |
 
 G0〜G3、G5〜G7とG4自動品質GateはPASS。実Safari機によるT-025の外部確認だけを
 promotion前のhuman/device witnessとして残す。production mutation flagsは引き続きOFFとし、
