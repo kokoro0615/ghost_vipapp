@@ -25,6 +25,7 @@ import {
   readSafeBoardCache,
   writeSafeBoardCache,
 } from "@/lib/vipFloorRealtime";
+import { readVipOperationFailure } from "@/lib/vipFloorClientErrors";
 
 import type {
   LiveCommandDraft,
@@ -53,6 +54,8 @@ type AuthState =
   | { status: "unauthenticated"; session: null }
   | { status: "authenticated"; session: Session };
 
+const STREAM_RECONNECT_GRACE_MS = 6_000;
+
 function currentBusinessDate() {
   const businessClock = new Date(Date.now() - 5 * 60 * 60 * 1000);
   return new Intl.DateTimeFormat("sv-SE", {
@@ -64,13 +67,7 @@ function currentBusinessDate() {
 }
 
 function readErrorMessage(status: number, payload: Record<string, unknown>) {
-  if (status === 401) return "セッションが終了しました。PINで再ログインしてください。";
-  if (status === 403) return "この操作を行う権限がないか、更新スイッチが停止中です。";
-  if (status === 409) return "別の端末で予約が更新されました。最新状態を読み直してください。";
-  if (status === 429) return "操作回数が上限に達しました。少し待って再試行してください。";
-  return typeof payload.error === "string"
-    ? `保存できませんでした（${payload.error}）`
-    : "保存できませんでした。通信状態を確認して再試行してください。";
+  return readVipOperationFailure(status, payload).message;
 }
 
 function readDemoConfig(payload: Session): DemoPublicConfig | null {
@@ -364,8 +361,13 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
     const events = new EventSource(
       `/api/admin/vip-floor/events?date=${encodeURIComponent(businessDate)}&since=${revisionAtConnect}`,
     );
+    let hasOpened = false;
+    let streamUnavailable = false;
+    let reconnectTimer: number | null = null;
 
     const markStreamUnavailable = () => {
+      if (streamUnavailable) return;
+      streamUnavailable = true;
       void reportRealtimeMetric({
         event: "realtime_unavailable",
         businessDate,
@@ -377,6 +379,27 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
         message: "再接続中 — 更新操作は停止中",
       });
     };
+
+    const scheduleStreamUnavailable = () => {
+      if (reconnectTimer !== null) return;
+      reconnectTimer = window.setTimeout(() => {
+        reconnectTimer = null;
+        markStreamUnavailable();
+      }, STREAM_RECONNECT_GRACE_MS);
+    };
+
+    events.addEventListener("open", () => {
+      const isReconnect = hasOpened || reconnectTimer !== null || streamUnavailable;
+      hasOpened = true;
+      if (reconnectTimer !== null) {
+        window.clearTimeout(reconnectTimer);
+        reconnectTimer = null;
+      }
+      if (isReconnect) {
+        streamUnavailable = false;
+        void loadBoard(businessDate);
+      }
+    });
 
     events.addEventListener("revision", (event) => {
       try {
@@ -416,9 +439,12 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
       }
     });
     events.addEventListener("unavailable", markStreamUnavailable);
-    events.addEventListener("error", markStreamUnavailable);
+    events.addEventListener("error", scheduleStreamUnavailable);
 
-    return () => events.close();
+    return () => {
+      if (reconnectTimer !== null) window.clearTimeout(reconnectTimer);
+      events.close();
+    };
   }, [
     auth.status,
     authMode,
@@ -458,7 +484,7 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
           type: "commandOutcome",
           outcome: {
             ok: false,
-            code: String(payload.error ?? response.status),
+            code: readVipOperationFailure(response.status, payload).code,
             message: response.status === 429
               ? "試行回数の上限です。時間をおいてください。"
               : "PINを確認してください。",
@@ -613,7 +639,7 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
         if (response.status === 401) setAuth({ status: "unauthenticated", session: null });
         const outcome = {
           ok: false as const,
-          code: String(payload.error ?? response.status),
+          code: readVipOperationFailure(response.status, payload).code,
           message: readErrorMessage(response.status, payload),
           recovery: response.status === 409
             ? "最新状態を読み込み、内容を確認してから再実行してください。"
@@ -737,7 +763,7 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
           type: "commandOutcome",
           outcome: {
             ok: false,
-            code: String(payload.error ?? response.status),
+            code: readVipOperationFailure(response.status, payload).code,
             message: eventDayMissing
               ? "選択した日は予約を受け付ける営業日として登録されていません。"
               : readErrorMessage(response.status, payload),
@@ -838,13 +864,14 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
       const payload = await response.json().catch(() => ({})) as Record<string, unknown>;
 
       if (!response.ok) {
+        const failure = readVipOperationFailure(response.status, payload);
         const outcome = {
           ok: false as const,
-          code: String(payload.error ?? response.status),
-          message: readErrorMessage(response.status, payload),
+          code: failure.code,
+          message: failure.message,
           recovery: Number(payload.completedCount ?? 0) > 0
             ? "繰返しの一部だけ保存済みです。台帳を再読込して対象日を確認してください。"
-            : "入力、卓の空き、ブロック競合を確認して再試行してください。",
+            : failure.recovery,
         };
         await loadBoard(businessDate);
         dispatch({
@@ -904,7 +931,7 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
           type: "commandOutcome",
           outcome: {
             ok: false,
-            code: String(payload.error ?? response.status),
+            code: readVipOperationFailure(response.status, payload).code,
             message: readErrorMessage(response.status, payload),
             recovery: "Owner sessionと営業日を確認して再読込してください。",
           },
@@ -983,7 +1010,7 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
           type: "commandOutcome",
           outcome: {
             ok: false,
-            code: String(payload.error ?? response.status),
+            code: readVipOperationFailure(response.status, payload).code,
             message: readErrorMessage(response.status, payload),
             recovery: response.status === 409
               ? "Waitlistを再読込して最新versionから実行してください。"
@@ -1082,7 +1109,7 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
           type: "commandOutcome",
           outcome: {
             ok: false,
-            code: String(payload.error ?? response.status),
+            code: readVipOperationFailure(response.status, payload).code,
             message: readErrorMessage(response.status, payload),
             recovery: response.status === 409
               ? "担当卓を再読込し、最新versionで再実行してください。"

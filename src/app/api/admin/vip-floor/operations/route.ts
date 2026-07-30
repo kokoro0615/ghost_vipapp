@@ -85,7 +85,10 @@ export async function POST(request: Request) {
     );
     const createResult = await copyJson(createResponse) as Record<string, unknown>;
     if (!createResponse.ok) {
-      return NextResponse.json(createResult, { status: createResponse.status });
+      return NextResponse.json(
+        normalizeOperationFailurePayload(createResponse.status, createResult),
+        { status: createResponse.status },
+      );
     }
     if (payload.value.notificationPreference !== "email") {
       return NextResponse.json({ ...createResult, notification: { requested: false } });
@@ -143,7 +146,10 @@ export async function POST(request: Request) {
     );
     const updateResult = await copyJson(updateResponse) as Record<string, unknown>;
     if (!updateResponse.ok) {
-      return NextResponse.json(updateResult, { status: updateResponse.status });
+      return NextResponse.json(
+        normalizeOperationFailurePayload(updateResponse.status, updateResult),
+        { status: updateResponse.status },
+      );
     }
     if (payload.value.command.notificationPreference !== "email") {
       return NextResponse.json({ ...updateResult, notification: { requested: false } });
@@ -659,7 +665,43 @@ async function forwardOperation(
   );
   const result = await copyJson(response);
 
-  return NextResponse.json(result, { status: response.status });
+  return NextResponse.json(
+    response.ok
+      ? result
+      : normalizeOperationFailurePayload(response.status, result),
+    {
+      status: response.status,
+      headers: { "Cache-Control": "no-store" },
+    },
+  );
+}
+
+function normalizeOperationFailurePayload(status: number, value: unknown) {
+  const payload = value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+  const error = payload.error;
+  const errorRecord = error && typeof error === "object" && !Array.isArray(error)
+    ? error as Record<string, unknown>
+    : null;
+  const code = typeof error === "string"
+    ? error
+    : typeof errorRecord?.code === "string"
+      ? errorRecord.code
+      : "operation_failed";
+  const details = errorRecord?.details && typeof errorRecord.details === "object"
+    && !Array.isArray(errorRecord.details)
+    ? errorRecord.details
+    : payload.details;
+  const currentVersion = payload.currentVersion ?? errorRecord?.currentVersion;
+
+  return {
+    ok: false,
+    error: code,
+    ...(details === undefined ? {} : { details }),
+    ...(currentVersion === undefined ? {} : { currentVersion }),
+    status,
+  };
 }
 
 function readUuid(value: unknown) {

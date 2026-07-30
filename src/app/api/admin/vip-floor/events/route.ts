@@ -103,6 +103,7 @@ export async function GET(request: Request) {
         if (!closed) controller.enqueue(encoder.encode(": heartbeat\n\n"));
       }, 10_000);
       request.signal.addEventListener("abort", close, { once: true });
+      controller.enqueue(encoder.encode("retry: 1000\n\n"));
       void poll();
       lifetimeTimer = setTimeout(close, 25_000);
     },
