@@ -2,11 +2,12 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-const [globals, layout, workspace, workspaceStyles] = await Promise.all([
+const [globals, layout, workspace, workspaceStyles, floorView] = await Promise.all([
   readFile(new URL("../../src/app/globals.css", import.meta.url), "utf8"),
   readFile(new URL("../../src/app/layout.tsx", import.meta.url), "utf8"),
   readFile(new URL("../../src/components/admin/vip-floor-v2/VipFloorWorkspace.tsx", import.meta.url), "utf8"),
   readFile(new URL("../../src/components/admin/vip-floor-v2/VipFloorWorkspace.module.css", import.meta.url), "utf8"),
+  readFile(new URL("../../src/components/admin/vip-floor-v2/floor/FloorView.tsx", import.meta.url), "utf8"),
 ]);
 
 test("VIP Manager keeps a white operator surface authored in OKLCH", () => {
@@ -61,6 +62,19 @@ test("the idle live region costs no vertical space", () => {
   assert.match(workspaceStyles, /\.liveMessage \{[\s\S]*?clip-path:\s*inset\(50%\)/u);
   assert.match(workspaceStyles, /\.liveMessage\[data-visible\]/u);
   assert.match(workspace, /data-visible=\{busy \|\| undefined\}/u);
+});
+
+test("the real floor plan stays full-colour and its controls cannot collapse", () => {
+  assert.match(floorView, /unoptimized/u);
+  assert.match(floorView, /カラー座席図/u);
+  assert.match(workspaceStyles, /\.floorImage\s*\{[\s\S]*?filter:\s*none;/u);
+  assert.match(workspaceStyles, /\.tableNode\s*\{[\s\S]*?min-width:\s*52px;/u);
+  assert.match(workspaceStyles, /\.tableNode\s*\{[\s\S]*?min-height:\s*var\(--h-control\);/u);
+});
+
+test("the eight table rows consume the available chart height", () => {
+  assert.match(workspaceStyles, /\.timelineGrid\s*\{[\s\S]*?min-height:\s*100%;[\s\S]*?flex-direction:\s*column;/u);
+  assert.match(workspaceStyles, /\.timelineRow\s*\{[\s\S]*?flex:\s*1 0 56px;/u);
 });
 
 test("status emphasis uses horizontal rules instead of AI-like colored side tabs", () => {

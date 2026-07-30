@@ -786,6 +786,19 @@ const tableIds = Array.from(
   (_, index) => `00000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
 );
 
+// Match the Production GHOST floor geometry. The earlier oversized 15×17%
+// fixture masked undersized table controls that occur at the real 4.15–4.7%.
+const qaTableGeometry = [
+  { x: 72.8, y: 17.9, size: 4.7, rotation: 0 },
+  { x: 71.6, y: 71.9, size: 4.45, rotation: -6 },
+  { x: 50.9, y: 71.6, size: 4.45, rotation: 0 },
+  { x: 40.8, y: 71.6, size: 4.45, rotation: 0 },
+  { x: 42.5, y: 53.3, size: 4.3, rotation: 0 },
+  { x: 51.9, y: 53.3, size: 4.3, rotation: 0 },
+  { x: 51.8, y: 16.1, size: 4.15, rotation: 0 },
+  { x: 44.2, y: 16.1, size: 4.15, rotation: 0 },
+];
+
 const board = {
   schemaVersion: "vip-floor.v2",
   generatedAt: "2026-07-26T13:15:00.000Z",
@@ -806,31 +819,34 @@ const board = {
     cancelReservation: true,
   },
   sections: [],
-  tables: tableIds.map((id, index) => ({
-    id,
-    version: 3,
-    publicResourceCode: `VIP-${index + 1}`,
-    displayCode: `VIP-${index + 1}`,
-    name: `VIP TABLE ${index + 1}`,
-    sectionId: "",
-    capacityMin: 1,
-    capacityMax: index === 0 ? 7 : 6,
-    onlineEligible: true,
-    geometry: {
-      shape: "rect",
-      xPercent: 18 + (index % 4) * 22,
-      yPercent: 33 + Math.floor(index / 4) * 35,
-      widthPercent: 15,
-      heightPercent: 17,
-      rotationDegrees: 0,
-    },
-    operationalLocked: false,
-    lockReason: null,
-    reservationIds: index === 0
-      ? ["20000000-0000-4000-8000-000000000001"]
-      : [],
-    blockIds: [],
-  })),
+  tables: tableIds.map((id, index) => {
+    const geometry = qaTableGeometry[index];
+    return {
+      id,
+      version: 3,
+      publicResourceCode: `VIP-${index + 1}`,
+      displayCode: `VIP-${index + 1}`,
+      name: `VIP TABLE ${index + 1}`,
+      sectionId: "",
+      capacityMin: 1,
+      capacityMax: index === 0 ? 7 : 6,
+      onlineEligible: true,
+      geometry: {
+        shape: "rect",
+        xPercent: geometry.x,
+        yPercent: geometry.y,
+        widthPercent: geometry.size,
+        heightPercent: geometry.size,
+        rotationDegrees: geometry.rotation,
+      },
+      operationalLocked: false,
+      lockReason: null,
+      reservationIds: index === 0
+        ? ["20000000-0000-4000-8000-000000000001"]
+        : [],
+      blockIds: [],
+    };
+  }),
   reservations: [{
     id: "20000000-0000-4000-8000-000000000001",
     version: 4,

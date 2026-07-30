@@ -66,10 +66,11 @@ export default function FloorView({
         <div className={styles.floorPlan}>
           <Image
             src="/media/images/vipmapv3.9239fd2174.webp"
-            alt="GHOST Osaka VIPフロア座席図"
+            alt="GHOST Osaka VIPフロアのカラー座席図"
             width={1672}
             height={940}
             priority
+            unoptimized
             sizes="(min-width: 1280px) 900px, (min-width: 768px) 72vw, 100vw"
             className={styles.floorImage}
           />

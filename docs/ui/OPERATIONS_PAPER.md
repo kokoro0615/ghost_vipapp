@@ -175,9 +175,21 @@ the QA harness — change both together.
 
 The plan shrink-wraps the asset (1672×940) so table geometry lands on the room,
 and it sits on `--paper` as a drawing laid on the desk. Table nodes occupy
-their **real footprint** from `geometry.widthPercent/heightPercent`, which is
-what stops them overlapping. Below 1024px the plan holds a legible 700px width
-and the canvas pans rather than shrinking the room to illegibility.
+their real coordinate from `geometry.xPercent/yPercent`. The source WebP keeps
+its authentic black-violet and champagne colour and bypasses a second image
+encode. Because Production footprints are only 4.15–4.7% of the plan, the
+interactive node expands to at least 52×44px around that coordinate instead of
+clipping its label inside the raw footprint. Below 1024px the plan holds a
+legible 700px width and the canvas pans rather than shrinking the room to
+illegibility.
+
+### Chart
+
+The chart header stays 32px and each official `VIP-1` through `VIP-8` row keeps
+a 56px floor. When the viewport is taller, the rows share the available height
+equally; when it is shorter, they retain the floor and the chart scrolls. This
+keeps `VIP-8` attached to the exception ledger instead of leaving a dead band
+below the final table.
 
 ---
 
