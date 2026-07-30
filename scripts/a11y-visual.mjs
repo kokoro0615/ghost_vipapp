@@ -140,7 +140,7 @@ async function auditViewport(context, viewport) {
 
   await goToWorkspace(page, "floor");
   await page.getByRole("button", { name: /新規オペレーション/u }).click();
-  const operationDialog = page.getByRole("dialog", { name: "新規オペレーション" });
+  const operationDialog = page.getByRole("dialog", { name: "新規予約" });
   await operationDialog.waitFor();
   await operationDialog.getByLabel("プラン").waitFor();
   assert.equal(
@@ -151,7 +151,7 @@ async function auditViewport(context, viewport) {
   await capture(page, "walk-in");
   await page.getByRole("tab", { name: /受付ブロック/u }).click();
   await capture(page, "block");
-  await page.getByRole("tab", { name: /8段階予約/u }).click();
+  await page.getByRole("tab", { name: /事前予約/u }).click();
   for (let step = 1; step <= 8; step += 1) {
     await page.getByLabel(new RegExp(`予約作成 ${step}/8`, "u")).waitFor();
     if (step === 4) {
@@ -308,7 +308,7 @@ async function auditViewport(context, viewport) {
   const operationConflictPage = await newQaPage(context, { operationStatus: 409 });
   await goToWorkspace(operationConflictPage, "list");
   await operationConflictPage.getByRole("button", { name: /新規オペレーション/u }).click();
-  const conflictDialog = operationConflictPage.getByRole("dialog", { name: "新規オペレーション" });
+  const conflictDialog = operationConflictPage.getByRole("dialog", { name: "新規予約" });
   await conflictDialog.getByRole("checkbox", { name: /VIP-1/u }).check();
   await conflictDialog.getByRole("button", { name: "競合確認して保存" }).click();
   await conflictDialog.getByRole("alert").getByText("TABLE_CONFLICT", { exact: true }).waitFor();
@@ -324,7 +324,7 @@ async function auditViewport(context, viewport) {
   });
   await demoLeaseRacePage.locator("#vip-workspace-main").waitFor();
   await demoLeaseRacePage.getByRole("button", { name: /新規オペレーション/u }).click();
-  await demoLeaseRacePage.getByRole("dialog", { name: "新規オペレーション" })
+  await demoLeaseRacePage.getByRole("dialog", { name: "新規予約" })
     .getByLabel("プラン")
     .waitFor();
   await demoLeaseRacePage.close();
@@ -332,7 +332,7 @@ async function auditViewport(context, viewport) {
   const demoWalkInPage = await newQaPage(context, { demoMode: "authenticated" });
   await goToDemoWorkspace(demoWalkInPage, "floor", "2026-07-31");
   await demoWalkInPage.getByRole("button", { name: /新規オペレーション/u }).click();
-  const demoWalkInDialog = demoWalkInPage.getByRole("dialog", { name: "新規オペレーション" });
+  const demoWalkInDialog = demoWalkInPage.getByRole("dialog", { name: "新規予約" });
   await demoWalkInDialog.getByLabel("プラン").waitFor();
   assert.equal(
     await demoWalkInDialog.locator('input[name="guestLabel"]').inputValue(),

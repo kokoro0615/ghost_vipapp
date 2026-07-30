@@ -171,7 +171,7 @@ test("release regression source covers required business and cleanup boundaries"
     "baselineRestored",
     "providerDelivery: 0",
     "context.setOffline(true)",
-    "8段階予約",
+    "事前予約",
     "RC UI Guest Edited",
     "ui_status_filter_failed",
     "ui_staff_filter_member_failed",

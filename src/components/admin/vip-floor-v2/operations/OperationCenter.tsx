@@ -232,7 +232,7 @@ export function OperationCenter({
         <header className={styles.commandHeader}>
           <div>
             <span>GHOST ARRIVAL CONTROL</span>
-            <h2 id="operation-title">{editReservation ? "予約編集" : "新規オペレーション"}</h2>
+            <h2 id="operation-title">{editReservation ? "予約編集" : "新規予約"}</h2>
           </div>
           <button type="button" onClick={closePanel} aria-label="新規作成を閉じる">
             <X size={19} />
@@ -275,7 +275,7 @@ export function OperationCenter({
               setWalkInErrors({});
             }}
           >
-            <CalendarPlus size={16} />8段階予約
+            <CalendarPlus size={16} />事前予約
           </button>
         </div> : null}
 

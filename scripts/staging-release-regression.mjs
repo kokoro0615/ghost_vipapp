@@ -1186,8 +1186,8 @@ async function runUiRegression(config, reservationId, uiReservationPlan) {
 
 async function runUiReservationCreateAndEdit(page, plan, businessDate) {
   await page.getByRole("button", { name: /^新規オペレーション/u }).click();
-  const dialog = page.getByRole("dialog", { name: "新規オペレーション" });
-  await dialog.getByRole("tab", { name: "8段階予約" }).click();
+  const dialog = page.getByRole("dialog", { name: "新規予約" });
+  await dialog.getByRole("tab", { name: "事前予約" }).click();
   let wizard = dialog.locator('section[aria-label^="予約作成"]');
 
   await wizard.getByRole("button", { name: "次へ" }).click();
