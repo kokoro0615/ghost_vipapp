@@ -11,6 +11,10 @@ import {
 } from "lucide-react";
 
 import type { VipFloorBoardV2 } from "@/lib/vipFloorV2Contract";
+import {
+  getSyntheticTextIssue,
+  type SyntheticTextIssue,
+} from "@/lib/demo/validation";
 
 import type {
   OperationDraft,
@@ -24,6 +28,8 @@ import { ReservationWizard } from "./ReservationWizard";
 import styles from "../VipFloorWorkspace.module.css";
 
 type OperationKind = "walk_in" | "block_create" | "reservation_create";
+type WalkInField = "guestLabel" | "operatorNote";
+type WalkInErrors = Partial<Record<WalkInField, string>>;
 
 type Props = {
   open: boolean;
@@ -54,6 +60,7 @@ export function OperationCenter({
   const [kind, setKind] = useState<OperationKind>("walk_in");
   const [venueWide, setVenueWide] = useState(false);
   const [editingBlockId, setEditingBlockId] = useState<string | null>(null);
+  const [walkInErrors, setWalkInErrors] = useState<WalkInErrors>({});
   const panelRef = useRef<HTMLDivElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
   const defaults = useMemo(() => operationDefaults(board), [board]);
@@ -76,7 +83,7 @@ export function OperationCenter({
   function trapFocus(event: React.KeyboardEvent<HTMLDivElement>) {
     if (event.key === "Escape") {
       event.preventDefault();
-      onClose();
+      closePanel();
       return;
     }
     if (event.key !== "Tab") return;
@@ -98,13 +105,29 @@ export function OperationCenter({
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!options) return;
-    const data = new FormData(event.currentTarget);
+    const form = event.currentTarget;
+    const data = new FormData(form);
     const tableIds = data.getAll("tableIds").map(String).filter(Boolean);
     const startAt = toTokyoTimestamp(data.get("startAt"));
     const endAt = toTokyoTimestamp(data.get("endAt"));
     let draft: OperationDraft;
 
     if (kind === "walk_in") {
+      const guestLabel = nullableText(data.get("guestLabel"));
+      const operatorNote = nullableText(data.get("operatorNote"));
+      if (demoMode.enabled) {
+        const errors = validateSyntheticWalkIn(guestLabel, operatorNote);
+        if (Object.keys(errors).length > 0) {
+          setWalkInErrors(errors);
+          const firstInvalidField = errors.guestLabel ? "guestLabel" : "operatorNote";
+          window.requestAnimationFrame(() => {
+            const field = form.elements.namedItem(firstInvalidField);
+            if (field instanceof HTMLElement) field.focus();
+          });
+          return;
+        }
+      }
+      setWalkInErrors({});
       draft = {
         kind,
         payload: {
@@ -114,8 +137,8 @@ export function OperationCenter({
           scheduledEndAt: endAt,
           guestCount: Number(data.get("guestCount")),
           tableIds,
-          guestLabel: nullableText(data.get("guestLabel")),
-          operatorNote: nullableText(data.get("operatorNote")),
+          guestLabel,
+          operatorNote,
           expectedTableVersions: tableIds.map((tableId) => ({
             tableId,
             expectedVersion: board.tables.find((table) => table.id === tableId)?.version ?? 0,
@@ -149,8 +172,36 @@ export function OperationCenter({
 
     if (await onRun(draft)) {
       setEditingBlockId(null);
-      onClose();
+      closePanel();
     }
+  }
+
+  function closePanel() {
+    setWalkInErrors({});
+    onClose();
+  }
+
+  function clearWalkInError(field: WalkInField) {
+    setWalkInErrors((current) => {
+      if (!current[field]) return current;
+      const next = { ...current };
+      delete next[field];
+      return next;
+    });
+  }
+
+  function validateWalkInField(field: WalkInField, value: string) {
+    if (!demoMode.enabled) return;
+    const issue = getSyntheticTextIssue(value, {
+      required: field === "guestLabel",
+      maximum: field === "guestLabel" ? 80 : 500,
+    });
+    setWalkInErrors((current) => {
+      const next = { ...current };
+      if (issue) next[field] = syntheticWalkInMessage(field, issue);
+      else delete next[field];
+      return next;
+    });
   }
 
   async function cancelBlock(blockId: string, expectedVersion: number) {
@@ -167,7 +218,7 @@ export function OperationCenter({
       className={styles.dialogBackdrop}
       role="presentation"
       onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
+        if (event.target === event.currentTarget) closePanel();
       }}
     >
       <div
@@ -183,7 +234,7 @@ export function OperationCenter({
             <span>GHOST ARRIVAL CONTROL</span>
             <h2 id="operation-title">{editReservation ? "予約編集" : "新規オペレーション"}</h2>
           </div>
-          <button type="button" onClick={onClose} aria-label="新規作成を閉じる">
+          <button type="button" onClick={closePanel} aria-label="新規作成を閉じる">
             <X size={19} />
           </button>
         </header>
@@ -195,7 +246,10 @@ export function OperationCenter({
             role="tab"
             aria-selected={kind === "walk_in"}
             data-active={kind === "walk_in" || undefined}
-            onClick={() => setKind("walk_in")}
+            onClick={() => {
+              setKind("walk_in");
+              setWalkInErrors({});
+            }}
           >
             <Footprints size={16} />Walk-in
           </button>
@@ -204,7 +258,10 @@ export function OperationCenter({
             role="tab"
             aria-selected={kind === "block_create"}
             data-active={kind === "block_create" || undefined}
-            onClick={() => setKind("block_create")}
+            onClick={() => {
+              setKind("block_create");
+              setWalkInErrors({});
+            }}
           >
             <Ban size={16} />受付ブロック
           </button>
@@ -213,7 +270,10 @@ export function OperationCenter({
             role="tab"
             aria-selected={kind === "reservation_create"}
             data-active={kind === "reservation_create" || undefined}
-            onClick={() => setKind("reservation_create")}
+            onClick={() => {
+              setKind("reservation_create");
+              setWalkInErrors({});
+            }}
           >
             <CalendarPlus size={16} />8段階予約
           </button>
@@ -228,7 +288,7 @@ export function OperationCenter({
             reservation={editReservation}
             pending={pending}
             onRun={onRun}
-            onDone={onClose}
+            onDone={closePanel}
           />
         ) : (
           <form
@@ -293,12 +353,54 @@ export function OperationCenter({
                     </label>
                   </div>
                   <label>
-                    ゲスト表示名{demoMode.enabled ? "（デモ cue必須）" : "（任意）"}
-                    <input name="guestLabel" maxLength={80} required={demoMode.enabled} placeholder={demoMode.enabled ? "例: デモゲストWalk-in001" : "例: 入口ゲスト / 連絡先は入力しない"} />
+                    ゲスト表示名{demoMode.enabled ? "（合成名のみ）" : "（任意）"}
+                    <input
+                      name="guestLabel"
+                      maxLength={80}
+                      required={demoMode.enabled}
+                      defaultValue={demoMode.enabled ? "デモWalk-inゲスト" : undefined}
+                      placeholder={demoMode.enabled ? "例: デモWalk-inゲスト" : "例: 入口ゲスト / 連絡先は入力しない"}
+                      aria-invalid={Boolean(walkInErrors.guestLabel)}
+                      aria-describedby={demoMode.enabled
+                        ? `walk-in-guest-rule${walkInErrors.guestLabel ? " walk-in-guest-error" : ""}`
+                        : undefined}
+                      onInput={() => clearWalkInError("guestLabel")}
+                      onBlur={(event) => validateWalkInField("guestLabel", event.currentTarget.value)}
+                    />
+                    {demoMode.enabled ? (
+                      <small id="walk-in-guest-rule" className={styles.syntheticInputHint}>
+                        「デモ」または「DEMO」を含む架空名だけを入力してください。電話番号・メール・秘密情報は入力できません。
+                      </small>
+                    ) : null}
+                    {walkInErrors.guestLabel ? (
+                      <small id="walk-in-guest-error" className={styles.fieldError} role="alert">
+                        {walkInErrors.guestLabel}
+                      </small>
+                    ) : null}
                   </label>
                   <label>
                     現場メモ（任意）
-                    <textarea name="operatorNote" maxLength={500} placeholder={demoMode.enabled ? "例: デモ：入口で到着確認済み" : "到着時の共有事項"} />
+                    <textarea
+                      name="operatorNote"
+                      maxLength={500}
+                      placeholder={demoMode.enabled ? "例: デモ：入口で到着確認済み" : "到着時の共有事項"}
+                      aria-invalid={Boolean(walkInErrors.operatorNote)}
+                      aria-describedby={demoMode.enabled
+                        ? `walk-in-note-rule${walkInErrors.operatorNote ? " walk-in-note-error" : ""}`
+                        : undefined}
+                      onInput={() => clearWalkInError("operatorNote")}
+                      onBlur={(event) => validateWalkInField("operatorNote", event.currentTarget.value)}
+                    />
+                    {demoMode.enabled ? (
+                      <small id="walk-in-note-rule" className={styles.syntheticInputHint}>
+                        空欄は可。入力する場合は「デモ」または「DEMO」を含む合成メモにしてください。
+                      </small>
+                    ) : null}
+                    {walkInErrors.operatorNote ? (
+                      <small id="walk-in-note-error" className={styles.fieldError} role="alert">
+                        {walkInErrors.operatorNote}
+                      </small>
+                    ) : null}
                   </label>
                 </>
               ) : (
@@ -393,7 +495,7 @@ export function OperationCenter({
           ) : null}
 
           <footer className={styles.commandFooter}>
-            <button type="button" className={styles.secondaryButton} onClick={onClose} disabled={pending}>
+            <button type="button" className={styles.secondaryButton} onClick={closePanel} disabled={pending}>
               取消
             </button>
             <button type="submit" className={styles.primaryButton} disabled={pending || !options}>
@@ -460,6 +562,34 @@ function operationDefaults(board: VipFloorBoardV2) {
     start: localInputValue(new Date(startAt).toISOString()),
     end: localInputValue(new Date(endAt).toISOString()),
   };
+}
+
+function validateSyntheticWalkIn(
+  guestLabel: string | null,
+  operatorNote: string | null,
+): WalkInErrors {
+  const errors: WalkInErrors = {};
+  const guestIssue = getSyntheticTextIssue(guestLabel, { required: true, maximum: 80 });
+  const noteIssue = getSyntheticTextIssue(operatorNote, { maximum: 500 });
+  if (guestIssue) errors.guestLabel = syntheticWalkInMessage("guestLabel", guestIssue);
+  if (noteIssue) errors.operatorNote = syntheticWalkInMessage("operatorNote", noteIssue);
+  return errors;
+}
+
+function syntheticWalkInMessage(field: WalkInField, issue: SyntheticTextIssue) {
+  const label = field === "guestLabel" ? "ゲスト表示名" : "現場メモ";
+  if (issue === "required") return "ゲスト表示名を入力してください。例: デモWalk-inゲスト";
+  if (issue === "missing_synthetic_cue") {
+    return `${label}に「デモ」または「DEMO」を含めてください。`;
+  }
+  if (issue === "phone_like" || issue === "email_like") {
+    return `${label}に${issue === "phone_like" ? "電話番号らしい数字列" : "メールアドレス"}があります。連絡先を削除し、合成値だけを入力してください。`;
+  }
+  if (issue === "secret_like") {
+    return `${label}に秘密情報らしい文字列があります。token・password・API key等を削除してください。`;
+  }
+  if (issue === "too_long") return `${label}が入力上限を超えています。短くしてください。`;
+  return `${label}に使用できない制御文字があります。該当文字を削除してください。`;
 }
 
 function localInputValue(value: string) {

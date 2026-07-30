@@ -25,6 +25,19 @@ test("operation errors stay visible inside the active dialog", () => {
   assert.match(reducer, /\{ type: "clearConflict" \}/u);
 });
 
+test("demo Walk-in rejects unsafe text beside the exact field before transport", () => {
+  assert.match(operationCenter, /getSyntheticTextIssue/u);
+  assert.match(operationCenter, /defaultValue=\{demoMode\.enabled \? "デモWalk-inゲスト" : undefined\}/u);
+  assert.match(operationCenter, /aria-invalid=\{Boolean\(walkInErrors\.guestLabel\)\}/u);
+  assert.match(operationCenter, /aria-invalid=\{Boolean\(walkInErrors\.operatorNote\)\}/u);
+  assert.match(operationCenter, /電話番号・メール・秘密情報は入力できません/u);
+  assert.match(operationCenter, /className=\{styles\.fieldError\} role="alert"/u);
+  assert.match(
+    workspaceHook,
+    /payload\.code === "INVALID_SYNTHETIC_INPUT"[\s\S]*ゲスト表示名と入力した現場メモ/u,
+  );
+});
+
 test("demo operation options renew a pending lease and continue automatically", () => {
   const optionsStart = workspaceHook.indexOf("const loadOperationOptions");
   const operationStart = workspaceHook.indexOf("const runOperation", optionsStart);

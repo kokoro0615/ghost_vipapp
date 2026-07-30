@@ -1244,6 +1244,21 @@
   font-size: var(--t-micro);
 }
 .trialInputHint { margin: var(--s-1) 0 0; color: var(--warn); font-size: var(--t-micro); line-height: var(--lh-ui); }
+.syntheticInputHint, .fieldError {
+  display: block;
+  margin: calc(var(--s-2) * -1) 0 0;
+  font-size: var(--t-micro);
+  font-weight: 500;
+  letter-spacing: normal;
+  line-height: var(--lh-ui);
+}
+.syntheticInputHint { color: var(--ink-3); }
+.fieldError { color: var(--alert); }
+.commandForm input[aria-invalid="true"],
+.commandForm textarea[aria-invalid="true"] {
+  border-color: var(--alert);
+  box-shadow: 0 0 0 1px var(--alert);
+}
 
 .stepRail { display: flex; min-height: 32px; flex: 0 0 auto; align-items: center; justify-content: center; gap: var(--s-4); border-bottom: 1px solid var(--rule); color: var(--ink-3); font-size: var(--t-micro); }
 .stepRail span[data-current] { color: var(--ink); font-weight: 700; }

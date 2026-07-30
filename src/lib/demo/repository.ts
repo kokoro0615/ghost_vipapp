@@ -815,7 +815,12 @@ export class BrowserDemoRepository {
       validateOperationDraft(draft);
     } catch (error) {
       if (error instanceof DemoValidationError) {
-        throw new DemoRepositoryError("INVALID_SYNTHETIC_INPUT", error.message);
+        throw new DemoRepositoryError(
+          "INVALID_SYNTHETIC_INPUT",
+          error.message,
+          400,
+          { field: error.field },
+        );
       }
       throw error;
     }

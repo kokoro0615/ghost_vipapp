@@ -288,6 +288,34 @@ async function auditViewport(context, viewport) {
     .waitFor();
   await demoLeaseRacePage.close();
 
+  const demoWalkInPage = await newQaPage(context, { demoMode: "authenticated" });
+  await goToDemoWorkspace(demoWalkInPage, "floor", "2026-07-31");
+  await demoWalkInPage.getByRole("button", { name: /新規オペレーション/u }).click();
+  const demoWalkInDialog = demoWalkInPage.getByRole("dialog", { name: "新規オペレーション" });
+  await demoWalkInDialog.getByLabel("プラン").waitFor();
+  assert.equal(
+    await demoWalkInDialog.locator('input[name="guestLabel"]').inputValue(),
+    "デモWalk-inゲスト",
+    "demo Walk-in must start with a safe synthetic label",
+  );
+  await demoWalkInDialog.locator('input[name="guestLabel"]').fill("山田太郎");
+  await demoWalkInDialog.locator('textarea[name="operatorNote"]').fill("入口で到着確認済み");
+  await demoWalkInDialog.getByRole("checkbox", { name: /VIP-8/u }).check();
+  await demoWalkInDialog.getByRole("button", { name: "競合確認して保存" }).click();
+  await demoWalkInDialog.locator("#walk-in-guest-error").waitFor();
+  await demoWalkInDialog.locator("#walk-in-note-error").waitFor();
+  assert.match(
+    await demoWalkInDialog.locator("#walk-in-guest-error").innerText(),
+    /「デモ」または「DEMO」/u,
+  );
+  assert.equal(await demoWalkInDialog.isVisible(), true, "invalid input must preserve the dialog");
+  await demoWalkInDialog.locator('input[name="guestLabel"]').fill("デモWalk-inテスト");
+  await demoWalkInDialog.locator('textarea[name="operatorNote"]').fill("デモ：入口で到着確認済み");
+  await demoWalkInDialog.getByRole("button", { name: "競合確認して保存" }).click();
+  await demoWalkInDialog.waitFor({ state: "hidden" });
+  assert.deepEqual(demoWalkInPage.qaServerErrors, [], "demo Walk-in produced a server 5xx");
+  await demoWalkInPage.close();
+
   const offlinePage = await newQaPage(context);
   await goToWorkspace(offlinePage, "list");
   await offlinePage.evaluate(() => window.dispatchEvent(new Event("offline")));

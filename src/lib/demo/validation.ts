@@ -14,10 +14,20 @@ const BUSINESS_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/u;
 const SYNTHETIC_CUE_PATTERN = /(?:DEMO|デモ)/iu;
 const SYNTHETIC_EMAIL_SUFFIX = "@example.invalid";
 const PHONE_LIKE_PATTERN = /(?:\+?81|0\d)[\d\s().-]{6,}\d|(?<!\d)\d(?:[\d\s().-]*\d){7,}(?!\d)/u;
+const EMAIL_LIKE_PATTERN = /[^\s@]+@[^\s@]+\.[^\s@]+/u;
 const SECRET_LIKE_PATTERN =
   /(?:authorization|bearer|secret|token|api[_\s-]?key|password|passwd|sk_(?:live|test)|pk_live|ghp_[a-z0-9])/iu;
 const CONTROL_PATTERN = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/u;
 const VALIDATION_WINDOW = ["2026-07-27", "2026-08-27"] as const;
+
+export type SyntheticTextIssue =
+  | "required"
+  | "too_long"
+  | "control_character"
+  | "phone_like"
+  | "email_like"
+  | "secret_like"
+  | "missing_synthetic_cue";
 
 export class DemoValidationError extends Error {
   readonly code = "INVALID_SYNTHETIC_INPUT" as const;
@@ -51,20 +61,25 @@ export function assertSyntheticLabel(
   options: { required?: boolean; maximum?: number } = {},
 ) {
   const normalized = value?.trim() ?? "";
-  if (!normalized) {
-    if (options.required) throw new DemoValidationError(field);
-    return null;
-  }
-  if (
-    normalized.length > (options.maximum ?? 160)
-    || CONTROL_PATTERN.test(normalized)
-    || PHONE_LIKE_PATTERN.test(normalized)
-    || SECRET_LIKE_PATTERN.test(normalized)
-    || !SYNTHETIC_CUE_PATTERN.test(normalized)
-  ) {
+  if (getSyntheticTextIssue(normalized, options)) {
     throw new DemoValidationError(field);
   }
-  return normalized;
+  return normalized || null;
+}
+
+export function getSyntheticTextIssue(
+  value: string | null | undefined,
+  options: { required?: boolean; maximum?: number } = {},
+): SyntheticTextIssue | null {
+  const normalized = value?.trim() ?? "";
+  if (!normalized) return options.required ? "required" : null;
+  if (normalized.length > (options.maximum ?? 160)) return "too_long";
+  if (CONTROL_PATTERN.test(normalized)) return "control_character";
+  if (PHONE_LIKE_PATTERN.test(normalized)) return "phone_like";
+  if (EMAIL_LIKE_PATTERN.test(normalized)) return "email_like";
+  if (SECRET_LIKE_PATTERN.test(normalized)) return "secret_like";
+  if (!SYNTHETIC_CUE_PATTERN.test(normalized)) return "missing_synthetic_cue";
+  return null;
 }
 
 export function assertSyntheticNote(

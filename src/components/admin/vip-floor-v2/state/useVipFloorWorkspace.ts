@@ -786,7 +786,9 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
             ok: false as const,
             code: String(payload.code ?? result.status),
             message: typeof payload.message === "string" ? payload.message : "合成オペレーションを保存できません。",
-            recovery: "入力、卓競合、version、leaseを確認してください。",
+            recovery: payload.code === "INVALID_SYNTHETIC_INPUT"
+              ? "ゲスト表示名と入力した現場メモに「デモ」または「DEMO」を含め、電話番号・メール・秘密情報を削除してください。"
+              : "卓競合、version、leaseを確認してください。",
           };
           if (result.status === 409) await loadBoard(businessDate);
           dispatch({

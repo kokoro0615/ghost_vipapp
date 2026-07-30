@@ -204,10 +204,16 @@ test("runtime synthetic validation rejects phone, real email, secrets, personal 
   );
 
   assert.equal(api.assertSyntheticLabel("デモゲストQA", "guest", { required: true }), "デモゲストQA");
+  assert.equal(api.getSyntheticTextIssue("デモゲストQA", { required: true }), null);
+  assert.equal(api.getSyntheticTextIssue("山田太郎", { required: true }), "missing_synthetic_cue");
+  assert.equal(api.getSyntheticTextIssue("デモ 090-1234-5678"), "phone_like");
+  assert.equal(api.getSyntheticTextIssue("デモ person@example.com"), "email_like");
+  assert.equal(api.getSyntheticTextIssue("デモ bearer token-value"), "secret_like");
   assert.equal(api.assertSyntheticEmail("qa@example.invalid"), "qa@example.invalid");
   assert.equal(api.assertNoPhone(""), null);
   assert.throws(() => api.assertSyntheticLabel("山田太郎", "guest", { required: true }));
   assert.throws(() => api.assertSyntheticLabel("デモ 090-1234-5678", "guest", { required: true }));
+  assert.throws(() => api.assertSyntheticNote("デモ person@example.com"));
   assert.throws(() => api.assertSyntheticEmail("person@example.com"));
   assert.throws(() => api.assertSyntheticNote("デモ bearer token-value"));
   assert.throws(() => api.validateCustomerPatch({
