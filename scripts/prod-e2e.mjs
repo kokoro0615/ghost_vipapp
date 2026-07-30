@@ -12,6 +12,7 @@ const ORIGIN = process.env.GHOST_VIPAPP_ORIGIN ?? "https://ghost-vipapp.vercel.a
 const basicUser = process.env.VIPAPP_BASIC_USER ?? "";
 const basicPassword = process.env.VIPAPP_BASIC_PASSWORD ?? "";
 const pin = process.env.VIPAPP_OWNER_PIN ?? "";
+const ADMIN_SESSION_COOKIE = "ghost_vipapp_admin_session";
 
 export const PRODUCTION_READ_ONLY_RULES = Object.freeze([
   { method: "GET", path: "/" },
@@ -97,7 +98,9 @@ async function main() {
     const logout = await client.requestJson("/api/admin/session", { method: "DELETE" });
     assert(logout.response.ok, `logout_failed:${logout.response.status}`);
     loggedIn = false;
-    assert(client.jar.size === 0, "logout_cookie_not_cleared");
+    // Basic access intentionally survives Owner logout for up to eight hours.
+    // Only the backend admin session must be removed here.
+    assert(client.jar.value(ADMIN_SESSION_COOKIE) === null, "logout_session_cookie_not_cleared");
 
     const afterLogout = await client.requestJson("/api/admin/session");
     assert(afterLogout.response.status === 401, "session_survived_logout");

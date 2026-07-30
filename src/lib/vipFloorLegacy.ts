@@ -60,16 +60,61 @@ export type LegacyVipBoard = {
   };
 };
 
+// Keep the read-only fallback on the same canonical geometry as the v2
+// backend seed. Exact resource/display codes are used deliberately: parsing
+// the first digit would make an unrelated code such as VIP-101 occupy VIP-1.
 const FLOOR_POSITIONS = [
-  { x: 17, y: 25, w: 13, h: 9, r: -4 },
-  { x: 37, y: 23, w: 13, h: 9, r: 2 },
-  { x: 61, y: 23, w: 13, h: 9, r: -2 },
-  { x: 82, y: 26, w: 13, h: 9, r: 4 },
-  { x: 17, y: 65, w: 13, h: 9, r: 3 },
-  { x: 38, y: 70, w: 13, h: 9, r: -3 },
-  { x: 62, y: 70, w: 13, h: 9, r: 3 },
-  { x: 82, y: 65, w: 13, h: 9, r: -3 },
+  { x: 72.8, y: 17.9, w: 4.7, h: 4.7, r: 0 },
+  { x: 71.6, y: 71.9, w: 4.45, h: 4.45, r: -6 },
+  { x: 50.9, y: 71.6, w: 4.45, h: 4.45, r: 0 },
+  { x: 40.8, y: 71.6, w: 4.45, h: 4.45, r: 0 },
+  { x: 42.5, y: 53.3, w: 4.3, h: 4.3, r: 0 },
+  { x: 51.9, y: 53.3, w: 4.3, h: 4.3, r: 0 },
+  { x: 51.8, y: 16.1, w: 4.15, h: 4.15, r: 0 },
+  { x: 44.2, y: 16.1, w: 4.15, h: 4.15, r: 0 },
 ] as const;
+
+const FLOOR_POSITION_INDEX_BY_CODE = new Map<string, number>([
+  ["royal-vip-1", 0],
+  ["prime-vip-2", 1],
+  ["regular-vip-3", 2],
+  ["regular-vip-4", 3],
+  ["floor-vip-5", 4],
+  ["floor-vip-6", 5],
+  ["floor-vip-7", 6],
+  ["floor-vip-8", 7],
+  ["VIP-1", 0],
+  ["VIP-2", 1],
+  ["VIP-3", 2],
+  ["VIP-4", 3],
+  ["VIP-5", 4],
+  ["VIP-6", 5],
+  ["VIP-7", 6],
+  ["VIP-8", 7],
+]);
+
+function resolveFloorPositions(seats: LegacyVipSeat[]) {
+  const slots = new Array<number | null>(seats.length).fill(null);
+  const taken = new Set<number>();
+
+  seats.forEach((seat, index) => {
+    const resourceCode = seat.publicResourceCode?.trim() ?? "";
+    const displayCode = seat.name.trim().toUpperCase();
+    const slot = FLOOR_POSITION_INDEX_BY_CODE.get(resourceCode)
+      ?? FLOOR_POSITION_INDEX_BY_CODE.get(displayCode);
+    if (slot === undefined || taken.has(slot)) return;
+    slots[index] = slot;
+    taken.add(slot);
+  });
+
+  return slots.map((slot, index) => {
+    if (slot !== null) return FLOOR_POSITIONS[slot];
+    const firstFree = FLOOR_POSITIONS.findIndex((_, candidate) => !taken.has(candidate));
+    const fallback = firstFree >= 0 ? firstFree : index % FLOOR_POSITIONS.length;
+    taken.add(fallback);
+    return FLOOR_POSITIONS[fallback];
+  });
+}
 
 function deriveServiceStatus(reservation: LegacyVipReservation): VipServiceStatus {
   if (reservation.serviceStatus) return reservation.serviceStatus;
@@ -112,9 +157,10 @@ export function adaptLegacyVipBoard(source: LegacyVipBoard, requestedDate: strin
   );
 
   const tableIdByCode = new Map<string, string>();
+  const floorPositions = resolveFloorPositions(source.seats);
   const tables = source.seats.map((seat, index) => {
     const id = seat.publicResourceCode ?? `seat-${index + 1}`;
-    const position = FLOOR_POSITIONS[index % FLOOR_POSITIONS.length];
+    const position = floorPositions[index];
     if (seat.publicResourceCode) tableIdByCode.set(seat.publicResourceCode, id);
     return {
       id,
