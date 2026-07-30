@@ -5,12 +5,13 @@ import test from "node:test";
 const read = (path) => readFile(new URL(`../../${path}`, import.meta.url), "utf8");
 
 test("Owner operation adapters expose only canonical Walk-in and block routes", async () => {
-  const [operations, options, workspace, hook, operationCenter] = await Promise.all([
+  const [operations, options, workspace, hook, operationCenter, reservationWizard] = await Promise.all([
     read("src/app/api/admin/vip-floor/operations/route.ts"),
     read("src/app/api/admin/vip-floor/options/route.ts"),
     read("src/components/admin/vip-floor-v2/VipFloorWorkspace.tsx"),
     read("src/components/admin/vip-floor-v2/state/useVipFloorWorkspace.ts"),
     read("src/components/admin/vip-floor-v2/operations/OperationCenter.tsx"),
+    read("src/components/admin/vip-floor-v2/operations/ReservationWizard.tsx"),
   ]);
 
   assert.match(operations, /session\.actor\.role !== "owner"/u);
@@ -37,4 +38,19 @@ test("Owner operation adapters expose only canonical Walk-in and block routes", 
   assert.match(operationCenter, /ACTIVE BLOCKS/u);
   assert.match(operationCenter, /block_cancel/u);
   assert.doesNotMatch(operationCenter, /name="reason"/u);
+
+  assert.match(reservationWizard, /type="date"/u);
+  assert.match(reservationWizard, />\s*予約日\s*</u);
+  assert.match(reservationWizard, /onBusinessDateChange\(nextBusinessDate\)/u);
+  assert.match(workspace, /loadOperationOptions\(nextBusinessDate\)/u);
+  assert.match(workspace, /await setBusinessDate\(nextBusinessDate\)/u);
+  assert.match(workspace, /updateRoute\(\{ date: nextBusinessDate \}\)/u);
+  assert.ok(
+    workspace.indexOf("loadOperationOptions(nextBusinessDate)")
+      < workspace.indexOf("await setBusinessDate(nextBusinessDate)"),
+    "the target event day must be verified before the workspace date changes",
+  );
+  assert.match(hook, /vip-floor\/options\?date=\$\{encodeURIComponent\(targetBusinessDate\)\}/u);
+  assert.match(hook, /response\.status === 404[\s\S]*payload\.error === "event_day_not_found"/u);
+  assert.match(hook, /event_day_not_found/u);
 });

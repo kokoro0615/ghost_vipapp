@@ -43,8 +43,10 @@ type Props = {
   selectedTableId: string | null;
   reservation?: UiReservation | null;
   pending: boolean;
+  datePending: boolean;
   onRun: (draft: OperationDraft) => Promise<boolean>;
   onDone: () => void;
+  onBusinessDateChange: (businessDate: string) => Promise<boolean>;
 };
 
 export function ReservationWizard({
@@ -54,8 +56,10 @@ export function ReservationWizard({
   selectedTableId,
   reservation = null,
   pending,
+  datePending,
   onRun,
   onDone,
+  onBusinessDateChange,
 }: Props) {
   const trialMode = useTrialMode();
   const demoMode = useDemoMode();
@@ -70,6 +74,7 @@ export function ReservationWizard({
     [board, reservation],
   );
   const [step, setStep] = useState(0);
+  const [dateError, setDateError] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft>(() => ({
     startAt: defaults.start,
     endAt: defaults.end,
@@ -89,7 +94,9 @@ export function ReservationWizard({
   }));
   const selectedTables = board.tables.filter((table) => draft.tableIds.includes(table.id));
   const capacity = selectedTables.reduce((sum, table) => sum + table.capacityMax, 0);
-  const canContinue = stepValid(step, draft, Boolean(reservation));
+  const canContinue = !datePending
+    && !dateError
+    && stepValid(step, draft, Boolean(reservation));
 
   function patch(next: Partial<Draft>) {
     setDraft((current) => ({ ...current, ...next }));
@@ -147,6 +154,21 @@ export function ReservationWizard({
     if (saved) onDone();
   }
 
+  async function changeBusinessDate(nextBusinessDate: string) {
+    if (
+      reservation
+      || !nextBusinessDate
+      || nextBusinessDate === options.businessDay.businessDate
+    ) {
+      return;
+    }
+    setDateError(null);
+    const changed = await onBusinessDateChange(nextBusinessDate);
+    if (!changed) {
+      setDateError("この日の予約情報を取得できませんでした。別の日を選ぶか、営業日設定を確認してください。");
+    }
+  }
+
   return (
     <section className={styles.reservationWizard} aria-label={`予約${reservation ? "編集" : "作成"} ${step + 1}/8 ${STEPS[step]}`}>
       <ol className={styles.wizardRail} aria-label={`予約${reservation ? "編集" : "作成"}ステップ`}>
@@ -182,7 +204,32 @@ export function ReservationWizard({
         {step === 0 ? (
           <div className={styles.wizardStatement}>
             <span>BUSINESS DATE</span>
-            <strong>{board.businessDay.businessDate}</strong>
+            {reservation ? (
+              <strong>{board.businessDay.businessDate}</strong>
+            ) : (
+              <label className={styles.wizardDateControl}>
+                予約日
+                <input
+                  type="date"
+                  value={options.businessDay.businessDate}
+                  disabled={pending || datePending}
+                  aria-describedby={`reservation-date-hint${dateError ? " reservation-date-error" : ""}`}
+                  onChange={(event) => void changeBusinessDate(event.target.value)}
+                />
+              </label>
+            )}
+            <p id="reservation-date-hint">
+              {reservation
+                ? "予約日の変更は新規事前予約から行います。"
+                : datePending
+                  ? "選択日の営業枠・プラン・卓状況を確認しています…"
+                  : "ここで予約日を変更できます。外側の営業日も自動で切り替わります。"}
+            </p>
+            {dateError ? (
+              <p id="reservation-date-error" className={styles.wizardDateError} role="alert">
+                {dateError}
+              </p>
+            ) : null}
             <p>GHOST Osakaの営業日は22:00から翌05:00までです。</p>
           </div>
         ) : null}

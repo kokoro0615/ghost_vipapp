@@ -43,7 +43,7 @@ test("demo operation options renew a pending lease and continue automatically", 
   const operationStart = workspaceHook.indexOf("const runOperation", optionsStart);
   const optionsSource = workspaceHook.slice(optionsStart, operationStart);
   const renew = optionsSource.indexOf("await demoTransport.renewLease()");
-  const loadOptions = optionsSource.indexOf("await demoTransport.loadOperationOptions(businessDate)");
+  const loadOptions = optionsSource.indexOf("await demoTransport.loadOperationOptions(targetBusinessDate)");
 
   assert.match(optionsSource, /if \(demoLeaseState !== "active"\)/u);
   assert.ok(renew >= 0, "demo lease renewal missing from option load");

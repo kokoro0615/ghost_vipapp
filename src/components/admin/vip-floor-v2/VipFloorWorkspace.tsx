@@ -170,6 +170,7 @@ export default function VipFloorWorkspace() {
   const [operationOpen, setOperationOpen] = useState(false);
   const [editingReservationId, setEditingReservationId] = useState<string | null>(null);
   const [operationOptions, setOperationOptions] = useState<OperationOptions | null>(null);
+  const [operationDatePending, setOperationDatePending] = useState(false);
   const [waitlistOpen, setWaitlistOpen] = useState(false);
   const [waitlistEntries, setWaitlistEntries] = useState<WaitlistEntry[]>([]);
   const [staffOpen, setStaffOpen] = useState(false);
@@ -280,7 +281,7 @@ export default function VipFloorWorkspace() {
     if (state.statusFilter !== nextStatus) dispatch({ type: "statusFilter", status: nextStatus });
 
     const date = searchParams.get("date");
-    if (date && DATE_PATTERN.test(date) && date !== businessDate) setBusinessDate(date);
+    if (date && DATE_PATTERN.test(date) && date !== businessDate) void setBusinessDate(date);
   }, [businessDate, dispatch, searchParams, setBusinessDate, state.query, state.statusFilter, state.view]);
 
   function switchView(view: WorkspaceView) {
@@ -374,6 +375,33 @@ export default function VipFloorWorkspace() {
     setEditingReservationId(selectedReservation.id);
     setOperationOpen(true);
     setOperationOptions(await loadOperationOptions());
+  }
+
+  async function changeOperationBusinessDate(nextBusinessDate: string) {
+    if (
+      !DATE_PATTERN.test(nextBusinessDate)
+      || nextBusinessDate === businessDate
+      || editingReservationId
+      || operationDatePending
+    ) {
+      return nextBusinessDate === businessDate;
+    }
+
+    setOperationDatePending(true);
+    dispatch({ type: "clearConflict" });
+    try {
+      const nextOptions = await loadOperationOptions(nextBusinessDate);
+      if (!nextOptions) return false;
+
+      const boardLoaded = await setBusinessDate(nextBusinessDate);
+      if (!boardLoaded) return false;
+
+      setOperationOptions(nextOptions);
+      updateRoute({ date: nextBusinessDate });
+      return true;
+    } finally {
+      setOperationDatePending(false);
+    }
   }
 
   async function refreshWaitlist() {
@@ -532,7 +560,7 @@ export default function VipFloorWorkspace() {
             value={businessDate}
             onChange={(event) => {
               if (event.target.value) {
-                setBusinessDate(event.target.value);
+                void setBusinessDate(event.target.value);
                 updateRoute({ date: event.target.value });
               }
             }}
@@ -960,6 +988,7 @@ export default function VipFloorWorkspace() {
         pending={state.pending}
         board={state.board}
         options={operationOptions}
+        datePending={operationDatePending}
         selectedTableId={editingReservationId || !state.selectedReservationId
           ? state.selectedTableId
           : null}
@@ -973,8 +1002,10 @@ export default function VipFloorWorkspace() {
           setOperationOpen(false);
           setEditingReservationId(null);
           setOperationOptions(null);
+          setOperationDatePending(false);
         }}
         onRun={runOperation}
+        onBusinessDateChange={changeOperationBusinessDate}
       />
 
       <WaitlistPanel

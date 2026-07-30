@@ -36,12 +36,14 @@ type Props = {
   pending: boolean;
   board: VipFloorBoardV2;
   options: OperationOptions | null;
+  datePending: boolean;
   selectedTableId: string | null;
   conflict: CommandOutcome | null;
   staffData: StaffWorkspaceData | null;
   editReservation?: UiReservation | null;
   onClose: () => void;
   onRun: (draft: OperationDraft) => Promise<boolean>;
+  onBusinessDateChange: (businessDate: string) => Promise<boolean>;
 };
 
 export function OperationCenter({
@@ -49,12 +51,14 @@ export function OperationCenter({
   pending,
   board,
   options,
+  datePending,
   selectedTableId,
   conflict,
   staffData,
   editReservation = null,
   onClose,
   onRun,
+  onBusinessDateChange,
 }: Props) {
   const demoMode = useDemoMode();
   const [kind, setKind] = useState<OperationKind>("walk_in");
@@ -281,14 +285,17 @@ export function OperationCenter({
 
         {(kind === "reservation_create" || editReservation) && options ? (
           <ReservationWizard
+            key={`${editReservation ? "edit" : "create"}:${options.businessDay.id}`}
             board={board}
             options={options}
             staffData={staffData}
             selectedTableId={selectedTableId}
             reservation={editReservation}
             pending={pending}
+            datePending={datePending}
             onRun={onRun}
             onDone={closePanel}
+            onBusinessDateChange={onBusinessDateChange}
           />
         ) : (
           <form

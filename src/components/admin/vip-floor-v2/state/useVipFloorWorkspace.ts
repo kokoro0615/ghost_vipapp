@@ -513,7 +513,8 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
 
   const setBusinessDate = useCallback((date: string) => {
     setBusinessDateState(date);
-    if (auth.status === "authenticated") void loadBoard(date, "initial");
+    if (auth.status === "authenticated") return loadBoard(date, "initial");
+    return Promise.resolve(false);
   }, [auth.status, loadBoard]);
 
   const runCommand = useCallback(async (draft: LiveCommandDraft) => {
@@ -671,7 +672,7 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
     }
   }, [auth.session, businessDate, loadBoard, mutationBlocked, offline]);
 
-  const loadOperationOptions = useCallback(async () => {
+  const loadOperationOptions = useCallback(async (targetBusinessDate = businessDate) => {
     if (workspaceMutationBlocked || !operatorAuthorized) return null;
 
     try {
@@ -707,7 +708,7 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
           setDemoLeaseState("active");
           setOffline(false);
         }
-        const result = await demoTransport.loadOperationOptions(businessDate);
+        const result = await demoTransport.loadOperationOptions(targetBusinessDate);
         if (!result.ok) {
           const payload = result.payload as unknown as Record<string, unknown>;
           dispatch({
@@ -724,19 +725,25 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
         return result.payload;
       }
       const response = await fetch(
-        `/api/admin/vip-floor/options?date=${encodeURIComponent(businessDate)}`,
+        `/api/admin/vip-floor/options?date=${encodeURIComponent(targetBusinessDate)}`,
         { cache: "no-store" },
       );
       const payload = await response.json().catch(() => ({})) as Record<string, unknown>;
 
       if (!response.ok || payload.ok !== true) {
+        const eventDayMissing = response.status === 404
+          && payload.error === "event_day_not_found";
         dispatch({
           type: "commandOutcome",
           outcome: {
             ok: false,
             code: String(payload.error ?? response.status),
-            message: readErrorMessage(response.status, payload),
-            recovery: "営業日を再読込し、Owner sessionを確認してください。",
+            message: eventDayMissing
+              ? "選択した日は予約を受け付ける営業日として登録されていません。"
+              : readErrorMessage(response.status, payload),
+            recovery: eventDayMissing
+              ? "別の予約日を選ぶか、営業日設定を確認してください。"
+              : "営業日を再読込し、Owner sessionを確認してください。",
           },
         });
         return null;

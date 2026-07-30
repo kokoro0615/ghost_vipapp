@@ -1693,6 +1693,14 @@
 .wizardStatement span, .wizardConfirm header span { color: var(--accent-ink); font-size: var(--t-micro); font-weight: 700; letter-spacing: var(--track-caps); }
 .wizardStatement strong { color: var(--ink); font-family: var(--font-figure); font-size: clamp(1.75rem, 4vw, 2.75rem); font-weight: 600; }
 .wizardStatement p, .wizardHint { color: var(--ink-3); font-size: var(--t-micro); line-height: var(--lh-ui); }
+.wizardDateControl {
+  width: min(100%, 280px);
+  margin: 0 auto;
+  color: var(--ink-2) !important;
+  text-align: left;
+}
+.wizardDateControl input { font-family: var(--font-figure); font-size: var(--t-data) !important; font-variant-numeric: tabular-nums; }
+.wizardDateError { max-width: 42ch; margin: 0 auto; color: var(--alert) !important; font-weight: 700; }
 .wizardWarning { color: var(--alert); font-size: var(--t-micro); font-weight: 700; }
 .wizardConfirm { display: grid; gap: var(--s-5); }
 .wizardConfirm > header { display: flex; align-items: center; gap: var(--s-4); color: var(--ink-3); }

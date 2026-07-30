@@ -31,6 +31,12 @@ Each step shows one task group, progress text, Back, and a fixed Continue/Save a
 ## Interaction contract
 
 - Create begins with deterministic defaults inside the allowed business-date window.
+- Step 1 exposes the reservation business date directly. Changing it reloads
+  that date's board, offerings, table versions, and staff context while the
+  editor remains open, then synchronizes the workspace date and URL.
+- A date without an `event_days` record stays unsaved and shows a recoverable
+  inline error; changing only the timestamp must never reuse another day's
+  `eventDayId`.
 - Edit begins from the selected saved revision.
 - Table choices are only `VIP-1` through `VIP-8`, plus unassigned where allowed.
 - Schedule and assignment validation run before mutation.
@@ -74,4 +80,3 @@ Each step shows one task group, progress text, Back, and a fixed Continue/Save a
 - Save is always subordinate to lease, validation, version, and conflict checks.
 - Selection and revision update in List, Floor, Chart, queue, and Inspector after one atomic write.
 - Cancel/discard, conflict recovery, offline, near-expiry, and expired flows are testable.
-

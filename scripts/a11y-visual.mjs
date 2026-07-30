@@ -154,6 +154,24 @@ async function auditViewport(context, viewport) {
   await page.getByRole("tab", { name: /事前予約/u }).click();
   for (let step = 1; step <= 8; step += 1) {
     await page.getByLabel(new RegExp(`予約作成 ${step}/8`, "u")).waitFor();
+    if (step === 1) {
+      await page.getByLabel("予約日").fill(unavailableBusinessDate);
+      await page.getByRole("alert").filter({ hasText: "この日の予約情報を取得できませんでした。" }).waitFor();
+      assert.equal(
+        await page.getByLabel("営業日").inputValue(),
+        board.businessDay.businessDate,
+        "an unavailable reservation date must not change the workspace business date",
+      );
+      await capture(page, "reservation-date-unavailable");
+      await page.getByLabel("予約日").fill(alternateBusinessDate);
+      await page.waitForFunction((expectedDate) => {
+        const reservationDate = document.querySelector('input[aria-describedby^="reservation-date-hint"]');
+        const workspaceDate = document.querySelector('input[aria-label="営業日"]');
+        return reservationDate?.value === expectedDate
+          && workspaceDate?.value === expectedDate
+          && new URL(window.location.href).searchParams.get("date") === expectedDate;
+      }, alternateBusinessDate);
+    }
     if (step === 4) {
       await page.getByRole("group", { name: "予約卓" })
         .getByRole("checkbox", { name: /VIP-1/u })
@@ -630,11 +648,23 @@ async function installSyntheticRoutes(page, scenario = {}) {
           }),
     });
   });
-  await page.route("**/api/admin/vip-floor/options?**", (route) => route.fulfill({
-    status: 200,
-    contentType: "application/json",
-    body: JSON.stringify(operationOptions),
-  }));
+  await page.route("**/api/admin/vip-floor/options?**", (route) => {
+    const requestedDate = new URL(route.request().url()).searchParams.get("date");
+    if (requestedDate === unavailableBusinessDate) {
+      return route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ ok: false, error: "event_day_not_found" }),
+      });
+    }
+    return route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(
+        requestedDate === alternateBusinessDate ? alternateOperationOptions : operationOptions,
+      ),
+    });
+  });
   await page.route("**/api/admin/vip-floor/waitlist?**", (route) => route.fulfill({
     status: 200,
     contentType: "application/json",
@@ -699,6 +729,7 @@ async function installSyntheticRoutes(page, scenario = {}) {
   let boardRequests = 0;
   await page.route("**/api/admin/vip-floor?**", async (route) => {
     boardRequests += 1;
+    const requestedDate = new URL(route.request().url()).searchParams.get("date");
     const delayMs = boardRequests > 1
       ? scenario.delaySecondBoardMs ?? 0
       : scenario.boardDelayMs ?? 0;
@@ -710,7 +741,9 @@ async function installSyntheticRoutes(page, scenario = {}) {
         ? { ok: false, error: "synthetic_board_failure" }
         : scenario.boardPayloads?.[
             Math.min(boardRequests - 1, scenario.boardPayloads.length - 1)
-          ] ?? scenario.boardPayload ?? board),
+          ] ?? scenario.boardPayload ?? (
+            requestedDate === alternateBusinessDate ? alternateBoard : board
+          )),
     });
   });
 }
@@ -1203,6 +1236,21 @@ const emptyBoard = {
   },
 };
 
+const alternateBusinessDate = "2026-07-31";
+const unavailableBusinessDate = "2026-07-27";
+const alternateBoard = {
+  ...emptyBoard,
+  generatedAt: "2026-07-31T13:15:00.000Z",
+  boardRevision: 1,
+  businessDay: {
+    ...emptyBoard.businessDay,
+    id: "10000000-0000-4000-8000-000000000002",
+    businessDate: alternateBusinessDate,
+    operatingStartAt: "2026-07-31T13:00:00.000Z",
+    operatingEndAt: "2026-07-31T20:00:00.000Z",
+  },
+};
+
 const readOnlyBoard = {
   ...board,
   operations: {
@@ -1221,6 +1269,11 @@ const operationOptions = {
     maxGuests: 20,
     minSpendYen: 0,
   }],
+};
+
+const alternateOperationOptions = {
+  ...operationOptions,
+  businessDay: alternateBoard.businessDay,
 };
 
 const waitlist = {
