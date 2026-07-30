@@ -6,7 +6,8 @@ export type VipCommandKind =
   | "arrival_time"
   | "assignment"
   | "seat_extension"
-  | "note";
+  | "note"
+  | "walk_in_cancel";
 
 export const ALL_VIP_COMMAND_KINDS = [
   "service_status",
@@ -15,6 +16,7 @@ export const ALL_VIP_COMMAND_KINDS = [
   "assignment",
   "seat_extension",
   "note",
+  "walk_in_cancel",
 ] as const satisfies readonly VipCommandKind[];
 
 const NO_COMMANDS = new Set<VipCommandKind>();

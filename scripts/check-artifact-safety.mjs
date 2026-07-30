@@ -54,19 +54,23 @@ export async function scanArtifactRoots(roots) {
   return findings;
 }
 
+export function formatFindingReport(findings) {
+  return JSON.stringify({
+    ok: false,
+    error: "sensitive_artifact_detected",
+    findings: findings.map(({ file, matches }) => ({
+      fileHash: createHash("sha256").update(file).digest("hex").slice(0, 12),
+      matches,
+    })),
+  });
+}
+
 async function main() {
   const roots = process.argv.slice(2);
   const targets = roots.length > 0 ? roots : DEFAULT_ROOTS;
   const findings = await scanArtifactRoots(targets);
   if (findings.length > 0) {
-    process.stderr.write(`${JSON.stringify({
-      ok: false,
-      error: "sensitive_artifact_detected",
-      findings: findings.map(({ file, matches }) => ({
-        fileHash: createHash("sha256").update(file).digest("hex").slice(0, 12),
-        matches,
-      })),
-    })}\n`);
+    process.stderr.write(`${formatFindingReport(findings)}\n`);
     process.exitCode = 1;
     return;
   }

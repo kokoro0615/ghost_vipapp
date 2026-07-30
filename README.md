@@ -16,6 +16,13 @@ GHOST OsakaのVIPフロア現場オペレーション画面を、公開サイト
 旧TableCheck関連文書は`docs/archive/tablecheck-legacy-2026-07/`の履歴資料であり、
 現行の実装指示として使用しません。
 
+Production UIの正本はこのrepositoryの
+`src/components/admin/vip-floor-v2`と`src/app/api/admin/vip-floor`です。
+`../ghost/website/src/components/admin/VipFloorDashboard.tsx`は旧website管理
+画面であり、standalone VIP Managerの機能有無を判断する資料には使用しません。
+`ghost-vipapp.vercel.app`について回答・変更する前に、共有statusに記録された
+Productionのcommitとこのcheckoutを照合します。
+
 ## Current scope
 
 - Customer Trial終了後の正式Production data planeをrelease targetとし、Trial mode、staging origin、bypass、Trial banner、Trial資格情報は各Gateで撤去
@@ -25,7 +32,8 @@ GHOST OsakaのVIPフロア現場オペレーション画面を、公開サイト
 - 例外キュー、予約Inspector、command center
 - healthy / loading / stale / reconnecting / error / read-only / empty / dense の運用状態
 - GHOST本体管理APIを中継し、実予約データを表示
-- 検索、check-in、到着時間更新、卓割当、延長、memo、service_status更新の6 command入口
+- 検索、check-in、到着時間更新、卓割当、延長、memo、service_status更新、
+  Walk-in取消の7 command入口
 - 顧客情報は表示上の必要最小限（マスク）を維持し、個人情報の新規エクスポートは対象外
 - 外部連携は Basic/PIN 認証付きの本番API連携で、TableCheck/API連携はこのサンドボックス外
 

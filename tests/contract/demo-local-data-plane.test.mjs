@@ -217,6 +217,7 @@ test("all permitted demo reservation, arrival and operations commands are repres
     "assignment",
     "seat_extension",
     "note",
+    "walk_in_cancel",
     "walk_in",
     "waitlist_create",
     "waitlist_call",

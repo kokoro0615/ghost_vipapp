@@ -5,7 +5,12 @@ import { AlertTriangle, ArrowLeft, ArrowRight, Check, LockKeyhole, X } from "luc
 
 import type { VipFloorBoardV2, VipServiceStatus } from "@/lib/vipFloorV2Contract";
 
-import type { CommandKind, LiveCommandDraft, UiReservation } from "../contract/uiTypes";
+import type {
+  CommandKind,
+  LiveCommandDraft,
+  UiReservation,
+  WalkInCancellationReason,
+} from "../contract/uiTypes";
 import { DemoCue, useDemoMode } from "../demo/DemoMode";
 import styles from "../VipFloorWorkspace.module.css";
 
@@ -16,6 +21,7 @@ const commandLabels: Record<CommandKind, string> = {
   assignment: "卓割当を変更",
   seat_extension: "利用時間を延長",
   note: "スタッフメモ",
+  walk_in_cancel: "Walk-inを取り消す",
 };
 
 type Props = {
@@ -83,6 +89,9 @@ export function CommandCenter({
     if (kind === "arrival_time") return "入力した到着時刻を予約へ記録します。未来時刻は保存できません。";
     if (kind === "seat_extension") return "現在の利用期限を15分単位、最大120分まで延長します。";
     if (kind === "note") return "500文字以内の現場共有メモを監査付きで保存します。";
+    if (kind === "walk_in_cancel") return demoMode.enabled
+      ? "合成Walk-inを取消済みにし、割当席をbrowser-local台帳で解放します。元記録と監査履歴は残ります。"
+      : "Walk-inを取消済みにし、割当席を解放します。元記録と監査履歴は残り、返金・顧客通知は実行しません。";
     return "接客状態を更新し、Floor・Chart・Listへ反映します。";
   }, [demoMode.enabled, kind]);
 
@@ -97,6 +106,16 @@ export function CommandCenter({
       previousFocusRef.current?.focus();
     };
   }, [open]);
+
+  useEffect(() => {
+    if (!open || kind !== "walk_in_cancel" || step !== 2) return;
+    const frame = window.requestAnimationFrame(() => {
+      panelRef.current
+        ?.querySelector<HTMLButtonElement>("[data-least-destructive]")
+        ?.focus();
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [kind, open, step]);
 
   if (!open || !source || !reservation) return null;
 
@@ -174,6 +193,18 @@ export function CommandCenter({
           ...base,
           kind,
           payload: { note: String(formData.get("note") ?? "").trim() },
+        };
+      case "walk_in_cancel":
+        return {
+          ...base,
+          kind,
+          payload: {
+            sourceChannel: "walk_in",
+            cancelReason: String(
+              formData.get("cancelReason"),
+            ) as WalkInCancellationReason,
+            reasonNote: String(formData.get("reasonNote") ?? "").trim(),
+          },
         };
     }
   }
@@ -304,11 +335,44 @@ export function CommandCenter({
             {kind === "check_in" ? (
               <p className={styles.helperText}>現在時刻でチェックインし、120分の利用期限を開始します。</p>
             ) : null}
+            {kind === "walk_in_cancel" ? (
+              <>
+                <label>
+                  取消区分
+                  <select name="cancelReason" defaultValue="mistake" required>
+                    <option value="mistake">誤登録</option>
+                    <option value="duplicate">重複登録</option>
+                    <option value="guest_request">来店取り消し</option>
+                    <option value="venue_decision">店舗判断</option>
+                  </select>
+                </label>
+                <label>
+                  取消理由メモ
+                  <textarea
+                    name="reasonNote"
+                    defaultValue={
+                      demoMode.enabled
+                        ? "デモ：Walk-in誤登録"
+                        : "Walk-in誤登録"
+                    }
+                    maxLength={500}
+                    required
+                    aria-describedby="walk-in-cancel-note-hint"
+                  />
+                </label>
+                <p id="walk-in-cancel-note-hint" className={styles.helperText}>
+                  個人情報は入力しないでください。取消後は席が解放され、元記録は監査履歴に残ります。
+                </p>
+              </>
+            ) : null}
 
           </fieldset>
 
           {step === 2 ? (
-            <section className={styles.confirmation}>
+            <section
+              className={styles.confirmation}
+              data-danger={kind === "walk_in_cancel" || undefined}
+            >
               <LockKeyhole size={18} />
               <div>
                 <strong>{demoMode.enabled ? "browser-local合成台帳への反映を確認" : "本番台帳への反映を確認"}</strong>
@@ -327,16 +391,32 @@ export function CommandCenter({
 
           <footer className={styles.commandFooter}>
             {step === 2 ? (
-              <button type="button" className={styles.secondaryButton} onClick={() => onStep(1)} disabled={pending}>
+              <button
+                type="button"
+                className={styles.secondaryButton}
+                data-least-destructive={kind === "walk_in_cancel" || undefined}
+                onClick={() => onStep(1)}
+                disabled={pending}
+              >
                 <ArrowLeft size={16} />戻る
               </button>
             ) : (
-              <button type="button" className={styles.secondaryButton} onClick={onClose}>取消</button>
+              <button type="button" className={styles.secondaryButton} onClick={onClose}>閉じる</button>
             )}
-            <button type="submit" className={styles.primaryButton} disabled={pending}>
+            <button
+              type="submit"
+              className={
+                kind === "walk_in_cancel" && step === 2
+                  ? styles.dangerButton
+                  : styles.primaryButton
+              }
+              disabled={pending}
+            >
               {pending ? "反映中" : step === 1
                 ? <>確認へ<ArrowRight size={16} /></>
-                : <><Check size={16} />{demoMode.enabled ? "合成台帳へ反映" : "GHOSTへ反映"}</>}
+                : kind === "walk_in_cancel"
+                  ? <><Check size={16} />Walk-inを取り消す</>
+                  : <><Check size={16} />{demoMode.enabled ? "合成台帳へ反映" : "GHOSTへ反映"}</>}
             </button>
           </footer>
         </form>

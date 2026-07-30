@@ -266,7 +266,7 @@ GHOSTの状態集合は次の13状態だけとする。TableCheckで確認した
 - TableCheck API連携
 - TableCheck名称・ロゴ・固有素材
 - Stripe状態・決済・返金の表示または操作
-- 通常キャンセル処理
+- 通常予約のキャンセル処理（店頭Walk-inの誤登録取消は例外として対象）
 - SMS、LINE通知
 - PDF、印刷、CSV、顧客export
 - 多店舗切替
@@ -278,7 +278,9 @@ GHOSTの状態集合は次の13状態だけとする。TableCheckで確認した
 - 公開予約確定後、同一予約が2秒目標でManagerへ表示される。
 - 8卓、翌日05:00までの営業日、最大3回転、複数卓配席を正しく扱う。
 - List、Floor、予約詳細、新規予約の主要操作順が基準画面と一致する。
-- 6操作、Walk-in、Waitlist、ブロック、受付停止、担当卓がOwner権限で動作する。
+- 既存6操作と店頭Walk-in取消、Walk-in、Waitlist、ブロック、受付停止、担当卓がOwner権限で動作する。
+- Walk-in取消は店頭予約だけに表示し、理由・影響の2段階確認、expectedVersion、
+  idempotency、監査ID、席解放を満たす。返金・顧客通知・物理削除は行わない。
 - 競合、kill switch、realtime切断、stale閲覧をE2Eで確認する。
 - 3解像度で主要操作が見切れず、44px target、focus、非色覚依存状態を満たす。
 - login、shell、List、Floor、Chart、queue、Inspector、全作成/編集/command/customer/staff/SLO dialogとloading/empty/error/offline/stale/reconnecting/conflict/read-only stateがlight semantic tokensへ移行し、UI chromeの旧purple/black-violet raw colorが0件である。

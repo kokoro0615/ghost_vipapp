@@ -54,7 +54,7 @@ test("light UI QA freezes the exact Chromium and WebKit release matrix", () => {
     assert.ok(QA_REQUIRED_STATES.includes(state), `missing QA state: ${state}`);
   }
   assert.equal(QA_REQUIRED_STATES.filter((state) => state.startsWith("reservation-create-")).length, 8);
-  assert.equal(QA_REQUIRED_STATES.filter((state) => state.startsWith("command-")).length, 6);
+  assert.equal(QA_REQUIRED_STATES.filter((state) => state.startsWith("command-")).length, 7);
 });
 
 test("light UI QA summary fails closed when a state or viewport is absent", () => {

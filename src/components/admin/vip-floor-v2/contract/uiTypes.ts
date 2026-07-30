@@ -19,8 +19,17 @@ export const COMMAND_KINDS = [
   "assignment",
   "seat_extension",
   "note",
+  "walk_in_cancel",
 ] as const;
 export type CommandKind = (typeof COMMAND_KINDS)[number];
+
+export const WALK_IN_CANCELLATION_REASONS = [
+  "mistake",
+  "duplicate",
+  "guest_request",
+  "venue_decision",
+] as const;
+export type WalkInCancellationReason = (typeof WALK_IN_CANCELLATION_REASONS)[number];
 
 export type LiveCommandDraft = {
   kind: CommandKind;
@@ -32,6 +41,9 @@ export type LiveCommandDraft = {
     tableIds?: string[];
     extendMinutes?: number;
     note?: string;
+    sourceChannel?: "walk_in";
+    cancelReason?: WalkInCancellationReason;
+    reasonNote?: string;
   };
 };
 

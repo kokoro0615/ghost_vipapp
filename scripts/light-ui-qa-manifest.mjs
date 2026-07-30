@@ -39,6 +39,7 @@ export const QA_REQUIRED_STATES = Object.freeze([
   "command-assignment",
   "command-seat-extension",
   "command-note",
+  "command-walk-in-cancel",
   "waitlist",
   "staff",
   "customer",

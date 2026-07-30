@@ -576,7 +576,9 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
           type: "commandOutcome",
           outcome: {
             ok: true,
-            message: `DEMO · 合成予約を保存しました（監査ID ${result.payload.auditLogId}）`,
+            message: draft.kind === "walk_in_cancel"
+              ? `DEMO · 合成Walk-inを取り消しました（監査ID ${result.payload.auditLogId}）`
+              : `DEMO · 合成予約を保存しました（監査ID ${result.payload.auditLogId}）`,
           },
         });
         dispatch({
@@ -627,6 +629,7 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
         assignment: "卓割当",
         note: "スタッフメモ",
         service_status: "接客状態",
+        walk_in_cancel: "Walk-in取消",
       };
       const auditLogId = typeof payload.auditLogId === "string" ? payload.auditLogId : null;
       const action = typeof payload.action === "string" ? payload.action : labels[draft.kind];

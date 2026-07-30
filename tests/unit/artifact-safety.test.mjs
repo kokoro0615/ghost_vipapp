@@ -1,11 +1,14 @@
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import { inspectText } from "../../scripts/check-artifact-safety.mjs";
+import {
+  formatFindingReport,
+  inspectText,
+  scanArtifactRoots,
+} from "../../scripts/check-artifact-safety.mjs";
 
 test("artifact inspection catches auth, cookie, PIN, email, and phone leaks", () => {
   assert.deepEqual(inspectText("Authorization: Bearer abcdefghijklmnop"), ["authorization"]);
@@ -31,20 +34,11 @@ test("artifact scanner reports only a path hash and finding class", async (t) =>
   const secret = "Bearer artifact-secret-value";
   await writeFile(path.join(directory, sensitiveFilename), `Authorization: ${secret}\n`, "utf8");
 
-  const scan = await new Promise((resolve) => {
-    const child = spawn(process.execPath, ["scripts/check-artifact-safety.mjs", directory], {
-      cwd: process.cwd(),
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-    let stderr = "";
-    child.stderr.on("data", (chunk) => {
-      stderr += chunk;
-    });
-    child.on("close", (code) => resolve({ code, stderr }));
-  });
+  const findings = await scanArtifactRoots([directory]);
+  const output = formatFindingReport(findings);
 
-  assert.equal(scan.code, 1);
-  assert.match(scan.stderr, /"fileHash":"[0-9a-f]{12}"/u);
-  assert.match(scan.stderr, /"authorization"/u);
-  assert.doesNotMatch(scan.stderr, /guest@example\.com|artifact-secret-value/u);
+  assert.equal(findings.length, 1);
+  assert.match(output, /"fileHash":"[0-9a-f]{12}"/u);
+  assert.match(output, /"authorization"/u);
+  assert.doesNotMatch(output, /guest@example\.com|artifact-secret-value/u);
 });

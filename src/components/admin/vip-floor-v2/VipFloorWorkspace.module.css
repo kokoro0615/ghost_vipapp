@@ -1357,6 +1357,9 @@
 .confirmation strong, .confirmation p, .confirmation small,
 .conflictBox strong, .conflictBox p, .conflictBox small { display: block; margin: 0; }
 .confirmation p, .confirmation small, .conflictBox p, .conflictBox small { color: var(--ink-2); font-size: var(--t-mini); line-height: var(--lh-ui); }
+.confirmation[data-danger] { border-top-color: var(--alert); background: var(--alert-wash); }
+.confirmation[data-danger] > svg,
+.confirmation[data-danger] strong { color: var(--alert); }
 .conflictBox { border-top-color: var(--alert); background: var(--alert-wash); color: var(--alert); }
 
 .commandFooter {

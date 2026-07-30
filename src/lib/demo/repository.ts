@@ -48,6 +48,12 @@ import {
 
 const REVISION_CHANNEL = "ghost-vip-demo-revision";
 const BLOCK_REPEAT_DAYS = new Set([1, 7, 14]);
+const WALK_IN_CANCELLATION_REASONS = new Set([
+  "mistake",
+  "duplicate",
+  "guest_request",
+  "venue_decision",
+]);
 
 type RepositoryConfig = {
   workspaceId: string;
@@ -174,6 +180,26 @@ function envelopeMatches(
 }
 
 function toBoard(envelope: DemoEnvelope): VipFloorBoardV2 {
+  const reservations = envelope.reservations.filter(
+    (reservation) => reservation.lifecycleStatus !== "cancelled",
+  );
+  const reservationIds = new Set(reservations.map((reservation) => reservation.id));
+  const assignments = envelope.assignments.filter(
+    (assignment) => reservationIds.has(assignment.reservationId),
+  );
+  const notes = envelope.notes.filter(
+    (note) => reservationIds.has(note.reservationId),
+  );
+  const tables = envelope.tables.map((table) => ({
+    ...table,
+    reservationIds: table.reservationIds.filter(
+      (reservationId) => reservationIds.has(reservationId),
+    ),
+  }));
+  const unassignedReservationIds = envelope.unassignedReservationIds.filter(
+    (reservationId) => reservationIds.has(reservationId),
+  );
+
   return {
     schemaVersion: VIP_FLOOR_SCHEMA_VERSION,
     generatedAt: envelope.generatedAt,
@@ -181,13 +207,19 @@ function toBoard(envelope: DemoEnvelope): VipFloorBoardV2 {
     businessDay: cloneValue(envelope.businessDay),
     capabilities: cloneValue(envelope.capabilities),
     sections: cloneValue(envelope.sections),
-    tables: cloneValue(envelope.tables),
-    reservations: cloneValue(envelope.reservations),
-    assignments: cloneValue(envelope.assignments),
-    unassignedReservationIds: cloneValue(envelope.unassignedReservationIds),
+    tables: cloneValue(tables),
+    reservations: cloneValue(reservations),
+    assignments: cloneValue(assignments),
+    unassignedReservationIds: cloneValue(unassignedReservationIds),
     blocks: cloneValue(envelope.blocks),
-    notes: cloneValue(envelope.notes),
-    totals: cloneValue(envelope.totals),
+    notes: cloneValue(notes),
+    totals: calculateDemoTotals({
+      tables,
+      reservations,
+      assignments,
+      blocks: envelope.blocks,
+      notes,
+    }),
     operations: cloneValue(envelope.operations),
   };
 }
@@ -737,7 +769,13 @@ export class BrowserDemoRepository {
         }
         reservation.serviceStatus = status;
         if (status === "seated") reservation.actualSeatedAt = draft.payload.occurredAt ?? at;
-        if (status === "completed") reservation.completedAt = draft.payload.occurredAt ?? at;
+        if (status === "completed") {
+          const priorTables = [...reservation.tableIds];
+          reservation.completedAt = draft.payload.occurredAt ?? at;
+          reservation.tableIds = [];
+          reservation.assignmentIds = [];
+          this.bumpTables(envelope, priorTables);
+        }
       } else if (draft.kind === "assignment") {
         const tableIds = draft.payload.tableIds ?? [];
         this.tableVersions(envelope, tableIds);
@@ -770,6 +808,49 @@ export class BrowserDemoRepository {
         reservation.scheduledEndAt = nextEnd;
         reservation.expectedReleaseAt = nextEnd;
         this.bumpTables(envelope, reservation.tableIds);
+      } else if (draft.kind === "walk_in_cancel") {
+        if (
+          reservation.sourceChannel !== "walk_in"
+          || reservation.lifecycleStatus === "cancelled"
+          || ["completed", "no_show"].includes(reservation.serviceStatus ?? "")
+        ) {
+          throw new DemoRepositoryError(
+            "INVALID_STATE_TRANSITION",
+            "この予約はWalk-in取消の対象ではありません。",
+            409,
+          );
+        }
+        const reasonNote = assertSyntheticNote(
+          draft.payload.reasonNote,
+          "reasonNote",
+        );
+        if (
+          !reasonNote
+          || draft.payload.sourceChannel !== "walk_in"
+          || !draft.payload.cancelReason
+          || !WALK_IN_CANCELLATION_REASONS.has(draft.payload.cancelReason)
+        ) {
+          throw new DemoRepositoryError(
+            "INVALID_SYNTHETIC_INPUT",
+            "デモ用の取消理由を入力してください。",
+          );
+        }
+        const priorTables = [...reservation.tableIds];
+        reservation.lifecycleStatus = "cancelled";
+        reservation.tableIds = [];
+        reservation.assignmentIds = [];
+        reservation.operatorNote = reasonNote;
+        this.bumpTables(envelope, priorTables);
+        const customerId = reservation.customer?.customerId;
+        if (typeof customerId === "string") {
+          const customer = envelope.customers[customerId];
+          const history = customer?.reservationHistory.find(
+            (item) => item.reservationId === reservation.id,
+          );
+          if (history) {
+            history.lifecycleStatus = "cancelled";
+          }
+        }
       } else {
         const body = assertSyntheticNote(draft.payload.note, "note");
         if (!body) {
@@ -799,9 +880,12 @@ export class BrowserDemoRepository {
       reservation.updatedAt = at;
       reservation.version += 1;
       return {
+        action: draft.kind,
         entityId: reservation.id,
         entityVersion: reservation.version,
-        summary: `デモ：予約操作 ${draft.kind}`,
+        summary: draft.kind === "walk_in_cancel"
+          ? `デモ：Walk-inを取消（${draft.payload.cancelReason ?? "mistake"}）`
+          : `デモ：予約操作 ${draft.kind}`,
       };
     });
   }

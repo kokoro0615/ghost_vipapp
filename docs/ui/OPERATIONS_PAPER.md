@@ -164,6 +164,11 @@ The four elements the Owner requires are all present without stacking:
 The queue is never a second copy of the ledger. That duplication was the
 original collapse.
 
+Walk-in取消はInspectorの店頭予約だけに現れる危険操作とし、理由入力と影響確認を
+分離する。確認画面では「戻る」を初期focusにし、取消実行はgraphiteの通常action
+ではなく`--alert`で区別する。取消は割当席を解放するが物理削除ではなく、元記録・
+version・監査履歴を残す。返金ケースと顧客通知はこの導線から作らない。
+
 ### ≤1023px
 
 Single column. The inspector becomes a full sheet, the counters become a 52px
@@ -199,7 +204,7 @@ below the final table.
 npm run ci     # lint · typecheck · unit+contract+PII · build · maintenance · a11y
 ```
 
-`npm run test:a11y` audits **40 states × 9 viewports** and asserts zero axe
+`npm run test:a11y` audits **41 states × 9 viewports** and asserts zero axe
 violations, zero horizontal overflow, zero controls under 44×44, zero legacy
 purple chrome, zero console errors and zero 5xx.
 

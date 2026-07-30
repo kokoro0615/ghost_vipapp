@@ -36,6 +36,7 @@ export const DEMO_OPERATION_KINDS = [
   "assignment",
   "seat_extension",
   "note",
+  "walk_in_cancel",
   "walk_in",
   "waitlist_create",
   "waitlist_call",

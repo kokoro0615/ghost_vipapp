@@ -26,6 +26,10 @@ const expectedCommands = [
     backendPath: "/api/admin/v2/reservations/{reservationId}/check-in",
   },
   {
+    kind: "walk_in_cancel",
+    backendPath: "/api/admin/v2/reservations/{reservationId}/cancel",
+  },
+  {
     kind: "arrival_time",
     backendPath: "/api/admin/v2/reservations/{reservationId}/arrival-time",
   },
@@ -52,7 +56,7 @@ function routeSourceFragment(backendPath) {
     .replace("{reservationId}", "${encodeURIComponent(id)}");
 }
 
-test("VIP App maps exactly six commands to the canonical v2 backend", () => {
+test("VIP App maps all seven commands to the canonical v2 backend", () => {
   const source = readFileSync(commandRoutePath, "utf8");
 
   for (const command of expectedCommands) {
@@ -86,6 +90,9 @@ test("command payload translation preserves the v2 concurrency and domain fields
   assert.match(source, /entityVersion: rawPayload\.entityVersion/u);
   assert.match(source, /boardRevision: rawPayload\.boardRevision/u);
   assert.match(source, /auditLogId: rawPayload\.auditLogId/u);
+  assert.match(source, /walk_in_cancel[\s\S]*refundDecision: "none"/u);
+  assert.match(source, /walk_in_cancel[\s\S]*notifyCustomer: false/u);
+  assert.match(source, /body\.payload\?\.sourceChannel !== "walk_in"/u);
 });
 
 test("board adapter prefers vip-floor.v2 and makes legacy fallback read-only", () => {

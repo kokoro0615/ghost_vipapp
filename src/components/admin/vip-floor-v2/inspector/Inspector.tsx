@@ -1,6 +1,6 @@
 "use client";
 
-import { Armchair, BellRing, CalendarClock, ChevronLeft, ChevronRight, ClipboardList, Clock3, MapPin, NotebookPen, Pencil, Route, ShieldCheck, Ticket, TimerReset, UserRound, UsersRound } from "lucide-react";
+import { Armchair, BellRing, CalendarClock, ChevronLeft, ChevronRight, CircleX, ClipboardList, Clock3, MapPin, NotebookPen, Pencil, Route, ShieldCheck, Ticket, TimerReset, UserRound, UsersRound } from "lucide-react";
 
 import type { VipFloorBoardV2 } from "@/lib/vipFloorV2Contract";
 
@@ -126,6 +126,22 @@ export function Inspector({
                 <CommandIcon size={14} aria-hidden />{command.label}
               </button>;
             })}
+            {reservation.sourceChannel === "walk_in" ? (
+              <button
+                type="button"
+                data-danger
+                onClick={() => onCommand("walk_in_cancel")}
+                disabled={
+                  readOnly
+                  || reservation.lifecycleStatus === "cancelled"
+                  || reservation.serviceStatus === "completed"
+                  || reservation.serviceStatus === "no_show"
+                  || !canCommand("walk_in_cancel")
+                }
+              >
+                <CircleX size={14} aria-hidden />Walk-in取消
+              </button>
+            ) : null}
           </div>
 
           <div className={styles.inspectorTabs} role="tablist" aria-label="予約詳細" onKeyDown={moveTabFocus}>

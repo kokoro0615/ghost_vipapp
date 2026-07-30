@@ -313,6 +313,35 @@ async function auditViewport(context, viewport) {
   await demoWalkInDialog.locator('textarea[name="operatorNote"]').fill("デモ：入口で到着確認済み");
   await demoWalkInDialog.getByRole("button", { name: "競合確認して保存" }).click();
   await demoWalkInDialog.waitFor({ state: "hidden" });
+  await goToDemoWorkspace(demoWalkInPage, "list", "2026-07-31");
+  const createdWalkInRow = demoWalkInPage.locator("tr", {
+    hasText: "デモWalk-inテスト",
+  });
+  await createdWalkInRow.getByRole("button", { name: /の詳細を開く/u }).click();
+  if (viewport.width < 1024) {
+    await demoWalkInPage.getByRole("dialog", { name: "予約詳細" }).waitFor();
+  } else {
+    await demoWalkInPage.locator('[data-instance="desktop"]').waitFor();
+  }
+  await demoWalkInPage.getByRole("button", { name: "Walk-in取消", exact: true }).click();
+  const cancelDialog = demoWalkInPage.getByRole("dialog", { name: "Walk-inを取り消す" });
+  await cancelDialog.getByLabel("取消区分").selectOption("mistake");
+  await cancelDialog.getByLabel("取消理由メモ").fill("デモ：Walk-in誤登録");
+  await cancelDialog.getByRole("button", { name: /確認へ/u }).click();
+  await cancelDialog.getByRole("button", { name: "Walk-inを取り消す", exact: true }).waitFor();
+  assert.equal(
+    await cancelDialog.locator("[data-least-destructive]").evaluate(
+      (element) => element === document.activeElement,
+    ),
+    true,
+    "destructive confirmation must initially focus the least destructive action",
+  );
+  await capture(demoWalkInPage, "command-walk-in-cancel");
+  await cancelDialog.getByRole("button", { name: "Walk-inを取り消す", exact: true }).click();
+  await cancelDialog.waitFor({ state: "hidden" });
+  await createdWalkInRow.waitFor({ state: "hidden" });
+  await goToDemoWorkspace(demoWalkInPage, "floor", "2026-07-31");
+  await demoWalkInPage.getByRole("button", { name: /VIP-8.*空席/u }).waitFor();
   assert.deepEqual(demoWalkInPage.qaServerErrors, [], "demo Walk-in produced a server 5xx");
   await demoWalkInPage.close();
 
