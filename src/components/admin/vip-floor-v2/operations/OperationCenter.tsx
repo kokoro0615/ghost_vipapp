@@ -235,7 +235,8 @@ export function OperationCenter({
       >
         <header className={styles.commandHeader}>
           <div>
-            <span>GHOST ARRIVAL CONTROL</span>
+            {/* No English kicker over a Japanese title: the venue is already named
+              * in the masthead, and the tabs below say which operation this is. */}
             <h2 id="operation-title">{editReservation ? "予約編集" : "新規予約"}</h2>
           </div>
           <button type="button" onClick={closePanel} aria-label="新規作成を閉じる">

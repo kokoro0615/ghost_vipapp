@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useMemo, useState } from "react";
-import { ArrowLeft, ArrowRight, Check, CheckCircle2, Clock3, Mail, MapPin, ShieldCheck, UsersRound } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Mail } from "lucide-react";
 
 import type { VipFloorBoardV2, VipServiceStatus } from "@/lib/vipFloorV2Contract";
 
@@ -17,6 +17,30 @@ import styles from "../VipFloorWorkspace.module.css";
 import { useTrialMode } from "../TrialMode";
 
 const STEPS = ["日付", "時刻", "人数", "卓", "顧客", "追加", "担当", "確認"] as const;
+
+/*
+ * Visual grouping only. All eight steps stay separate, keep their order, and
+ * stay individually reachable and announced; this just tells the operator which
+ * part of the job they are in so eight equal cells stop reading as eight equal
+ * tasks.
+ */
+const PHASES = [
+  { label: "日時・席", firstStep: 0, lastStep: 3 },
+  { label: "顧客・詳細", firstStep: 4, lastStep: 6 },
+  { label: "確認", firstStep: 7, lastStep: 7 },
+] as const;
+
+const SOURCE_LABELS: Record<Draft["sourceChannel"], string> = {
+  admin_hold: "管理者作成",
+  online: "GHOST Web",
+};
+
+const SERVICE_STATUS_LABELS: Record<string, string> = {
+  expected: "来店予定",
+  late: "遅刻",
+  arrived: "到着",
+  seated: "着席",
+};
 
 type Draft = {
   startAt: string;
@@ -98,6 +122,15 @@ export function ReservationWizard({
     && !dateError
     && stepValid(step, draft, Boolean(reservation));
 
+  const phase = PHASES.find((entry) => step >= entry.firstStep && step <= entry.lastStep) ?? PHASES[0];
+  const tableCodes = selectedTables.map((table) => table.displayCode).join("・");
+  const timeValid = Boolean(draft.startAt && draft.endAt && draft.startAt < draft.endAt);
+  const capacityShort = selectedTables.length > 0 && capacity < draft.guestCount;
+  const staffName = (staffData?.staffMembers ?? [])
+    .find((member) => member.id === draft.bookingStaffMemberId)?.displayName ?? null;
+  const emailMissing = draft.notificationPreference === "email" && !reservation && !draft.email;
+  const guestName = (reservation?.guestLabel ?? draft.displayName) || "匿名";
+
   function patch(next: Partial<Draft>) {
     setDraft((current) => ({ ...current, ...next }));
   }
@@ -171,41 +204,63 @@ export function ReservationWizard({
 
   return (
     <section className={styles.reservationWizard} aria-label={`予約${reservation ? "編集" : "作成"} ${step + 1}/8 ${STEPS[step]}`}>
-      <ol className={styles.wizardRail} aria-label={`予約${reservation ? "編集" : "作成"}ステップ`}>
-        {STEPS.map((label, index) => (
-          <li key={label} data-current={index === step || undefined} data-complete={index < step || undefined}>
-            <span>{index + 1}</span><small>{label}</small>
-          </li>
-        ))}
-      </ol>
-      <div className={styles.wizardBody}>
-        <aside className={styles.wizardContext} aria-label="予約コンテキスト">
-          <header>
-            <span>DATE / TABLE</span>
-            <strong>日時・席</strong>
-          </header>
-          <dl>
-            <div><dt><Clock3 size={14} />営業日</dt><dd>{board.businessDay.businessDate}</dd></div>
-            <div><dt>時間</dt><dd>{draft.startAt.slice(11)}–{draft.endAt.slice(11)}</dd></div>
-            <div><dt><UsersRound size={14} />人数</dt><dd>{draft.guestCount}名</dd></div>
-            <div><dt><MapPin size={14} />卓</dt><dd>{selectedTables.map((table) => table.displayCode).join(" + ") || "未選択"}</dd></div>
-          </dl>
-          <div className={styles.wizardMap}>
-            <Image
-              src="/media/images/vipmapv3.9239fd2174.webp"
-              alt="選択中のVIP席を確認するGHOST Osakaフロア図"
-              fill
-              sizes="300px"
-            />
-          </div>
-          <p>正式卓はVIP-1〜VIP-8のみ。保存時に版と席競合を再検証します。</p>
-        </aside>
+      <div className={styles.wizardProgress}>
+        <p className={styles.wizardPhase}>
+          <strong>{phase.label}</strong>
+          <span className="tabular-nums">{step + 1}/8</span>
+          <em>{STEPS[step]}</em>
+        </p>
+        <ol className={styles.wizardRail} aria-label={`予約${reservation ? "編集" : "作成"}ステップ`}>
+          {STEPS.map((label, index) => (
+            <li
+              key={label}
+              data-state={index < step ? "done" : index === step ? "current" : "todo"}
+              data-phase-start={PHASES.some((entry) => entry.firstStep === index) || undefined}
+              aria-current={index === step ? "step" : undefined}
+            >
+              <span className={styles.wizardRailMark} aria-hidden>
+                {index < step ? <Check size={11} strokeWidth={3} /> : index + 1}
+              </span>
+              <small>{label}</small>
+              {/* State is never colour-only: it is also spoken. */}
+              <span className="sr-only">
+                {index < step ? "入力済み" : index === step ? "現在の段階" : "未入力"}
+              </span>
+            </li>
+          ))}
+        </ol>
+      </div>
+
+      {/* The running record stays on screen at every width, so no step ever
+        * hides what the operator already decided. */}
+      <dl className={styles.wizardSummaryBar} aria-label="入力済みの予約内容">
+        <div>
+          <dt>日付</dt>
+          <dd className="tabular-nums">{board.businessDay.businessDate}</dd>
+        </div>
+        <div>
+          <dt>時刻</dt>
+          <dd className="tabular-nums">{draft.startAt.slice(11)}–{draft.endAt.slice(11)}</dd>
+        </div>
+        <div>
+          <dt>人数</dt>
+          <dd className="tabular-nums">{draft.guestCount}名</dd>
+        </div>
+        <div>
+          <dt>卓</dt>
+          <dd data-empty={selectedTables.length === 0 || undefined}>{tableCodes || "未選択"}</dd>
+        </div>
+      </dl>
+
+      <div className={styles.wizardBody} data-single={step === 7 || undefined}>
         <div className={styles.wizardActive}>
         {step === 0 ? (
-          <div className={styles.wizardStatement}>
-            <span>BUSINESS DATE</span>
+          <fieldset>
+            <legend>予約日を選ぶ</legend>
             {reservation ? (
-              <strong>{board.businessDay.businessDate}</strong>
+              <p className={styles.wizardLockedValue}>
+                <span className="tabular-nums">{board.businessDay.businessDate}</span>
+              </p>
             ) : (
               <label className={styles.wizardDateControl}>
                 予約日
@@ -218,20 +273,29 @@ export function ReservationWizard({
                 />
               </label>
             )}
-            <p id="reservation-date-hint">
+            <p id="reservation-date-hint" className={styles.wizardHint}>
               {reservation
                 ? "予約日の変更は新規事前予約から行います。"
                 : datePending
                   ? "選択日の営業枠・プラン・卓状況を確認しています…"
-                  : "ここで予約日を変更できます。外側の営業日も自動で切り替わります。"}
+                  : "外側の営業日も自動で切り替わります。"}
             </p>
             {dateError ? (
-              <p id="reservation-date-error" className={styles.wizardDateError} role="alert">
+              <p id="reservation-date-error" className={styles.wizardFieldError} role="alert">
                 {dateError}
               </p>
             ) : null}
-            <p>GHOST Osakaの営業日は22:00から翌05:00までです。</p>
-          </div>
+            <dl className={styles.wizardFacts}>
+              <div>
+                <dt>営業枠</dt>
+                <dd className="tabular-nums">22:00–05:00</dd>
+              </div>
+              <div>
+                <dt>正式卓</dt>
+                <dd className="tabular-nums">VIP-1〜VIP-{board.tables.length}</dd>
+              </div>
+            </dl>
+          </fieldset>
         ) : null}
         {step === 1 ? (
           <fieldset>
@@ -240,6 +304,18 @@ export function ReservationWizard({
               <label>開始<input type="datetime-local" value={draft.startAt} onChange={(event) => patch({ startAt: event.target.value })} /></label>
               <label>終了<input type="datetime-local" value={draft.endAt} onChange={(event) => patch({ endAt: event.target.value })} /></label>
             </div>
+            {/* The native control follows the browser locale, so the venue's own
+              * 24-hour reading is stated next to it. */}
+            <p className={styles.wizardReadout}>
+              <span>この予約の時間帯</span>
+              <strong className="tabular-nums">{draft.startAt.slice(11)}–{draft.endAt.slice(11)}</strong>
+              <em className="tabular-nums">{stayLabel(draft.startAt, draft.endAt)}</em>
+            </p>
+            {timeValid ? null : (
+              <p className={styles.wizardFieldError} role="alert">
+                終了時刻は開始時刻より後にしてください。
+              </p>
+            )}
             <p className={styles.wizardHint}>保存時に営業日範囲と卓の重複を再検証します。</p>
           </fieldset>
         ) : null}
@@ -261,10 +337,10 @@ export function ReservationWizard({
         ) : null}
         {step === 3 ? (
           <fieldset>
-            <legend>複数卓を選択</legend>
+            <legend>卓を選ぶ</legend>
             <div className={styles.checkGrid} role="group" aria-label="予約卓">
               {board.tables.map((table) => (
-                <label key={table.id}>
+                <label key={table.id} data-selected={draft.tableIds.includes(table.id) || undefined}>
                   <input
                     type="checkbox"
                     checked={draft.tableIds.includes(table.id)}
@@ -274,30 +350,66 @@ export function ReservationWizard({
                         : draft.tableIds.filter((id) => id !== table.id),
                     })}
                   />
-                  <span>{table.displayCode}</span><small>{table.capacityMax}名</small>
+                  <span>{table.displayCode}</span>
+                  <small className="tabular-nums">{table.capacityMax}名</small>
                 </label>
               ))}
             </div>
-            <p className={capacity < draft.guestCount ? styles.wizardWarning : styles.wizardHint}>
-              選択 {selectedTables.length}卓 / 定員 {capacity}名 / 予約 {draft.guestCount}名
+            <p className={capacityShort ? styles.wizardWarning : styles.wizardHint}>
+              選択 <span className="tabular-nums">{selectedTables.length}</span>卓 / 定員{" "}
+              <span className="tabular-nums">{capacity}</span>名 / 予約{" "}
+              <span className="tabular-nums">{draft.guestCount}</span>名
+              {capacityShort ? " — 定員が不足しています。卓を追加してください。" : null}
             </p>
+            {/* The plan is a working instrument on this step only: real venue
+              * geometry, real colour, and the selection actually marked. */}
+            <figure className={styles.wizardMap}>
+              <Image
+                src="/media/images/vipmapv3.9239fd2174.webp"
+                alt="GHOST Osaka VIPフロアのカラー座席図"
+                width={1672}
+                height={940}
+                unoptimized
+                sizes="(min-width: 1024px) 560px, 92vw"
+                className={styles.wizardMapImage}
+              />
+              {/* The plan artwork already prints every table number, so the
+                * overlay is a bracket around the selection rather than a second
+                * set of labels — and it stays open so the printed code below it
+                * is still readable. */}
+              {selectedTables.map((table) => (
+                <span
+                  key={table.id}
+                  className={styles.wizardMapNode}
+                  style={{
+                    left: `${table.geometry.xPercent}%`,
+                    top: `${table.geometry.yPercent}%`,
+                  }}
+                  aria-hidden
+                />
+              ))}
+              <figcaption>
+                {selectedTables.length > 0
+                  ? `座席図で強調しているのが選択中の${tableCodes}です。`
+                  : "卓を選ぶと座席図の該当位置を強調します。"}
+              </figcaption>
+            </figure>
           </fieldset>
         ) : null}
         {step === 4 ? (
           <fieldset>
             <legend>{demoMode.enabled ? "顧客（合成データ専用）" : "顧客（暗号化・Owner限定）"}</legend>
             {reservation ? (
-              <div className={styles.wizardStatement}>
-                <span>CUSTOMER LINK</span>
-                <strong>{reservation.guestLabel}</strong>
-                <p>{demoMode.enabled
+              <>
+                <p className={styles.wizardLockedValue}>{reservation.guestLabel}</p>
+                <p className={styles.wizardHint}>{demoMode.enabled
                   ? reservation.customerId
                     ? "現在の合成顧客リンクをbrowser-localで保持します。"
                     : "合成顧客未紐付けのまま更新します。"
                   : reservation.customerId
                     ? "現在の暗号化顧客リンクを保持します。"
                     : "顧客未紐付けのまま更新します。"}</p>
-              </div>
+              </>
             ) : (
               <>
                 <label>氏名<input value={draft.displayName} maxLength={120} autoComplete="off" placeholder={demoMode.enabled ? "例: デモゲスト001" : trialMode ? "例: TRIAL-ゲスト01" : undefined} onChange={(event) => patch({ displayName: event.target.value })} /></label>
@@ -346,60 +458,59 @@ export function ReservationWizard({
         ) : null}
         {step === 7 ? (
           <div className={styles.wizardConfirm}>
-            <header><ShieldCheck size={20} /><div><span>FINAL VALIDATION</span><strong>予約内容を確認</strong></div></header>
+            <h3>この内容で{reservation ? "更新" : "作成"}します</h3>
             <dl>
-              <div><dt>営業日</dt><dd>{board.businessDay.businessDate}</dd></div>
-              <div><dt>時刻</dt><dd>{draft.startAt.slice(11)}–{draft.endAt.slice(11)}</dd></div>
-              <div><dt>人数 / 卓</dt><dd>{draft.guestCount}名 / {selectedTables.map((table) => table.displayCode).join("・")}</dd></div>
-              <div><dt>顧客</dt><dd>{(reservation?.guestLabel ?? draft.displayName) || "匿名"}</dd></div>
+              <div><dt>営業日</dt><dd className="tabular-nums">{board.businessDay.businessDate}</dd></div>
+              <div><dt>時刻</dt><dd className="tabular-nums">{draft.startAt.slice(11)}–{draft.endAt.slice(11)}</dd></div>
+              <div><dt>人数</dt><dd className="tabular-nums">{draft.guestCount}名</dd></div>
+              <div>
+                <dt>卓</dt>
+                <dd data-empty={selectedTables.length === 0 || undefined}>
+                  {tableCodes || "未選択"}
+                  {selectedTables.length > 0 ? <span className="tabular-nums"> / 定員{capacity}名</span> : null}
+                </dd>
+              </div>
+              <div><dt>顧客</dt><dd>{guestName}</dd></div>
+              <div><dt>入口表示名</dt><dd data-empty={draft.guestLabel ? undefined : true}>{draft.guestLabel || "未設定"}</dd></div>
+              <div><dt>経路 / 状態</dt><dd>{SOURCE_LABELS[draft.sourceChannel]} / {SERVICE_STATUS_LABELS[draft.serviceStatus] ?? draft.serviceStatus}</dd></div>
+              <div><dt>担当</dt><dd data-empty={staffName ? undefined : true}>{staffName ?? "未指定"}</dd></div>
+              <div><dt>通知</dt><dd>{draft.notificationPreference === "email" ? "Eメール送信" : "送信しない"}</dd></div>
+              <div><dt>現場メモ</dt><dd data-empty={draft.operatorNote ? undefined : true}>{draft.operatorNote || "なし"}</dd></div>
+              <div><dt>版</dt><dd>{reservation ? `v${reservation.version}を更新` : "新規作成"}</dd></div>
             </dl>
             <fieldset>
               <legend>顧客通知</legend>
               <label className={styles.choiceRow}><input type="radio" name="notify" checked={draft.notificationPreference === "none"} onChange={() => patch({ notificationPreference: "none" })} />送信しない</label>
               <label className={styles.choiceRow}><input type="radio" name="notify" checked={draft.notificationPreference === "email"} disabled={demoMode.enabled} onChange={() => patch({ notificationPreference: "email" })} /><Mail size={15} />{demoMode.enabled ? "DEMOでは外部送信なし" : "Eメール送信"}</label>
             </fieldset>
-            {draft.notificationPreference === "email" && !reservation && !draft.email ? <p className={styles.wizardWarning}>Eメール送信には顧客Eメールが必要です。</p> : null}
+            {emailMissing ? <p className={styles.wizardFieldError} role="alert">Eメール送信には顧客Eメールが必要です。手順5でEメールを入力してください。</p> : null}
+            <p className={styles.wizardHint}>
+              保存時に版と席競合を再検証し、{reservation ? "予約変更" : "新規予約作成"}を監査へ記録します。
+            </p>
           </div>
         ) : null}
         </div>
-        <aside className={styles.wizardChecks} aria-label="保存前チェック">
-          <header>
-            <span>PRE-SAVE CHECK</span>
-            <strong>保存前チェック</strong>
-          </header>
-          <ul>
-            <li data-ok={Boolean(draft.startAt && draft.endAt && draft.startAt < draft.endAt) || undefined}>
-              <CheckCircle2 size={15} />日時
-              <strong>{draft.startAt && draft.endAt && draft.startAt < draft.endAt ? "OK" : "要確認"}</strong>
-            </li>
-            <li data-ok={draft.guestCount > 0 || undefined}>
-              <CheckCircle2 size={15} />人数
-              <strong>{draft.guestCount > 0 ? "OK" : "要確認"}</strong>
-            </li>
-            <li data-ok={draft.tableIds.length > 0 || undefined}>
-              <CheckCircle2 size={15} />席選択
-              <strong>{draft.tableIds.length > 0 ? "OK" : "未選択"}</strong>
-            </li>
-            <li data-ok={syntheticMode || undefined}>
-              <CheckCircle2 size={15} />データ境界
-              <strong>{syntheticMode ? "合成のみ" : "Owner"}</strong>
-            </li>
-          </ul>
-          <section>
-            <span>版情報</span>
-            <strong>{reservation ? `v${reservation.version}を更新` : "新規"}</strong>
-          </section>
-          <section>
-            <span>監査プレビュー</span>
-            <p>{reservation ? "予約変更を監査へ記録" : "新規予約作成を監査へ記録"}</p>
-          </section>
-        </aside>
+        {step === 7 ? null : (
+          <aside className={styles.wizardAside} aria-label="この予約の控え">
+            <dl>
+              <div><dt>顧客</dt><dd>{guestName}</dd></div>
+              <div><dt>入口表示名</dt><dd data-empty={draft.guestLabel ? undefined : true}>{draft.guestLabel || "未設定"}</dd></div>
+              <div><dt>担当</dt><dd data-empty={staffName ? undefined : true}>{staffName ?? "未指定"}</dd></div>
+              <div><dt>通知</dt><dd>{draft.notificationPreference === "email" ? "Eメール送信" : "送信しない"}</dd></div>
+              <div><dt>版</dt><dd>{reservation ? `v${reservation.version}` : "新規"}</dd></div>
+              <div>
+                <dt>データ</dt>
+                <dd>{syntheticMode ? "合成のみ" : "Owner"}</dd>
+              </div>
+            </dl>
+          </aside>
+        )}
       </div>
       <footer className={styles.wizardFooter}>
         <button type="button" className={styles.secondaryButton} disabled={step === 0 || pending} onClick={() => setStep((current) => current - 1)}>
           <ArrowLeft size={16} />戻る
         </button>
-        <span>{step + 1} / 8 · {STEPS[step]}</span>
+        <span>{step < 7 ? `次は ${STEPS[step + 1]}` : "保存前の最終確認"}</span>
         {step < 7 ? (
           <button type="button" className={styles.primaryButton} disabled={!canContinue || pending} onClick={() => setStep((current) => current + 1)}>
             次へ<ArrowRight size={16} />
@@ -430,6 +541,17 @@ function scheduleDefaults(board: VipFloorBoardV2) {
     start: localInput(new Date(startAt).toISOString()),
     end: localInput(new Date(startAt + 120 * 60_000).toISOString()),
   };
+}
+
+/* Presentational only: both inputs are naive local strings, so the difference is
+ * timezone-independent. */
+function stayLabel(startAt: string, endAt: string) {
+  const minutes = Math.round((Date.parse(endAt) - Date.parse(startAt)) / 60_000);
+  if (!Number.isFinite(minutes) || minutes <= 0) return "—";
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  if (hours === 0) return `${rest}分`;
+  return rest === 0 ? `${hours}時間` : `${hours}時間${rest}分`;
 }
 
 function localInput(value: string) {

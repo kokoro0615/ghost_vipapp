@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { IBM_Plex_Mono, IBM_Plex_Sans_JP } from "next/font/google";
+import { M_PLUS_2 } from "next/font/google";
 import type { ReactNode } from "react";
 
 import { isGhostVipMaintenanceMode } from "@/lib/server/maintenanceMode";
@@ -7,27 +7,32 @@ import { isGhostVipMaintenanceMode } from "@/lib/server/maintenanceMode";
 import "./globals.css";
 
 /*
- * Type pairing for the "OPERATIONS PAPER" direction.
+ * Type for the "OPERATIONS PAPER" direction: one Japanese-first family.
  *
- * IBM Plex Sans JP carries both Japanese and Latin in one family with a real
- * weight range, so hierarchy comes from weight rather than from size inflation.
- * IBM Plex Mono owns every figure — times, codes, counts, revisions — which is
- * what keeps a dense ledger from reflowing column to column.
+ * M PLUS 2 (M+ FONTS, OFL) carries Japanese and Latin in one voice with
+ * 400/500/700, so hierarchy comes from weight rather than from size inflation.
+ * It also has uniform digit advances and a working `tnum`, which is the one job
+ * the retired IBM Plex Mono was doing: a ledger column must never reflow when a
+ * digit changes. Keeping figures inside the text family additionally removes the
+ * seam in mixed runs like `4名` / `¥120,000`, where the digit and the counter
+ * used to come from two different fonts.
+ *
+ * The fallback list is the Hiragino-first system stack, so a slow font fetch
+ * degrades to the best local Japanese face rather than to a Latin default.
+ * Measurements: docs/ui/VIP_MANAGER_LIGHT_RESERVATION_RESEARCH.md §4.
  */
-const operatorFont = IBM_Plex_Sans_JP({
+const operatorFont = M_PLUS_2({
   weight: ["400", "500", "700"],
   display: "swap",
   variable: "--font-operator",
   preload: false,
-  fallback: ["Hiragino Sans", "Yu Gothic UI", "Noto Sans JP", "sans-serif"],
-});
-
-const figureFont = IBM_Plex_Mono({
-  weight: ["500", "600"],
-  subsets: ["latin"],
-  display: "swap",
-  variable: "--font-figure",
-  fallback: ["ui-monospace", "SFMono-Regular", "monospace"],
+  fallback: [
+    "Hiragino Sans",
+    "Hiragino Kaku Gothic ProN",
+    "Yu Gothic UI",
+    "Meiryo",
+    "sans-serif",
+  ],
 });
 
 export function generateMetadata(): Metadata {
@@ -50,13 +55,15 @@ export const viewport: Viewport = {
   initialScale: 1,
   viewportFit: "cover",
   colorScheme: "light",
-  themeColor: "#f5f4f2",
+  /* sRGB equivalent of the --paper token, so mobile browser chrome matches the
+   * application ground. Update both together. */
+  themeColor: "#f2f1ee",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
     <html lang="ja">
-      <body className={`${operatorFont.className} ${operatorFont.variable} ${figureFont.variable}`}>
+      <body className={`${operatorFont.className} ${operatorFont.variable}`}>
         {children}
       </body>
     </html>

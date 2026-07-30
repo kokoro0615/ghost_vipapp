@@ -1659,65 +1659,166 @@
 .operationTabs small { flex-basis: 100%; color: var(--ink-3); font-size: var(--t-micro); text-align: center; }
 
 .reservationWizard { display: flex; min-height: 0; flex: 1; flex-direction: column; overflow: hidden; }
-.wizardRail { display: grid; margin: 0; padding: 0; flex: 0 0 auto; grid-template-columns: repeat(8, minmax(0, 1fr)); border-bottom: 1px solid var(--rule); background: var(--surface-quiet); list-style: none; }
-.wizardRail li { display: flex; min-width: 0; min-height: 40px; align-items: center; justify-content: center; gap: var(--s-2); border-right: 1px solid var(--rule); color: var(--ink-3); font-size: var(--t-micro); }
-.wizardRail li:last-child { border-right: 0; }
-.wizardRail li > span { display: grid; width: 20px; height: 20px; place-items: center; border: 1px solid var(--rule-control); border-radius: 50%; font-family: var(--font-figure); font-size: var(--t-micro); }
-.wizardRail li[data-current] { background: var(--surface); color: var(--ink); box-shadow: inset 0 -2px var(--ink); font-weight: 700; }
-.wizardRail li[data-complete] > span { border-color: var(--live); color: var(--live); }
-.wizardBody { display: grid; min-height: 0; flex: 1; grid-template-columns: minmax(230px, 0.85fr) minmax(340px, 1.35fr) minmax(210px, 0.7fr); overflow: hidden; }
-.wizardContext, .wizardChecks { min-width: 0; overflow-y: auto; background: var(--surface-quiet); }
-.wizardContext { padding: var(--s-6); border-right: 1px solid var(--rule); }
-.wizardActive { min-width: 0; overflow-y: auto; padding: var(--s-6); background: var(--surface); }
-.wizardChecks { padding: var(--s-6); border-left: 1px solid var(--rule); }
-.wizardContext > header, .wizardChecks > header { display: grid; gap: var(--s-1); margin-bottom: var(--s-5); }
-.wizardContext > header span, .wizardChecks > header span { color: var(--accent-ink); font-size: var(--t-micro); font-weight: 700; letter-spacing: var(--track-caps); }
-.wizardContext > header strong, .wizardChecks > header strong { font-size: var(--t-body); font-weight: 700; }
-.wizardContext dl, .wizardConfirm dl { margin: 0; border-top: 1px solid var(--rule); }
-.wizardContext dl div, .wizardConfirm dl div { display: grid; min-height: 40px; grid-template-columns: minmax(0, 42%) minmax(0, 1fr); align-items: center; border-bottom: 1px solid var(--rule); }
-.wizardContext dt, .wizardConfirm dt { display: flex; align-items: center; gap: var(--s-3); color: var(--ink-3); font-size: var(--t-micro); }
-.wizardContext dd, .wizardConfirm dd { margin: 0; color: var(--ink); font-family: var(--font-figure); font-size: var(--t-mini); font-variant-numeric: tabular-nums; text-align: right; }
-.wizardMap { position: relative; min-height: 200px; margin-top: var(--s-5); overflow: hidden; border: 1px solid var(--rule); border-radius: var(--r-chip); background: var(--surface); }
-.wizardMap img { object-fit: contain; opacity: 0.9; filter: invert(1) grayscale(1) contrast(1.6) brightness(0.94); }
-.wizardContext > p { margin: var(--s-5) 0 0; color: var(--ink-3); font-size: var(--t-micro); line-height: var(--lh-ui); }
-.wizardChecks ul { margin: 0; padding: 0; overflow: hidden; border: 1px solid var(--rule); border-radius: var(--r-control); list-style: none; }
-.wizardChecks li { display: grid; min-height: 42px; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-3) var(--s-4); border-bottom: 1px solid var(--rule); background: var(--surface); color: var(--warn); font-size: var(--t-micro); }
-.wizardChecks li:last-child { border-bottom: 0; }
-.wizardChecks li[data-ok] { color: var(--live); }
-.wizardChecks li strong { color: inherit; font-size: var(--t-micro); }
-.wizardChecks > section { display: grid; gap: var(--s-3); margin-top: var(--s-5); padding: var(--s-4); border: 1px solid var(--rule); border-radius: var(--r-control); background: var(--surface); }
-.wizardChecks > section span { color: var(--ink-3); font-size: var(--t-micro); }
-.wizardChecks > section p { margin: 0; color: var(--ink-2); font-size: var(--t-micro); line-height: var(--lh-ui); }
-.wizardBody legend { margin-bottom: var(--s-4); color: var(--ink); font-size: var(--t-body); font-weight: 700; }
-.wizardStatement { display: grid; min-height: 240px; place-content: center; gap: var(--s-3); text-align: center; }
-.wizardStatement span, .wizardConfirm header span { color: var(--accent-ink); font-size: var(--t-micro); font-weight: 700; letter-spacing: var(--track-caps); }
-.wizardStatement strong { color: var(--ink); font-family: var(--font-figure); font-size: clamp(1.75rem, 4vw, 2.75rem); font-weight: 600; }
-.wizardStatement p, .wizardHint { color: var(--ink-3); font-size: var(--t-micro); line-height: var(--lh-ui); }
-.wizardDateControl {
-  width: min(100%, 280px);
-  margin: 0 auto;
-  color: var(--ink-2) !important;
-  text-align: left;
+
+/* ---- Progress: one ruler, eight segments, three phases ----
+ *
+ * Eight equal cells with circled numbers read as eight equal tasks and became
+ * illegible on a phone. The ruler keeps all eight steps individually present and
+ * announced, states the current phase and position in words, and separates the
+ * phases by whitespace rather than by more chrome.
+ */
+.wizardProgress {
+  display: grid;
+  flex: 0 0 auto;
+  gap: var(--s-4);
+  padding: var(--s-5) var(--s-6) var(--s-4);
+  border-bottom: 1px solid var(--rule);
+  background: var(--surface-quiet);
 }
-.wizardDateControl input { font-family: var(--font-figure); font-size: var(--t-data) !important; font-variant-numeric: tabular-nums; }
-.wizardDateError { max-width: 42ch; margin: 0 auto; color: var(--alert) !important; font-weight: 700; }
-.wizardWarning { color: var(--alert); font-size: var(--t-micro); font-weight: 700; }
-.wizardConfirm { display: grid; gap: var(--s-5); }
-.wizardConfirm > header { display: flex; align-items: center; gap: var(--s-4); color: var(--ink-3); }
-.wizardConfirm > header div { display: grid; }
-.wizardConfirm > header strong { color: var(--ink); font-size: var(--t-body); font-weight: 700; }
+.wizardPhase { display: flex; align-items: baseline; gap: var(--s-3); margin: 0; }
+.wizardPhase strong { color: var(--ink); font-size: var(--t-data); font-weight: 700; letter-spacing: -0.005em; }
+.wizardPhase span { color: var(--ink-2); font-size: var(--t-mini); font-weight: 500; }
+.wizardPhase em { min-width: 0; overflow: hidden; color: var(--ink-2); font-size: var(--t-mini); font-style: normal; text-overflow: ellipsis; white-space: nowrap; }
+.wizardPhase em::before { margin-right: var(--s-3); color: var(--ink-3); content: "／"; }
+
+.wizardRail { display: grid; margin: 0; padding: 0; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: var(--s-2); list-style: none; }
+.wizardRail li {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--s-2);
+  padding-top: var(--s-3);
+  border-top: 2px solid var(--rule-strong);
+  color: var(--ink-3);
+  font-size: var(--t-micro);
+}
+/* Phase boundaries are read as a gap, not as another line. */
+.wizardRail li[data-phase-start]:not(:first-child) { margin-left: var(--s-5); }
+.wizardRail li[data-state="done"] { border-top-color: var(--ink-2); color: var(--ink-2); }
+.wizardRail li[data-state="current"] { border-top-color: var(--accent); color: var(--ink); font-weight: 700; }
+.wizardRailMark {
+  display: grid;
+  width: 18px;
+  height: 18px;
+  place-items: center;
+  border: 1px solid var(--rule-control);
+  border-radius: var(--r-chip);
+  font-size: var(--t-micro);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.wizardRail li[data-state="done"] .wizardRailMark { border-color: var(--ink-2); background: var(--ink-2); color: var(--ink-inverse); }
+.wizardRail li[data-state="current"] .wizardRailMark { border-color: var(--action); background: var(--action); color: var(--action-text); }
+.wizardRail small { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ---- The running record, on screen at every width ---- */
+.wizardSummaryBar {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  margin: 0;
+  padding: 0;
+  border-bottom: 1px solid var(--rule-strong);
+  background: var(--surface);
+}
+.wizardSummaryBar > div {
+  display: flex;
+  min-width: 0;
+  min-height: 44px;
+  flex: 1 1 auto;
+  align-items: baseline;
+  gap: var(--s-3);
+  padding: var(--s-3) var(--s-6);
+}
+.wizardSummaryBar > div + div { border-left: 1px solid var(--rule); }
+.wizardSummaryBar dt { flex: 0 0 auto; color: var(--ink-3); font-size: var(--t-micro); }
+.wizardSummaryBar dd { min-width: 0; margin: 0; overflow: hidden; color: var(--ink); font-size: var(--t-body); font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.wizardSummaryBar dd[data-empty] { color: var(--ink-3); font-weight: 400; }
+
+/* ---- Two zones, never three: the active step dominates ---- */
+.wizardBody { display: grid; min-height: 0; flex: 1; grid-template-columns: minmax(0, 1fr) minmax(264px, 0.4fr); overflow: hidden; }
+.wizardBody[data-single] { grid-template-columns: minmax(0, 1fr); }
+.wizardActive { min-width: 0; overflow-y: auto; padding: var(--s-6); background: var(--surface); }
+.wizardAside { min-width: 0; overflow-y: auto; padding: var(--s-6); border-left: 1px solid var(--rule); background: var(--surface-quiet); }
+
+.wizardAside dl, .wizardConfirm dl, .wizardFacts { margin: 0; border-top: 1px solid var(--rule); }
+.wizardAside dl div, .wizardConfirm dl div, .wizardFacts div {
+  display: grid;
+  min-height: 40px;
+  grid-template-columns: minmax(0, 40%) minmax(0, 1fr);
+  align-items: center;
+  gap: var(--s-4);
+  border-bottom: 1px solid var(--rule);
+}
+.wizardAside dt, .wizardConfirm dt, .wizardFacts dt { color: var(--ink-3); font-size: var(--t-micro); }
+.wizardAside dd, .wizardConfirm dd, .wizardFacts dd { min-width: 0; margin: 0; color: var(--ink); font-size: var(--t-mini); overflow-wrap: anywhere; text-align: right; }
+.wizardAside dd[data-empty], .wizardConfirm dd[data-empty] { color: var(--ink-3); }
+
+.wizardActive > fieldset > legend { margin-bottom: var(--s-5); color: var(--ink); font-size: var(--t-lead); font-weight: 700; letter-spacing: -0.005em; }
+.wizardConfirm h3 { margin: 0; color: var(--ink); font-size: var(--t-lead); font-weight: 700; letter-spacing: -0.005em; }
+.wizardConfirm fieldset legend { margin-bottom: var(--s-4); color: var(--ink-2); font-size: var(--t-mini); font-weight: 500; }
+.wizardConfirm { display: grid; gap: var(--s-6); }
+
+.wizardLockedValue { margin: 0; color: var(--ink); font-size: var(--t-figure); font-weight: 500; }
+.wizardDateControl { width: min(100%, 260px); }
+.wizardDateControl input { font-size: var(--t-data) !important; font-variant-numeric: tabular-nums; }
+.wizardHint { margin: 0; color: var(--ink-2); font-size: var(--t-micro); line-height: var(--lh-ui); }
+.wizardWarning { margin: 0; color: var(--alert); font-size: var(--t-mini); font-weight: 700; line-height: var(--lh-ui); }
+/* Validation sits with the field it concerns, never in a standing side panel. */
+.wizardFieldError {
+  margin: 0;
+  padding: var(--s-3) var(--s-4);
+  border: 1px solid var(--alert-line);
+  border-radius: var(--r-control);
+  background: var(--alert-wash);
+  color: var(--alert);
+  font-size: var(--t-mini);
+  font-weight: 700;
+  line-height: var(--lh-ui);
+}
+.wizardReadout {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-4);
+  margin: 0;
+  padding: var(--s-4) var(--s-5);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-control);
+  background: var(--surface-quiet);
+}
+.wizardReadout span { color: var(--ink-3); font-size: var(--t-micro); }
+.wizardReadout strong { color: var(--ink); font-size: var(--t-figure); font-weight: 500; }
+.wizardReadout em { color: var(--ink-2); font-size: var(--t-mini); font-style: normal; }
+
+/* ---- The plan as a working instrument on the table step ---- */
+.wizardMap { position: relative; margin: 0; overflow: hidden; border: 1px solid var(--rule-strong); border-radius: var(--r-chip); background: var(--paper); }
+.wizardMapImage { display: block; width: 100%; height: auto; filter: none; }
+/* Champagne means "you are here", so the selection bracket is the only overlay.
+ * It stays open-centred so the table code printed on the plan reads through it. */
+.wizardMapNode {
+  position: absolute;
+  width: 34px;
+  height: 30px;
+  border: 2px solid var(--accent);
+  border-radius: var(--r-chip);
+  transform: translate(-50%, -50%);
+}
+.wizardMap figcaption { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--rule); background: var(--surface); color: var(--ink-3); font-size: var(--t-micro); line-height: var(--lh-ui); }
+.checkGrid label[data-selected] { border-color: var(--accent); box-shadow: inset 0 -2px var(--accent); }
+
 .wizardFooter {
   display: grid;
-  min-height: 56px;
+  min-height: 60px;
   flex: 0 0 auto;
-  grid-template-columns: minmax(110px, auto) 1fr minmax(110px, auto);
+  grid-template-columns: minmax(104px, auto) minmax(0, 1fr) minmax(132px, auto);
   align-items: center;
   gap: var(--s-4);
   padding: var(--s-3) var(--s-5);
-  border-top: 1px solid var(--rule);
+  border-top: 1px solid var(--rule-strong);
   background: var(--surface-quiet);
 }
-.wizardFooter > span { color: var(--ink-3); font-size: var(--t-micro); text-align: center; }
+.wizardFooter > span { min-width: 0; overflow: hidden; color: var(--ink-2); font-size: var(--t-micro); text-align: center; text-overflow: ellipsis; white-space: nowrap; }
 
 .blockLedger { display: grid; max-height: 220px; overflow: auto; border-top: 1px solid var(--rule); background: var(--surface); }
 .blockLedger > header, .blockLedger > div {
@@ -2004,8 +2105,12 @@
     border: 0;
     border-radius: 0;
   }
-  .wizardBody { grid-template-columns: minmax(0, 1fr); }
-  .wizardContext, .wizardChecks { display: none; }
+  /* The running record is never deleted on a small screen: the body becomes one
+   * scroll column and the aside follows the active step instead of vanishing. */
+  .wizardBody { grid-template-columns: minmax(0, 1fr); grid-auto-rows: min-content; overflow-y: auto; }
+  .wizardActive, .wizardAside { overflow: visible; }
+  .wizardAside { border-top: 1px solid var(--rule); border-left: 0; }
+  .wizardSummaryBar > div { padding: var(--s-3) var(--s-5); }
   .formColumns, .customerHistory, .customerLinkControl div { grid-template-columns: minmax(0, 1fr); }
   .chartExceptions { grid-template-columns: minmax(0, 1fr); max-height: 164px; overflow-y: auto; }
 
@@ -2056,6 +2161,20 @@
   }
   .floorContextAction span { min-width: 0; overflow: hidden; color: var(--ink-2); font-size: var(--t-mini); text-overflow: ellipsis; white-space: nowrap; }
   .chartExceptions { max-height: 128px; }
+
+  /* Phones: the ruler keeps all eight marks, and the step's name is carried by
+   * .wizardPhase plus each item's spoken state — so dropping the 11px label
+   * loses no information and stops the labels from crushing to nothing. */
+  .wizardProgress { padding: var(--s-4) var(--s-5) var(--s-3); }
+  .wizardRail small { display: none; }
+  .wizardRail li { grid-template-columns: minmax(0, 1fr); justify-items: center; }
+  .wizardRail li[data-phase-start]:not(:first-child) { margin-left: var(--s-4); }
+  .wizardSummaryBar { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .wizardSummaryBar > div + div { border-left: 0; }
+  .wizardSummaryBar > div { border-top: 1px solid var(--rule); }
+  .wizardSummaryBar > div:nth-child(-n + 2) { border-top: 0; }
+  .wizardSummaryBar > div:nth-child(odd) { border-right: 1px solid var(--rule); }
+  .wizardActive, .wizardAside { padding: var(--s-5); }
 }
 
 @media (max-width: 359px) {

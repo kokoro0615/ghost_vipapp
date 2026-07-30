@@ -14,14 +14,20 @@
 :root {
   color-scheme: light;
 
-  /* ---- Surface stack (value separation, lightest → most sunken) ---- */
-  --paper: oklch(0.968 0.0025 85); /* application ground */
+  /* ---- Surface stack (value separation, lightest → most sunken) ----
+   *
+   * The ground sits a clear step below pure white so a working pane reads as
+   * paper laid on a desk. The previous ramp put paper at 0.968 against a 1.0
+   * pane — a 1.6% step that read as one flat field, which is why no pane looked
+   * like the focal object. Every step here stays warm white; none is grey.
+   */
+  --paper: oklch(0.958 0.0035 85); /* application ground */
   --surface: oklch(1 0 0); /* working pane */
   --surface-raised: oklch(1 0 0); /* popovers, dialogs */
-  --surface-quiet: oklch(0.984 0.002 85); /* zebra / inset rows */
-  --surface-sunken: oklch(0.955 0.003 85); /* pane headers, rails */
-  --surface-hover: oklch(0.962 0.004 85);
-  --surface-active: oklch(0.941 0.005 85);
+  --surface-quiet: oklch(0.981 0.0025 85); /* zebra / inset rows */
+  --surface-sunken: oklch(0.944 0.004 85); /* pane headers, rails */
+  --surface-hover: oklch(0.955 0.004 85);
+  --surface-active: oklch(0.932 0.005 85);
 
   /* Legacy alias kept so route-level shells resolve to the same ground. */
   --canvas: var(--paper);
@@ -126,8 +132,12 @@
   --h-toolbar: 56px;
   --h-row: 52px;
 
-  --font-ui: var(--font-operator), "Hiragino Sans", "Yu Gothic UI", "Noto Sans JP", sans-serif;
-  --font-figure: var(--font-figure), ui-monospace, "SFMono-Regular", monospace;
+  /* One family carries text and figures. The figure role stays a distinct
+   * register through weight, tabular numerals and tracking (see .tabular-nums)
+   * rather than through a monospace face, which read as a terminal. */
+  --font-ui: var(--font-operator), "Hiragino Sans", "Hiragino Kaku Gothic ProN",
+    "Yu Gothic UI", "Meiryo", sans-serif;
+  --font-figure: var(--font-ui);
 
   background: var(--paper);
   color: var(--ink);
@@ -157,11 +167,14 @@ textarea {
   font: inherit;
 }
 
-/* Figures never reflow a column: one rule, applied everywhere numbers live. */
+/* Figures never reflow a column: one rule, applied everywhere numbers live.
+ * `palt` is switched off here on purpose — proportional Japanese spacing is
+ * right for prose but would undo the tabular advance the ledger depends on. */
 .tabular-nums {
   font-family: var(--font-figure);
   font-variant-numeric: tabular-nums lining-nums;
-  letter-spacing: -0.01em;
+  font-feature-settings: "palt" 0;
+  letter-spacing: 0.005em;
 }
 
 .sr-only {

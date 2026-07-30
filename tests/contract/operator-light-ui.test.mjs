@@ -2,12 +2,13 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-const [globals, layout, workspace, workspaceStyles, floorView] = await Promise.all([
+const [globals, layout, workspace, workspaceStyles, floorView, reservationWizard] = await Promise.all([
   readFile(new URL("../../src/app/globals.css", import.meta.url), "utf8"),
   readFile(new URL("../../src/app/layout.tsx", import.meta.url), "utf8"),
   readFile(new URL("../../src/components/admin/vip-floor-v2/VipFloorWorkspace.tsx", import.meta.url), "utf8"),
   readFile(new URL("../../src/components/admin/vip-floor-v2/VipFloorWorkspace.module.css", import.meta.url), "utf8"),
   readFile(new URL("../../src/components/admin/vip-floor-v2/floor/FloorView.tsx", import.meta.url), "utf8"),
+  readFile(new URL("../../src/components/admin/vip-floor-v2/operations/ReservationWizard.tsx", import.meta.url), "utf8"),
 ]);
 
 test("VIP Manager keeps a white operator surface authored in OKLCH", () => {
@@ -29,16 +30,59 @@ test("the surface is a real light system, not a renamed dark lacquer theme", () 
   assert.doesNotMatch(workspaceStyles, /Georgia|Times New Roman/u);
 });
 
-test("type is a real pairing with tabular figures for every number", () => {
-  assert.match(layout, /IBM_Plex_Sans_JP/u);
-  assert.match(layout, /IBM_Plex_Mono/u);
-  assert.doesNotMatch(layout, /BIZ_UDPGothic|Noto_Sans_JP|Inter|Roboto/u);
-  assert.match(globals, /--font-figure:\s*var\(--font-figure\)/u);
+test("type is one Japanese-first family with tabular figures for every number", () => {
+  // M PLUS 2 is pinned because it was the only humane Japanese candidate that
+  // measured uniform digit advances AND an effective `tnum`. Zen Kaku Gothic
+  // New/Antique, Murecho and BIZ UDPGothic drift 15-19px across a ten-digit
+  // string, so a ledger column would jitter. BIZ UDPGothic also ships only
+  // 400/700. See docs/ui/VIP_MANAGER_LIGHT_RESERVATION_RESEARCH.md section 4.
+  assert.match(layout, /M_PLUS_2/u);
+  assert.match(layout, /weight:\s*\["400", "500", "700"\]/u);
+  // The retired monospace face is what made the board read as a terminal.
+  assert.doesNotMatch(layout, /IBM_Plex_Mono/u);
+  assert.doesNotMatch(layout, /BIZ_UDPGothic|Noto_Sans_JP|Zen_Kaku|Murecho|Inter|Roboto/u);
+  // Figures stay a distinct register inside that one family, never a re-import.
+  assert.match(globals, /--font-figure:\s*var\(--font-ui\)/u);
   assert.match(globals, /font-variant-numeric:\s*tabular-nums/u);
+  // Proportional Japanese spacing must not undo the tabular advance.
+  assert.match(globals, /\.tabular-nums \{[\s\S]*?font-feature-settings:\s*"palt" 0/u);
+  assert.doesNotMatch(globals, /font-family:[^;]*monospace/u);
   // Six-step scale, so component sizes are chosen from a system.
   for (const step of ["--t-micro", "--t-mini", "--t-body", "--t-data", "--t-lead", "--t-figure"]) {
     assert.match(globals, new RegExp(`${step}:`, "u"));
   }
+});
+
+test("the reservation wizard keeps one dominant column and a persistent record", () => {
+  // Two zones, never three: three co-equal columns left the active step on ~47%
+  // of the dialog, so the thing to act on was not the dominant object.
+  assert.match(workspaceStyles, /\.wizardBody \{[\s\S]*?grid-template-columns: minmax\(0, 1fr\) minmax\(264px, 0\.4fr\)/u);
+  assert.doesNotMatch(workspaceStyles, /\.wizardContext|\.wizardChecks/u);
+  // The running record is never deleted on a small screen.
+  assert.doesNotMatch(workspaceStyles, /\.wizard[A-Za-z]* \{ display: none/u);
+  assert.match(workspaceStyles, /\.wizardSummaryBar \{/u);
+  // All eight steps stay present, in order, individually announced.
+  assert.match(reservationWizard, /STEPS = \["日付", "時刻", "人数", "卓", "顧客", "追加", "担当", "確認"\]/u);
+  assert.match(reservationWizard, /\$\{step \+ 1\}\/8/u);
+  assert.match(reservationWizard, /aria-current=\{index === step \? "step" : undefined\}/u);
+  // Step state is carried by more than colour.
+  assert.match(reservationWizard, /index < step \? "入力済み" : index === step \? "現在の段階" : "未入力"/u);
+  // The plan is a real instrument on the table step: true colour, real geometry.
+  assert.match(workspaceStyles, /\.wizardMapImage \{[\s\S]*?filter: none;/u);
+  assert.doesNotMatch(workspaceStyles, /invert\(1\)/u);
+  assert.match(reservationWizard, /table\.geometry\.xPercent/u);
+  assert.match(reservationWizard, /unoptimized/u);
+  // Confirmation shows everything that gets saved, not four of the fields.
+  for (const field of ["担当", "通知", "現場メモ", "入口表示名"]) {
+    assert.match(reservationWizard, new RegExp(`<dt>${field}</dt>`, "u"));
+  }
+});
+
+test("the wizard never spends alert colour on a state the operator cannot act on", () => {
+  // The old standing rail showed 席選択「未選択」in warn colour from step 1, and
+  // データ境界 permanently in warn colour although it is a neutral fact.
+  assert.doesNotMatch(reservationWizard, /PRE-SAVE CHECK|保存前チェック/u);
+  assert.doesNotMatch(reservationWizard, /data-ok=/u);
 });
 
 test("desktop keeps summary, work views, queue and inspector without stacking chrome", () => {

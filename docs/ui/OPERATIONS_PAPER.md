@@ -62,7 +62,8 @@ Measured before → after (dense 14-reservation board):
    button. Colour is never the only carrier.
 4. **Emphasis is horizontal.** Selection is a bottom rule; alert is a tinted
    row. No coloured side tabs (an Owner decision this rebuild preserves).
-5. **Every figure is mono and tabular** so a column never reflows.
+5. **Every figure is tabular** so a column never reflows — carried by the text
+   family's tabular numerals, never by a monospace face.
 6. **One dominant focal object per viewport**: the ledger, the venue map, or
    the timeline.
 7. **The idle state costs no pixels.** The live region is visually hidden until
@@ -75,12 +76,17 @@ Measured before → after (dense 14-reservation board):
 ### Surface stack (value separation)
 
 ```
---paper           oklch(0.968 0.0025 85)   application ground
+--paper           oklch(0.958 0.0035 85)   application ground
 --surface         oklch(1 0 0)             working pane
---surface-quiet   oklch(0.984 0.002 85)    zebra rows, inset blocks
---surface-sunken  oklch(0.955 0.003 85)    pane headers, rails
+--surface-quiet   oklch(0.981 0.0025 85)   zebra rows, inset blocks
+--surface-sunken  oklch(0.944 0.004 85)    pane headers, rails
 --surface-hover / --surface-active         interaction states
 ```
+
+The ground sits a clear step below pure white so a working pane reads as paper
+laid on a desk. The first light ramp put `--paper` at `0.968` against a `1.0`
+pane — a 1.6% step that read as one flat field, which is why no pane looked like
+the focal object. Every step stays warm white; none of them is grey.
 
 ### Ink (all verified against WCAG 2.2 AA)
 
@@ -109,9 +115,30 @@ Measured before → after (dense 14-reservation board):
 
 ### Type
 
-Pairing: **IBM Plex Sans JP** (400/500/700) for Japanese and Latin, **IBM Plex
-Mono** (500/600) for every figure. Hierarchy comes from weight, not from size
-inflation. Both are `display: swap` with a metrics-compatible JP fallback.
+One Japanese-first family: **M PLUS 2** (400/500/700) for Japanese, Latin and
+every figure. Hierarchy comes from weight, not from size inflation.
+`display: swap`, `preload: false`, with next/font's metrics-matched fallback in
+front of a Hiragino-first system stack.
+
+The previous pairing was IBM Plex Sans JP + **IBM Plex Mono for every figure**.
+That mono was the single largest reason the board read as a generated developer
+dashboard: `22:30`, `GHO-0726-01`, `VIP-1`, `v4` in an IDE face turn a
+reservation ledger into a log viewer. Mono is retired. The figure role stays a
+distinct register through weight, `tabular-nums` and tracking — how printed
+timetables do it — and one family also removes the seam in mixed runs like `4名`
+or `¥120,000`, where the digit and the counter used to come from two fonts.
+
+The replacement was chosen by measurement, not taste: M PLUS 2 was the only
+humane Japanese candidate with **uniform digit advances and an effective `tnum`**.
+Zen Kaku Gothic New/Antique, Murecho and BIZ UDPGothic have no tabular figures at
+all (15–19.5px drift across a ten-digit string), so a ledger column would jitter;
+BIZ UDPGothic also ships only 400/700. Full matrix and method:
+`docs/ui/VIP_MANAGER_LIGHT_RESERVATION_RESEARCH.md` §4.
+
+`palt` is enabled on `body` for Japanese prose but switched **off** inside
+`.tabular-nums`, because proportional spacing would undo the tabular advance the
+ledger depends on. Verified in the built app: `1111111111` and `0000000000`
+render at identical width.
 
 Six-step scale: `--t-micro 11 · --t-mini 12 · --t-body 13 · --t-data 15 ·
 --t-lead 18 · --t-figure 22` plus a fluid `--t-display`.
@@ -181,6 +208,59 @@ Single column. The inspector becomes a full sheet, the counters become a 52px
 filter strip, and a five-item bottom nav carries 受付 / 一覧 / フロア / 時間軸 /
 メニュー. The `1023px` threshold is shared by the workspace (`matchMedia`) and
 the QA harness — change both together.
+
+### 新規予約 dialog — two zones, never three
+
+The 事前予約 wizard keeps all eight steps (日付 / 時刻 / 人数 / 卓 / 顧客 / 追加 /
+担当 / 確認), their order, and their save behaviour. Only the presentation is
+authored here.
+
+```
+┌──────────────────────────────────────────────────────────┐
+│ 新規予約                                              [×] │
+│ Walk-in │ 受付ブロック │ 事前予約                          │
+├──────────────────────────────────────────────────────────┤
+│ 日時・席 4/8 ／ 卓        ← phase, position, step name    │
+│ ▁▁1 ▁▁2 ▁▁3 ▁▁4   ▁▁5 ▁▁6 ▁▁7   ▁▁8   ← one ruler       │
+├──────────────────────────────────────────────────────────┤
+│ 日付 2026-07-31 │ 時刻 22:00–00:00 │ 人数 2名 │ 卓 VIP-1  │
+├───────────────────────────────────────┬──────────────────┤
+│ THE ACTIVE STEP (dominant)            │ この予約の控え    │
+│ + the venue plan on the 卓 step       │ 顧客/担当/通知/版 │
+├───────────────────────────────────────┴──────────────────┤
+│ ← 戻る            次は 顧客                      次へ →   │
+└──────────────────────────────────────────────────────────┘
+```
+
+- **Two zones.** Three co-equal columns left the active step on ~47% of the
+  dialog, so the thing to act on was not the dominant object. 確認 (step 8) drops
+  the rail entirely and the review takes the full width.
+- **The summary bar is permanent** at every width, phones included. It is what
+  replaced the old left context column, and it is why nothing needs
+  `display: none` below 1024px any more — the aside becomes a block in the scroll
+  flow instead of being deleted.
+- **No standing pre-save checklist.** The old rail showed 席選択「未選択」in warn
+  colour from step 1, before a table could be chosen, and データ境界 permanently in
+  warn colour although it is a neutral fact. Warn colour that never resolves
+  teaches operators to ignore warn colour. Validation now sits with the field it
+  concerns.
+- **Progress ruler.** Eight segments, phase-grouped by whitespace into 日時・席
+  (1–4) / 顧客・詳細 (5–7) / 確認 (8). Completed / current / upcoming differ by
+  glyph, weight and fill — never colour alone — and each carries `aria-current`
+  plus a spoken state, so all eight steps stay individually recognisable. On
+  phones the ruler keeps its eight marks and the step's name is carried by the
+  phase line.
+- **The plan is an instrument on the 卓 step only**, inline in the active pane, in
+  its true colour (`filter: none`, `unoptimized`), with an open champagne bracket
+  at the selected table's real `geometry.xPercent/yPercent`. It is a bracket and
+  not a label because the plan artwork already prints every table number — an
+  overlay of codes double-labelled all eight tables. The old wizard map was
+  `invert(1) grayscale(1)`, i.e. the colour venue drawing reduced to an
+  illegible grey line at ~293px, and it never marked the selection.
+- **確認 reviews everything that gets saved**: 営業日, 時刻, 人数, 卓 (+定員), 顧客,
+  入口表示名, 経路 / 状態, 担当, 通知, 現場メモ, 版. It previously showed four of them.
+- The footer keeps 戻る / position / 次へ・保存 in the same place on every step and
+  at every width, so the primary action never moves.
 
 ### Floor plan
 
