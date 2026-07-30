@@ -24,6 +24,7 @@ export type WorkspaceAction =
   | { type: "mobileInspector"; open: boolean }
   | { type: "openCommand"; kind: CommandKind }
   | { type: "closeCommand" }
+  | { type: "clearConflict" }
   | { type: "commandStep"; step: 1 | 2 }
   | { type: "pending"; pending: boolean }
   | { type: "commandOutcome"; outcome: CommandOutcome }
@@ -95,6 +96,7 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
     case "mobileInspector": return { ...state, mobileInspectorOpen: action.open };
     case "openCommand": return { ...state, command: { open: true, kind: action.kind, step: 1 }, conflict: null, mobileInspectorOpen: false };
     case "closeCommand": return { ...state, command: { ...state.command, open: false, step: 1 }, pending: false };
+    case "clearConflict": return { ...state, conflict: null };
     case "commandStep": return { ...state, command: { ...state.command, step: action.step } };
     case "pending": return { ...state, pending: action.pending };
     case "commandOutcome":

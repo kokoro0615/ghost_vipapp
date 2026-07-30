@@ -10,11 +10,19 @@ type ListProps = {
   reservations: UiReservation[];
   selectedReservationId: string | null;
   density: "compact" | "comfortable";
+  emptyMessage: string;
   onDensity: (density: "compact" | "comfortable") => void;
   onSelect: (id: string) => void;
 };
 
-export default function ReservationListView({ reservations, selectedReservationId, density, onDensity, onSelect }: ListProps) {
+export default function ReservationListView({
+  reservations,
+  selectedReservationId,
+  density,
+  emptyMessage,
+  onDensity,
+  onSelect,
+}: ListProps) {
   const attentionCount = reservations.filter((item) => item.exceptionLabel).length;
 
   return (
@@ -46,7 +54,7 @@ export default function ReservationListView({ reservations, selectedReservationI
           <tbody>
             {reservations.length === 0 ? (
               <tr className={styles.emptyTableRow}>
-                <td colSpan={7}>一致する予約はありません。検索またはステータス条件を解除してください。</td>
+                <td colSpan={7}>{emptyMessage}</td>
               </tr>
             ) : null}
             {reservations.map((reservation) => {

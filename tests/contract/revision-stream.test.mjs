@@ -23,7 +23,8 @@ test("revision stream is authenticated, day-scoped, PII-free, and bounded", asyn
   assert.match(hook, /new EventSource/u);
   assert.match(hook, /classifyBoardRevision/u);
   assert.match(hook, /decision === "gap_refresh"/u);
-  assert.match(hook, /const mutationBlocked = offline/u);
+  assert.match(hook, /const workspaceMutationBlocked = offline/u);
+  assert.match(hook, /const mutationBlocked = workspaceMutationBlocked/u);
   assert.match(hook, /"stale", "reconnecting", "error", "read_only"/u);
   assert.match(hook, /STALE_READ_ONLY/u);
   assert.match(hook, /readSafeBoardCache/u);

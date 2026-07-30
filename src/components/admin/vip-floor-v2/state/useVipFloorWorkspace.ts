@@ -109,9 +109,10 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
   const isDemo = auth.status === "authenticated" && auth.session.mode === "demo";
   const operatorAuthorized = auth.status === "authenticated"
     && (auth.session.role === "owner" || auth.session.role === "owner-compatible-demo");
-  const mutationBlocked = offline
+  const workspaceMutationBlocked = offline
     || ["loading", "stale", "reconnecting", "error", "read_only"].includes(state.globalState)
-    || !state.board.operations.adminMutationEnabled
+    || !state.board.operations.adminMutationEnabled;
+  const mutationBlocked = workspaceMutationBlocked
     || (isDemo && demoLeaseState !== "active");
 
   const loadBoard = useCallback(async (date: string, mode: "initial" | "refresh" = "refresh") => {
@@ -558,16 +559,17 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
           const payload = result.payload as unknown as Record<string, unknown>;
           if (result.status === 410) setDemoLeaseState("expired");
           else if (payload.read_only === true) setDemoLeaseState("read_only");
+          const outcome = {
+            ok: false as const,
+            code: String(payload.code ?? result.status),
+            message: typeof payload.message === "string" ? payload.message : "合成予約を保存できませんでした。",
+            recovery: "DEMO台帳を再読込してrevisionとleaseを確認してください。",
+          };
+          if (result.status === 409) await loadBoard(businessDate);
           dispatch({
             type: "commandOutcome",
-            outcome: {
-              ok: false,
-              code: String(payload.code ?? result.status),
-              message: typeof payload.message === "string" ? payload.message : "合成予約を保存できませんでした。",
-              recovery: "DEMO台帳を再読込してrevisionとleaseを確認してください。",
-            },
+            outcome,
           });
-          if (result.status === 409) await loadBoard(businessDate);
           return;
         }
         dispatch({
@@ -657,11 +659,41 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
   }, [auth.session, businessDate, loadBoard, mutationBlocked, offline]);
 
   const loadOperationOptions = useCallback(async () => {
-    if (mutationBlocked || !operatorAuthorized) return null;
+    if (workspaceMutationBlocked || !operatorAuthorized) return null;
 
     try {
       const demoTransport = demoTransportRef.current;
       if (demoTransport) {
+        if (demoLeaseState !== "active") {
+          const lease = await demoTransport.renewLease();
+          if (!lease.ok) {
+            const payload = lease.payload as unknown as Record<string, unknown>;
+            if (lease.status === 410) {
+              setDemoLeaseState("expired");
+              try {
+                demoTransport.purgeExpired();
+              } catch {
+                // Keep the demo fail-closed if browser storage is unavailable.
+              }
+            } else {
+              setDemoLeaseState("read_only");
+            }
+            dispatch({
+              type: "commandOutcome",
+              outcome: {
+                ok: false,
+                code: String(payload.code ?? lease.status),
+                message: typeof payload.message === "string"
+                  ? payload.message
+                  : "DEMOの操作権限を確認できませんでした。",
+                recovery: "通信状態を確認し、営業日を再読込してください。",
+              },
+            });
+            return null;
+          }
+          setDemoLeaseState("active");
+          setOffline(false);
+        }
         const result = await demoTransport.loadOperationOptions(businessDate);
         if (!result.ok) {
           const payload = result.payload as unknown as Record<string, unknown>;
@@ -710,7 +742,12 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
       });
       return null;
     }
-  }, [businessDate, mutationBlocked, operatorAuthorized]);
+  }, [
+    businessDate,
+    demoLeaseState,
+    operatorAuthorized,
+    workspaceMutationBlocked,
+  ]);
 
   const runOperation = useCallback(async (draft: OperationDraft) => {
     if (mutationBlocked || !operatorAuthorized) {
@@ -745,16 +782,17 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
         if (!result.ok) {
           const payload = result.payload as unknown as Record<string, unknown>;
           if (result.status === 410) setDemoLeaseState("expired");
+          const outcome = {
+            ok: false as const,
+            code: String(payload.code ?? result.status),
+            message: typeof payload.message === "string" ? payload.message : "合成オペレーションを保存できません。",
+            recovery: "入力、卓競合、version、leaseを確認してください。",
+          };
+          if (result.status === 409) await loadBoard(businessDate);
           dispatch({
             type: "commandOutcome",
-            outcome: {
-              ok: false,
-              code: String(payload.code ?? result.status),
-              message: typeof payload.message === "string" ? payload.message : "合成オペレーションを保存できません。",
-              recovery: "入力、卓競合、version、leaseを確認してください。",
-            },
+            outcome,
           });
-          if (result.status === 409) await loadBoard(businessDate);
           return false;
         }
         const createdCount = result.payload.createdCount
@@ -778,18 +816,19 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
       const payload = await response.json().catch(() => ({})) as Record<string, unknown>;
 
       if (!response.ok) {
+        const outcome = {
+          ok: false as const,
+          code: String(payload.error ?? response.status),
+          message: readErrorMessage(response.status, payload),
+          recovery: Number(payload.completedCount ?? 0) > 0
+            ? "繰返しの一部だけ保存済みです。台帳を再読込して対象日を確認してください。"
+            : "入力、卓の空き、ブロック競合を確認して再試行してください。",
+        };
+        await loadBoard(businessDate);
         dispatch({
           type: "commandOutcome",
-          outcome: {
-            ok: false,
-            code: String(payload.error ?? response.status),
-            message: readErrorMessage(response.status, payload),
-            recovery: Number(payload.completedCount ?? 0) > 0
-              ? "繰返しの一部だけ保存済みです。台帳を再読込して対象日を確認してください。"
-              : "入力、卓の空き、ブロック競合を確認して再試行してください。",
-          },
+          outcome,
         });
-        await loadBoard(businessDate);
         return false;
       }
 

@@ -277,6 +277,7 @@ export default function VipFloorWorkspace() {
 
   async function openOperation() {
     if (readOnly || !isOwner) return;
+    dispatch({ type: "clearConflict" });
     setEditingReservationId(null);
     setOperationOpen(true);
     setOperationOptions(await loadOperationOptions());
@@ -284,6 +285,7 @@ export default function VipFloorWorkspace() {
 
   async function openReservationEdit() {
     if (readOnly || !isOwner || !selectedReservation) return;
+    dispatch({ type: "clearConflict" });
     dispatch({ type: "mobileInspector", open: false });
     setEditingReservationId(selectedReservation.id);
     setOperationOpen(true);
@@ -648,8 +650,7 @@ export default function VipFloorWorkspace() {
         <div className={styles.viewFrame}>
           {state.globalState === "loading" ? <WorkspaceSkeleton label="VIP Floorを読み込んでいます" /> : null}
           {state.globalState === "error" ? <ErrorState description={state.stateDescription} onRetry={() => void loadBoard()} /> : null}
-          {state.globalState === "empty" ? <EmptyState businessDate={businessDate} onRetry={() => void loadBoard()} /> : null}
-          {!["loading", "error", "empty"].includes(state.globalState) && state.view === "floor" ? (
+          {!["loading", "error"].includes(state.globalState) && state.view === "floor" ? (
             <FloorView
               board={state.board}
               reservations={reservations}
@@ -667,7 +668,7 @@ export default function VipFloorWorkspace() {
               staffFilter={staffFilter}
             />
           ) : null}
-          {!["loading", "error", "empty"].includes(state.globalState) && state.view === "timeline" ? (
+          {!["loading", "error"].includes(state.globalState) && state.view === "timeline" ? (
             <ChartView
               board={state.board}
               reservations={reservations}
@@ -677,11 +678,14 @@ export default function VipFloorWorkspace() {
               onSelect={selectReservation}
             />
           ) : null}
-          {!["loading", "error", "empty"].includes(state.globalState) && state.view === "list" ? (
+          {!["loading", "error"].includes(state.globalState) && state.view === "list" ? (
             <ReservationListView
               reservations={reservations}
               selectedReservationId={state.selectedReservationId}
               density={state.density}
+              emptyMessage={allReservations.length === 0
+                ? "この営業日の予約はありません。新規受付から登録できます。"
+                : "一致する予約はありません。検索またはステータス条件を解除してください。"}
               onDensity={(density) => dispatch({ type: "density", density })}
               onSelect={selectReservation}
             />
@@ -866,12 +870,16 @@ export default function VipFloorWorkspace() {
         pending={state.pending}
         board={state.board}
         options={operationOptions}
-        selectedTableId={state.selectedTableId}
+        selectedTableId={editingReservationId || !state.selectedReservationId
+          ? state.selectedTableId
+          : null}
+        conflict={state.conflict}
         staffData={staffData}
         editReservation={
           allReservations.find((item) => item.id === editingReservationId) ?? null
         }
         onClose={() => {
+          dispatch({ type: "clearConflict" });
           setOperationOpen(false);
           setEditingReservationId(null);
           setOperationOptions(null);
@@ -948,19 +956,6 @@ function ErrorState({ description, onRetry }: { description: string; onRetry: ()
       <AlertTriangle size={28} aria-hidden />
       <h2>予約状態を読み込めません</h2>
       <p>{description}</p>
-      <button type="button" className={styles.primaryButton} onClick={onRetry}>
-        <RefreshCw size={16} aria-hidden />再読込
-      </button>
-    </div>
-  );
-}
-
-function EmptyState({ businessDate, onRetry }: { businessDate: string; onRetry: () => void }) {
-  return (
-    <div className={styles.centerState}>
-      <LayoutGrid size={28} aria-hidden />
-      <h2>この営業日の予約はありません</h2>
-      <p>{businessDate} のGHOST予約台帳は空です。営業日を切り替えるか、最新状態を再読込してください。</p>
       <button type="button" className={styles.primaryButton} onClick={onRetry}>
         <RefreshCw size={16} aria-hidden />再読込
       </button>

@@ -143,12 +143,22 @@ async function auditViewport(context, viewport) {
   const operationDialog = page.getByRole("dialog", { name: "新規オペレーション" });
   await operationDialog.waitFor();
   await operationDialog.getByLabel("プラン").waitFor();
+  assert.equal(
+    await operationDialog.locator('input[name="tableIds"]:checked').count(),
+    0,
+    "new reception must not inherit the selected reservation table",
+  );
   await capture(page, "walk-in");
   await page.getByRole("tab", { name: /受付ブロック/u }).click();
   await capture(page, "block");
   await page.getByRole("tab", { name: /8段階予約/u }).click();
   for (let step = 1; step <= 8; step += 1) {
     await page.getByLabel(new RegExp(`予約作成 ${step}/8`, "u")).waitFor();
+    if (step === 4) {
+      await page.getByRole("group", { name: "予約卓" })
+        .getByRole("checkbox", { name: /VIP-1/u })
+        .check();
+    }
     await capture(page, `reservation-create-${step}`);
     if (step < 8) await page.getByRole("button", { name: /次へ/u }).click();
   }
@@ -216,7 +226,7 @@ async function auditViewport(context, viewport) {
 
   for (const scenario of [
     { state: "loading", boardDelayMs: 5_000, waitFor: '[aria-label="VIP Floorを読み込んでいます"]' },
-    { state: "empty", boardPayload: emptyBoard, waitFor: "text=この営業日の予約はありません" },
+    { state: "empty", boardPayload: emptyBoard, waitFor: "text=この営業日の予約はありません。新規受付から登録できます。" },
     { state: "error", boardStatus: 503, waitFor: "text=予約状態を読み込めません" },
     { state: "read-only", boardPayload: readOnlyBoard, waitFor: 'main[data-state="read_only"]' },
     { state: "stale", eventMode: "unavailable", waitFor: 'main[data-state="stale"]' },
@@ -228,6 +238,55 @@ async function auditViewport(context, viewport) {
     await capture(scenarioPage, scenario.state);
     await scenarioPage.close();
   }
+
+  const emptyViewsPage = await newQaPage(context, { boardPayload: emptyBoard });
+  for (const [view, heading] of [
+    ["list", "来店台帳"],
+    ["floor", "VIPフロア"],
+    ["chart", "席の時間軸"],
+  ]) {
+    await goToWorkspace(emptyViewsPage, view);
+    await emptyViewsPage.getByRole("heading", { name: heading }).waitFor();
+    if (view === "chart") {
+      assert.equal(
+        await emptyViewsPage.locator('[class*="timelineRow"]').count(),
+        8,
+        "an empty business day must still render all eight chart rows",
+      );
+    }
+  }
+  await goToWorkspace(emptyViewsPage, "floor");
+  await emptyViewsPage.getByRole("heading", { name: "VIPフロア" }).waitFor();
+  assert.equal(
+    await emptyViewsPage.locator('button[class*="tableNode"]').count(),
+    8,
+    "an empty business day must still render all eight floor tables",
+  );
+  await emptyViewsPage.close();
+
+  const operationConflictPage = await newQaPage(context, { operationStatus: 409 });
+  await goToWorkspace(operationConflictPage, "list");
+  await operationConflictPage.getByRole("button", { name: /新規オペレーション/u }).click();
+  const conflictDialog = operationConflictPage.getByRole("dialog", { name: "新規オペレーション" });
+  await conflictDialog.getByRole("checkbox", { name: /VIP-1/u }).check();
+  await conflictDialog.getByRole("button", { name: "競合確認して保存" }).click();
+  await conflictDialog.getByRole("alert").getByText("TABLE_CONFLICT", { exact: true }).waitFor();
+  await operationConflictPage.close();
+
+  const demoLeaseRacePage = await newQaPage(context, {
+    demoMode: "authenticated",
+    fixedNow: "2026-07-30T21:00:00+09:00",
+    demoLeaseDelayMs: 750,
+  });
+  await demoLeaseRacePage.goto(`${origin}/?view=list&date=2026-07-31`, {
+    waitUntil: "domcontentloaded",
+  });
+  await demoLeaseRacePage.locator("#vip-workspace-main").waitFor();
+  await demoLeaseRacePage.getByRole("button", { name: /新規オペレーション/u }).click();
+  await demoLeaseRacePage.getByRole("dialog", { name: "新規オペレーション" })
+    .getByLabel("プラン")
+    .waitFor();
+  await demoLeaseRacePage.close();
 
   const offlinePage = await newQaPage(context);
   await goToWorkspace(offlinePage, "list");
@@ -455,18 +514,23 @@ async function installSyntheticRoutes(page, scenario = {}) {
         : { ok: true, role: scenario.role ?? "owner", displayName: scenario.role === "viewer" ? "Viewer" : "Owner" }),
     });
   });
-  await page.route("**/api/admin/demo/lease", (route) => route.fulfill({
-    status: scenario.demoMode === "expired" ? 410 : 200,
-    contentType: "application/json",
-    body: JSON.stringify(scenario.demoMode === "expired"
-      ? { ok: false, error: "demo_expired" }
-      : {
-          ...demoPublicConfig,
-          ok: true,
-          serverNow: demoServerNow,
-          leaseExpiresAt: demoLeaseExpiresAt,
-        }),
-  }));
+  await page.route("**/api/admin/demo/lease", async (route) => {
+    if (scenario.demoLeaseDelayMs) {
+      await new Promise((resolve) => setTimeout(resolve, scenario.demoLeaseDelayMs));
+    }
+    await route.fulfill({
+      status: scenario.demoMode === "expired" ? 410 : 200,
+      contentType: "application/json",
+      body: JSON.stringify(scenario.demoMode === "expired"
+        ? { ok: false, error: "demo_expired" }
+        : {
+            ...demoPublicConfig,
+            ok: true,
+            serverNow: demoServerNow,
+            leaseExpiresAt: demoLeaseExpiresAt,
+          }),
+    });
+  });
   await page.route("**/api/admin/vip-floor/options?**", (route) => route.fulfill({
     status: 200,
     contentType: "application/json",
@@ -509,6 +573,24 @@ async function installSyntheticRoutes(page, scenario = {}) {
           boardRevision: 43,
           entityVersion: 5,
           auditLogId: "synthetic-audit",
+      }),
+  }));
+  await page.route("**/api/admin/vip-floor/operations", (route) => route.fulfill({
+    status: scenario.operationStatus ?? 200,
+    contentType: "application/json",
+    body: JSON.stringify(scenario.operationStatus === 409
+      ? {
+          ok: false,
+          code: "TABLE_CONFLICT",
+          error: "TABLE_CONFLICT",
+          message: "対象卓には同時間帯の予約があります。",
+        }
+      : {
+          ok: true,
+          message: "Synthetic operation accepted",
+          boardRevision: 43,
+          entityVersion: 5,
+          auditLogId: "synthetic-operation-audit",
         }),
   }));
   let boardRequests = 0;

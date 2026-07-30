@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  AlertTriangle,
   Ban,
   CalendarPlus,
   Check,
@@ -14,6 +15,7 @@ import type { VipFloorBoardV2 } from "@/lib/vipFloorV2Contract";
 import type {
   OperationDraft,
   OperationOptions,
+  CommandOutcome,
   StaffWorkspaceData,
   UiReservation,
 } from "../contract/uiTypes";
@@ -29,6 +31,7 @@ type Props = {
   board: VipFloorBoardV2;
   options: OperationOptions | null;
   selectedTableId: string | null;
+  conflict: CommandOutcome | null;
   staffData: StaffWorkspaceData | null;
   editReservation?: UiReservation | null;
   onClose: () => void;
@@ -41,6 +44,7 @@ export function OperationCenter({
   board,
   options,
   selectedTableId,
+  conflict,
   staffData,
   editReservation = null,
   onClose,
@@ -376,6 +380,17 @@ export function OperationCenter({
               ) : null}
             </fieldset>
           )}
+
+          {conflict && !conflict.ok ? (
+            <div className={styles.conflictBox} role="alert">
+              <AlertTriangle size={18} aria-hidden />
+              <div>
+                <strong>{conflict.code}</strong>
+                <p>{conflict.message}</p>
+                <small>{conflict.recovery}</small>
+              </div>
+            </div>
+          ) : null}
 
           <footer className={styles.commandFooter}>
             <button type="button" className={styles.secondaryButton} onClick={onClose} disabled={pending}>
