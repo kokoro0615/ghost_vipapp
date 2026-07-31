@@ -1,10 +1,14 @@
 # VIP Manager 白基調 / font / 新規予約layout — 完了報告
 
-> **履歴資料（2026-07-31追記）**: 本文のdeployment ID、Owner PIN、
+> **履歴資料（2026-07-31最終追記）**: 本文のdeployment ID、Owner PIN、
 > `datetime-local`に関する記述は執筆時点の情報です。UI commit `8f7ceee` は
-> 現行正本 `3b33a0386ccfb5987fa34b605b6d8592a51563ba` に含まれ、
-> fixed Production `dpl_2XzxGeLTZ994wVJQDANVmBvhjSYs` へ反映済みです。
-> 現在はBasic認証のみ、時刻入力は22:00〜翌05:00の限定selectです。
+> 現行Production runtime commit
+> `dcc10c42fe6b9fcf22e96109c7740813396b6d60` に含まれ、fixed Production
+> `dpl_Bjm8Tk3RzR1UW15cojhEAMgwNhDj` へ反映済みです
+> （rollback=`dpl_2XzxGeLTZ994wVJQDANVmBvhjSYs`）。現在はBasic認証のみ、
+> 時刻入力は22:00〜翌05:00の限定selectです。認証付きdesktop/mobile
+> Production E2EもSSE rotation 2回、background board refresh中の操作、
+> offering/table互換filter、error 0、business mutation 0までPASSしています。
 
 | 項目 | 内容 |
 |---|---|
@@ -359,7 +363,7 @@ tests/contract/operator-light-ui.test.mjs
 
 ### Vercel Production — Codexが反映済み
 
-**Claude Codeはdeploy操作を一切実行していない。** その後Codexが同一commitをProductionへ反映した（`docs/AI_WORK_LOG.md` の該当行による）。
+**Claude Codeはdeploy操作を一切実行していない。** その後Codexが同一commitをProductionへ反映した（`docs/AI_WORK_LOG.md` の該当行による）。以下は2026-07-30時点の初回反映記録であり、現行Productionは冒頭の最終追記を正とする。
 
 ```
 candidate/fixed  dpl_CZtSaZhCASxpM97jLnFk91ksaTZt  （READY、promote済み）
@@ -374,7 +378,7 @@ Codex側の検証記録: lint / typecheck / unit19 / contract80 / PII / build15 
 
 ### 本ファイルの扱い
 
-本完了報告は `8f7ceee` に含まれておらず、untrackedのまま残している。Codexのlogにも「deploy後に並行生成された未追跡completion reportは古いdeploy前提のdocs-onlyとして保持」と記録されているが、**本節の内容は実際のdeploy結果に合わせて更新済み**である。
+本完了報告は `8f7ceee` には含まれていなかったが、後続の正本commitで履歴資料として追跡された。本文中の初回deployment記録は当時のまま保持し、現行状態は冒頭の最終追記と共有statusを正とする。
 
 ---
 
