@@ -7,6 +7,8 @@ import {
   CalendarPlus,
   Check,
   Footprints,
+  Store,
+  UserRoundCheck,
   X,
 } from "lucide-react";
 
@@ -24,6 +26,10 @@ import type {
   StaffWorkspaceData,
   UiReservation,
 } from "../contract/uiTypes";
+import {
+  canSelectWalkInTable,
+  resolveWalkInOffering,
+} from "../contract/walkInOffering";
 import { DemoCue, useDemoMode } from "../demo/DemoMode";
 import { BusinessTimeFormFields } from "./BusinessTimeFields";
 import { ReservationWizard } from "./ReservationWizard";
@@ -66,31 +72,20 @@ export function OperationCenter({
   const [kind, setKind] = useState<OperationKind>("walk_in");
   const [venueWide, setVenueWide] = useState(false);
   const [editingBlockId, setEditingBlockId] = useState<string | null>(null);
-  const [walkInOfferingId, setWalkInOfferingId] = useState("");
+  const [walkInGuestCount, setWalkInGuestCount] = useState(2);
+  const [walkInTableIds, setWalkInTableIds] = useState<string[] | null>(null);
+  const [walkInBookingStaffMemberId, setWalkInBookingStaffMemberId] = useState("");
   const [walkInErrors, setWalkInErrors] = useState<WalkInErrors>({});
   const panelRef = useRef<HTMLDivElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
   const defaults = useMemo(() => operationDefaults(board), [board]);
   const editingBlock = board.blocks.find((block) => block.id === editingBlockId) ?? null;
-  const walkInOffering = options?.offerings.find((offering) => offering.id === walkInOfferingId)
-    ?? options?.offerings.find((offering) =>
-      selectedTableId
-      && (
-        offering.compatibleTableIds === null
-        || offering.compatibleTableIds === undefined
-        || offering.compatibleTableIds.includes(selectedTableId)
-      ))
-    ?? options?.offerings[0]
-    ?? null;
-  const resolvedWalkInOfferingId = walkInOffering?.id ?? "";
-  const walkInCompatibleTableIds = walkInOffering?.compatibleTableIds === null
-    || walkInOffering?.compatibleTableIds === undefined
-    ? null
-    : new Set(walkInOffering?.compatibleTableIds ?? []);
-  const walkInTables = kind === "walk_in"
-    ? board.tables.filter((table) =>
-        walkInCompatibleTableIds === null || walkInCompatibleTableIds.has(table.id))
-    : board.tables;
+  const activeStaffMembers = (staffData?.staffMembers ?? []).filter((member) => member.active);
+  const activeWalkInTableIds = walkInTableIds ?? (selectedTableId ? [selectedTableId] : []);
+  const selectedWalkInStaff = activeStaffMembers.find(
+    (member) => member.id === walkInBookingStaffMemberId,
+  ) ?? null;
+  const selectedWalkInTables = board.tables.filter((table) => activeWalkInTableIds.includes(table.id));
 
   useEffect(() => {
     if (!open) return;
@@ -133,7 +128,9 @@ export function OperationCenter({
     if (!options) return;
     const form = event.currentTarget;
     const data = new FormData(form);
-    const tableIds = data.getAll("tableIds").map(String).filter(Boolean);
+    const tableIds = kind === "walk_in"
+      ? activeWalkInTableIds
+      : data.getAll("tableIds").map(String).filter(Boolean);
     const startAt = toTokyoTimestamp(data.get("startAt"));
     const endAt = toTokyoTimestamp(data.get("endAt"));
     let draft: OperationDraft;
@@ -141,16 +138,13 @@ export function OperationCenter({
     if (kind === "walk_in") {
       const guestLabel = nullableText(data.get("guestLabel"));
       const operatorNote = nullableText(data.get("operatorNote"));
-      const offering = options.offerings.find((item) => item.id === resolvedWalkInOfferingId);
-      const incompatibleTable = tableIds.some((tableId) =>
-        Array.isArray(offering?.compatibleTableIds)
-        && !offering.compatibleTableIds.includes(tableId));
-      if (tableIds.length === 0 || !offering || incompatibleTable) {
+      const offering = resolveWalkInOffering(options.offerings, tableIds, walkInGuestCount);
+      if (tableIds.length === 0 || !offering) {
         setWalkInErrors((current) => ({
           ...current,
           tableIds: tableIds.length === 0
             ? "登録する卓を1つ以上選択してください。"
-            : "このプランに対応する卓を選び直してください。",
+            : "この人数で登録できる卓の組み合わせを選び直してください。",
         }));
         window.requestAnimationFrame(() => {
           form.querySelector<HTMLElement>('input[name="tableIds"]')?.focus();
@@ -174,11 +168,12 @@ export function OperationCenter({
         kind,
         payload: {
           eventDayId: options.businessDay.id,
-          offeringId: resolvedWalkInOfferingId,
+          offeringId: offering.id,
           scheduledStartAt: startAt,
           scheduledEndAt: endAt,
-          guestCount: Number(data.get("guestCount")),
+          guestCount: walkInGuestCount,
           tableIds,
+          bookingStaffMemberId: walkInBookingStaffMemberId || null,
           guestLabel,
           operatorNote,
           expectedTableVersions: tableIds.map((tableId) => ({
@@ -220,6 +215,9 @@ export function OperationCenter({
 
   function closePanel() {
     setWalkInErrors({});
+    setWalkInGuestCount(2);
+    setWalkInTableIds(null);
+    setWalkInBookingStaffMemberId("");
     onClose();
   }
 
@@ -374,10 +372,10 @@ export function OperationCenter({
             className={styles.commandForm}
             onSubmit={submit}
           >
-          <div className={styles.commandContext}>
-            <strong>{kind === "walk_in" ? "即時来店" : "販売・運用停止"}</strong>
-            <span>{board.businessDay.businessDate} / 22:00–05:00</span>
-          </div>
+	          <div className={styles.commandContext}>
+	            <strong>{kind === "walk_in" ? "店頭受付・即時着席" : "販売・運用停止"}</strong>
+	            <span className="tabular-nums">{board.businessDay.businessDate} / 22:00–翌05:00</span>
+	          </div>
 
           {!options ? (
             <div className={styles.centerState} aria-busy="true">
@@ -391,95 +389,216 @@ export function OperationCenter({
                   : "競合確認後、対象卓の受付を停止します"}
               </legend>
 
-              <BusinessTimeFormFields
-                key={`${kind}:${editingBlock?.id ?? "new"}:${options.businessDay.businessDate}`}
-                businessDate={options.businessDay.businessDate}
-                initialValue={{
-                  startAt: editingBlock ? localInputValue(editingBlock.startAt) : defaults.start,
-                  endAt: editingBlock ? localInputValue(editingBlock.endAt) : defaults.end,
-                }}
-                disabled={pending}
-              />
+	              {kind === "walk_in" ? (
+	                <div className={styles.walkInDesk}>
+	                  <div className={styles.walkInIntake}>
+	                    <section className={styles.walkInSection} aria-labelledby="walk-in-time-title">
+	                      <div className={styles.walkInSectionHeading}>
+	                        <span className="tabular-nums">01</span>
+	                        <div><strong id="walk-in-time-title">滞在時間</strong><small>現在時刻を基準に15分単位</small></div>
+	                      </div>
+	                      <BusinessTimeFormFields
+	                        key={`${kind}:${options.businessDay.businessDate}`}
+	                        businessDate={options.businessDay.businessDate}
+	                        initialValue={{ startAt: defaults.start, endAt: defaults.end }}
+	                        disabled={pending}
+	                      />
+	                    </section>
 
-              {kind === "walk_in" ? (
-                <>
-                  <div className={styles.formColumns}>
-                    <label>
-                      プラン
-                      <select
-                        name="offeringId"
-                        required
-                        value={resolvedWalkInOfferingId}
-                        onChange={(event) => {
-                          setWalkInOfferingId(event.target.value);
-                          clearWalkInError("tableIds");
-                        }}
-                      >
-                        {options.offerings.map((offering) => (
-                          <option key={offering.id} value={offering.id}>
-                            {offering.name} / {offering.minGuests}–{offering.maxGuests}名
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label>
-                      人数
-                      <input type="number" name="guestCount" min="1" max="99" defaultValue="2" required />
-                    </label>
-                  </div>
-                  <label>
-                    ゲスト表示名{demoMode.enabled ? "（合成名のみ）" : "（任意）"}
-                    <input
-                      name="guestLabel"
-                      maxLength={80}
-                      required={demoMode.enabled}
-                      defaultValue={demoMode.enabled ? "デモWalk-inゲスト" : undefined}
-                      placeholder={demoMode.enabled ? "例: デモWalk-inゲスト" : "例: 入口ゲスト / 連絡先は入力しない"}
-                      aria-invalid={Boolean(walkInErrors.guestLabel)}
-                      aria-describedby={demoMode.enabled
-                        ? `walk-in-guest-rule${walkInErrors.guestLabel ? " walk-in-guest-error" : ""}`
-                        : undefined}
-                      onInput={() => clearWalkInError("guestLabel")}
-                      onBlur={(event) => validateWalkInField("guestLabel", event.currentTarget.value)}
-                    />
-                    {demoMode.enabled ? (
-                      <small id="walk-in-guest-rule" className={styles.syntheticInputHint}>
-                        「デモ」または「DEMO」を含む架空名だけを入力してください。電話番号・メール・秘密情報は入力できません。
-                      </small>
-                    ) : null}
-                    {walkInErrors.guestLabel ? (
-                      <small id="walk-in-guest-error" className={styles.fieldError} role="alert">
-                        {walkInErrors.guestLabel}
-                      </small>
-                    ) : null}
-                  </label>
-                  <label>
-                    現場メモ（任意）
-                    <textarea
-                      name="operatorNote"
-                      maxLength={500}
-                      placeholder={demoMode.enabled ? "例: デモ：入口で到着確認済み" : "到着時の共有事項"}
-                      aria-invalid={Boolean(walkInErrors.operatorNote)}
-                      aria-describedby={demoMode.enabled
-                        ? `walk-in-note-rule${walkInErrors.operatorNote ? " walk-in-note-error" : ""}`
-                        : undefined}
-                      onInput={() => clearWalkInError("operatorNote")}
-                      onBlur={(event) => validateWalkInField("operatorNote", event.currentTarget.value)}
-                    />
-                    {demoMode.enabled ? (
-                      <small id="walk-in-note-rule" className={styles.syntheticInputHint}>
-                        空欄は可。入力する場合は「デモ」または「DEMO」を含む合成メモにしてください。
-                      </small>
-                    ) : null}
-                    {walkInErrors.operatorNote ? (
-                      <small id="walk-in-note-error" className={styles.fieldError} role="alert">
-                        {walkInErrors.operatorNote}
-                      </small>
-                    ) : null}
-                  </label>
-                </>
-              ) : (
-                <>
+	                    <section className={styles.walkInSection} aria-labelledby="walk-in-guest-title">
+	                      <div className={styles.walkInSectionHeading}>
+	                        <span className="tabular-nums">02</span>
+	                        <div><strong id="walk-in-guest-title">来店情報</strong><small>人数と入口で呼ぶ名前</small></div>
+	                      </div>
+	                      <div className={styles.formColumns}>
+	                        <label>
+	                          人数
+	                          <input
+	                            type="number"
+	                            name="guestCount"
+	                            min="1"
+	                            max="99"
+	                            value={walkInGuestCount}
+	                            required
+	                            onChange={(event) => {
+	                              const guestCount = Number(event.target.value);
+	                              setWalkInGuestCount(guestCount);
+	                              if (
+	                                activeWalkInTableIds.length > 0
+	                                && !resolveWalkInOffering(options.offerings, activeWalkInTableIds, guestCount)
+	                              ) {
+	                                setWalkInTableIds([]);
+	                                setWalkInErrors((current) => ({
+	                                  ...current,
+	                                  tableIds: "人数を変更したため卓選択を解除しました。配席を選び直してください。",
+	                                }));
+	                              }
+	                            }}
+	                          />
+	                        </label>
+	                        <label>
+	                          ゲスト表示名{demoMode.enabled ? "（合成名のみ）" : "（任意）"}
+	                          <input
+	                            name="guestLabel"
+	                            maxLength={80}
+	                            required={demoMode.enabled}
+	                            defaultValue={demoMode.enabled ? "デモWalk-inゲスト" : undefined}
+	                            placeholder={demoMode.enabled ? "例: デモWalk-inゲスト" : "例: 入口ゲスト"}
+	                            aria-invalid={Boolean(walkInErrors.guestLabel)}
+	                            aria-describedby={demoMode.enabled
+	                              ? `walk-in-guest-rule${walkInErrors.guestLabel ? " walk-in-guest-error" : ""}`
+	                              : undefined}
+	                            onInput={() => clearWalkInError("guestLabel")}
+	                            onBlur={(event) => validateWalkInField("guestLabel", event.currentTarget.value)}
+	                          />
+	                        </label>
+	                      </div>
+	                      {demoMode.enabled ? (
+	                        <small id="walk-in-guest-rule" className={styles.syntheticInputHint}>
+	                          「デモ」または「DEMO」を含む架空名だけを入力してください。連絡先・秘密情報は入力できません。
+	                        </small>
+	                      ) : null}
+	                      {walkInErrors.guestLabel ? (
+	                        <small id="walk-in-guest-error" className={styles.fieldError} role="alert">
+	                          {walkInErrors.guestLabel}
+	                        </small>
+	                      ) : null}
+	                    </section>
+
+	                    <section className={styles.walkInSection} aria-labelledby="walk-in-table-title">
+	                      <div className={styles.walkInSectionHeading}>
+	                        <span className="tabular-nums">03</span>
+	                        <div><strong id="walk-in-table-title">配席</strong><small>人数に合う受付可能卓だけを選択</small></div>
+	                      </div>
+	                      <div
+	                        className={styles.checkGrid}
+	                        role="group"
+	                        aria-label="登録可能な対象卓"
+	                        aria-describedby={walkInErrors.tableIds ? "walk-in-table-error" : "walk-in-table-hint"}
+	                      >
+	                        {board.tables.map((table) => {
+	                          const checked = activeWalkInTableIds.includes(table.id);
+	                          const selectable = checked || canSelectWalkInTable(
+	                            options.offerings,
+	                            activeWalkInTableIds,
+	                            table.id,
+	                            walkInGuestCount,
+	                          );
+	                          return (
+	                            <label key={table.id} data-selected={checked || undefined} data-unavailable={!selectable || undefined}>
+	                              <input
+	                                type="checkbox"
+	                                name="tableIds"
+	                                value={table.id}
+	                                checked={checked}
+	                                disabled={!selectable}
+	                                onChange={(event) => {
+	                                  setWalkInTableIds(event.target.checked
+	                                    ? [...activeWalkInTableIds, table.id]
+	                                    : activeWalkInTableIds.filter((id) => id !== table.id));
+	                                  clearWalkInError("tableIds");
+	                                }}
+	                              />
+	                              <span>{table.displayCode}</span>
+	                              <small className="tabular-nums">{table.capacityMax}名</small>
+	                            </label>
+	                          );
+	                        })}
+	                      </div>
+	                      {walkInErrors.tableIds ? (
+	                        <small id="walk-in-table-error" className={styles.fieldError} role="alert">
+	                          {walkInErrors.tableIds}
+	                        </small>
+	                      ) : (
+	                        <small id="walk-in-table-hint" className={styles.syntheticInputHint}>
+	                          プランは人数・配席から内部で自動判定します。
+	                        </small>
+	                      )}
+	                    </section>
+
+	                    <label>
+	                      現場メモ（任意）
+	                      <textarea
+	                        name="operatorNote"
+	                        maxLength={500}
+	                        placeholder={demoMode.enabled ? "例: デモ：入口で到着確認済み" : "到着時の共有事項"}
+	                        aria-invalid={Boolean(walkInErrors.operatorNote)}
+	                        aria-describedby={demoMode.enabled
+	                          ? `walk-in-note-rule${walkInErrors.operatorNote ? " walk-in-note-error" : ""}`
+	                          : undefined}
+	                        onInput={() => clearWalkInError("operatorNote")}
+	                        onBlur={(event) => validateWalkInField("operatorNote", event.currentTarget.value)}
+	                      />
+	                      {demoMode.enabled ? (
+	                        <small id="walk-in-note-rule" className={styles.syntheticInputHint}>
+	                          空欄は可。入力時は「デモ」または「DEMO」を含む合成メモにしてください。
+	                        </small>
+	                      ) : null}
+	                      {walkInErrors.operatorNote ? (
+	                        <small id="walk-in-note-error" className={styles.fieldError} role="alert">
+	                          {walkInErrors.operatorNote}
+	                        </small>
+	                      ) : null}
+	                    </label>
+	                  </div>
+
+	                  <aside className={styles.walkInAttribution} aria-labelledby="walk-in-attribution-title">
+	                    <header>
+	                      <UserRoundCheck size={18} aria-hidden />
+	                      <div><h3 id="walk-in-attribution-title">集客担当</h3><small>来店経路を予約へ記録</small></div>
+	                    </header>
+	                    <fieldset>
+	                      <legend>このお客様の担当</legend>
+	                      <div className={styles.walkInAttributionOptions}>
+	                        <label data-selected={!walkInBookingStaffMemberId || undefined}>
+	                          <input
+	                            type="radio"
+	                            name="bookingStaffMemberId"
+	                            value=""
+	                            checked={!walkInBookingStaffMemberId}
+	                            onChange={() => setWalkInBookingStaffMemberId("")}
+	                          />
+	                          <Store size={16} aria-hidden />
+	                          <span><strong>店舗へ直接来店</strong><small>プロモーター・担当者なし</small></span>
+	                        </label>
+	                        {activeStaffMembers.map((member) => (
+	                          <label key={member.id} data-selected={walkInBookingStaffMemberId === member.id || undefined}>
+	                            <input
+	                              type="radio"
+	                              name="bookingStaffMemberId"
+	                              value={member.id}
+	                              checked={walkInBookingStaffMemberId === member.id}
+	                              onChange={() => setWalkInBookingStaffMemberId(member.id)}
+	                            />
+	                            <UserRoundCheck size={16} aria-hidden />
+	                            <span><strong>{member.displayName}</strong><small>プロモーター／集客担当</small></span>
+	                          </label>
+	                        ))}
+	                      </div>
+	                    </fieldset>
+	                    <dl className={styles.walkInReceipt} aria-label="Walk-in入力内容">
+	                      <div><dt>経路</dt><dd>{selectedWalkInStaff ? "担当者経由" : "直接来店"}</dd></div>
+	                      <div><dt>担当</dt><dd>{selectedWalkInStaff?.displayName ?? "店舗"}</dd></div>
+	                      <div><dt>人数</dt><dd className="tabular-nums">{walkInGuestCount}名</dd></div>
+	                      <div><dt>配席</dt><dd>{selectedWalkInTables.map((table) => table.displayCode).join(" / ") || "未選択"}</dd></div>
+	                      <div><dt>内部プラン</dt><dd>自動判定</dd></div>
+	                    </dl>
+	                    {activeStaffMembers.length === 0 ? (
+	                      <p>担当者を追加する場合は、メニューの「スタッフ担当卓」から登録できます。</p>
+	                    ) : null}
+	                  </aside>
+	                </div>
+	              ) : (
+	                <>
+	                  <BusinessTimeFormFields
+	                    key={`${kind}:${editingBlock?.id ?? "new"}:${options.businessDay.businessDate}`}
+	                    businessDate={options.businessDay.businessDate}
+	                    initialValue={{
+	                      startAt: editingBlock ? localInputValue(editingBlock.startAt) : defaults.start,
+	                      endAt: editingBlock ? localInputValue(editingBlock.endAt) : defaults.end,
+	                    }}
+	                    disabled={pending}
+	                  />
                   <div className={styles.formColumns}>
                     <label>
                       停止範囲
@@ -535,15 +654,14 @@ export function OperationCenter({
                 </>
               )}
 
-              {!venueWide ? (
+	              {!venueWide && kind !== "walk_in" ? (
                 <>
                 <div
-                  className={styles.checkGrid}
-                  role="group"
-                  aria-label={kind === "walk_in" ? "登録可能な対象卓" : "対象卓"}
-                  aria-describedby={walkInErrors.tableIds ? "walk-in-table-error" : undefined}
+	                  className={styles.checkGrid}
+	                  role="group"
+	                  aria-label="対象卓"
                 >
-                  {walkInTables.map((table) => (
+	                  {board.tables.map((table) => (
                     <label key={table.id}>
                       <input
                         type="checkbox"
@@ -561,18 +679,7 @@ export function OperationCenter({
                     </label>
                   ))}
                 </div>
-                {kind === "walk_in" ? (
-                  walkInErrors.tableIds ? (
-                    <small id="walk-in-table-error" className={styles.fieldError} role="alert">
-                      {walkInErrors.tableIds}
-                    </small>
-                  ) : (
-                    <small className={styles.syntheticInputHint}>
-                      選択したプランで登録できる卓だけを表示しています。
-                    </small>
-                  )
-                ) : null}
-                </>
+	                </>
               ) : null}
             </fieldset>
           )}

@@ -957,8 +957,7 @@ export class BrowserDemoRepository {
           notes: [],
           flags: draft.kind === "walk_in" ? ["walk_in"] : [],
           bookingOfferingId: payload.offeringId,
-          bookingStaffMemberId:
-            draft.kind === "reservation_create" ? draft.payload.bookingStaffMemberId : null,
+          bookingStaffMemberId: draft.payload.bookingStaffMemberId,
           notificationPreference: "none",
           operatorNote: payload.operatorNote,
           updatedAt: at,

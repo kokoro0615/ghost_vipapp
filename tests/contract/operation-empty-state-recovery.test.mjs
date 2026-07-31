@@ -15,7 +15,7 @@ test("new reception does not inherit the selected reservation table", () => {
     workspace,
     /selectedTableId=\{editingReservationId \|\| !state\.selectedReservationId\s*\?\s*state\.selectedTableId\s*:\s*null\}/u,
   );
-  assert.match(operationCenter, /table\.id === selectedTableId/u);
+  assert.match(operationCenter, /walkInTableIds \?\? \(selectedTableId \? \[selectedTableId\] : \[\]\)/u);
 });
 
 test("operation errors stay visible inside the active dialog", () => {
@@ -30,7 +30,9 @@ test("demo Walk-in rejects unsafe text beside the exact field before transport",
   assert.match(operationCenter, /defaultValue=\{demoMode\.enabled \? "デモWalk-inゲスト" : undefined\}/u);
   assert.match(operationCenter, /aria-invalid=\{Boolean\(walkInErrors\.guestLabel\)\}/u);
   assert.match(operationCenter, /aria-invalid=\{Boolean\(walkInErrors\.operatorNote\)\}/u);
-  assert.match(operationCenter, /電話番号・メール・秘密情報は入力できません/u);
+  assert.match(operationCenter, /電話番号らしい数字列/u);
+  assert.match(operationCenter, /メールアドレス/u);
+  assert.match(operationCenter, /秘密情報らしい文字列/u);
   assert.match(operationCenter, /className=\{styles\.fieldError\} role="alert"/u);
   assert.match(
     workspaceHook,

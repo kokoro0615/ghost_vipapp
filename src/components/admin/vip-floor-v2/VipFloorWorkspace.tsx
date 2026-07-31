@@ -959,7 +959,8 @@ export default function VipFloorWorkspace() {
           board={state.board}
           reservation={selectedReservation}
           selectedTableId={state.selectedTableId}
-          history={state.history}
+	          history={state.history}
+	          staffData={staffData}
           collapsed={state.inspectorCollapsed}
           instance="desktop"
           readOnly={readOnly}
@@ -1083,7 +1084,8 @@ export default function VipFloorWorkspace() {
           board={state.board}
           reservation={selectedReservation}
           selectedTableId={state.selectedTableId}
-          history={state.history}
+	          history={state.history}
+	          staffData={staffData}
           instance="mobile"
           readOnly={readOnly}
           pending={state.pending}

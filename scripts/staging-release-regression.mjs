@@ -286,6 +286,7 @@ async function main() {
           tableIds: [vip3.id],
           guestLabel: "RC Walk-in",
           operatorNote: "Synthetic walk-in",
+          bookingStaffMemberId: null,
           expectedTableVersions: tableVersions([vip3]),
           capacityOverride: false,
         },

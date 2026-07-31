@@ -5,7 +5,7 @@ import { Armchair, BellRing, CalendarClock, ChevronLeft, ChevronRight, CircleX, 
 import type { VipFloorBoardV2 } from "@/lib/vipFloorV2Contract";
 
 import { getStatusMeta } from "../contract/statusModel";
-import type { CommandKind, HistoryEntry, UiReservation } from "../contract/uiTypes";
+import type { CommandKind, HistoryEntry, StaffWorkspaceData, UiReservation } from "../contract/uiTypes";
 import { useDemoMode } from "../demo/DemoMode";
 import styles from "../VipFloorWorkspace.module.css";
 
@@ -32,6 +32,7 @@ type Props = {
   reservation: UiReservation | null;
   selectedTableId: string | null;
   history: HistoryEntry[];
+  staffData: StaffWorkspaceData | null;
   collapsed?: boolean;
   instance: "desktop" | "mobile";
   readOnly: boolean;
@@ -52,6 +53,7 @@ export function Inspector({
   reservation,
   selectedTableId,
   history,
+  staffData,
   collapsed = false,
   instance,
   readOnly,
@@ -72,6 +74,9 @@ export function Inspector({
   const StatusIcon = meta.icon;
   const notes = reservation ? board.notes.filter((note) => note.reservationId === reservation.id) : [];
   const visibleFlags = reservation?.flags.filter((flag) => !flag.includes("payment") && !flag.includes("stripe")) ?? [];
+  const bookingStaffName = reservation?.bookingStaffMemberId
+    ? staffData?.staffMembers.find((member) => member.id === reservation.bookingStaffMemberId)?.displayName
+    : null;
 
   function moveTabFocus(event: React.KeyboardEvent<HTMLDivElement>) {
     if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
@@ -215,6 +220,7 @@ export function Inspector({
                 <div><dt><UserRound size={14} aria-hidden /> ゲスト</dt><dd>{reservation.guestLabel}</dd></div>
                 <div><dt><Ticket size={14} aria-hidden /> 予約番号</dt><dd>{reservation.publicCode}</dd></div>
                 <div><dt><Route size={14} aria-hidden /> 経路</dt><dd>{reservation.sourceLabel}</dd></div>
+                <div><dt><UserRoundCheck size={14} aria-hidden /> 集客担当</dt><dd>{bookingStaffName ?? (reservation.sourceChannel === "walk_in" ? "店舗へ直接来店" : "未指定")}</dd></div>
                 <div><dt><ShieldCheck size={14} aria-hidden /> 版</dt><dd>v{reservation.version}</dd></div>
                 <div><dt><ClipboardList size={14} aria-hidden /> 例外</dt><dd>{reservation.exceptionLabel ?? "なし"}</dd></div>
               </dl>

@@ -74,6 +74,7 @@ export type WalkInDraft = {
     scheduledEndAt: string;
     guestCount: number;
     tableIds: string[];
+    bookingStaffMemberId: string | null;
     guestLabel: string | null;
     operatorNote: string | null;
     expectedTableVersions: Array<{ tableId: string; expectedVersion: number }>;

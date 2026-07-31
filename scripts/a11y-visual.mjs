@@ -170,7 +170,7 @@ async function auditViewport(context, viewport) {
   await page.getByRole("button", { name: /新規オペレーション/u }).click();
   const operationDialog = page.getByRole("dialog", { name: "新規予約" });
   await operationDialog.waitFor();
-  await operationDialog.getByLabel("プラン").waitFor();
+	  await operationDialog.getByRole("heading", { name: "集客担当" }).waitFor();
   assert.equal(
     await operationDialog.locator('input[name="tableIds"]:checked').count(),
     0,
@@ -371,7 +371,7 @@ async function auditViewport(context, viewport) {
   await demoLeaseRacePage.locator("#vip-workspace-main").waitFor();
   await demoLeaseRacePage.getByRole("button", { name: /新規オペレーション/u }).click();
   await demoLeaseRacePage.getByRole("dialog", { name: "新規予約" })
-    .getByLabel("プラン")
+	    .getByRole("heading", { name: "集客担当" })
     .waitFor();
   await demoLeaseRacePage.close();
 
@@ -379,7 +379,7 @@ async function auditViewport(context, viewport) {
   await goToDemoWorkspace(demoWalkInPage, "floor", "2026-07-31");
   await demoWalkInPage.getByRole("button", { name: /新規オペレーション/u }).click();
   const demoWalkInDialog = demoWalkInPage.getByRole("dialog", { name: "新規予約" });
-  await demoWalkInDialog.getByLabel("プラン").waitFor();
+	  await demoWalkInDialog.getByRole("heading", { name: "集客担当" }).waitFor();
   assert.equal(
     await demoWalkInDialog.locator('input[name="guestLabel"]').inputValue(),
     "デモWalk-inゲスト",
@@ -397,19 +397,20 @@ async function auditViewport(context, viewport) {
   );
   assert.equal(await demoWalkInDialog.isVisible(), true, "invalid input must preserve the dialog");
   await demoWalkInDialog.locator('input[name="guestLabel"]').fill("デモWalk-inテスト");
-  await demoWalkInDialog.locator('textarea[name="operatorNote"]').fill("デモ：入口で到着確認済み");
-  await demoWalkInDialog.getByRole("button", { name: "競合確認して保存" }).click();
+	  await demoWalkInDialog.locator('textarea[name="operatorNote"]').fill("デモ：入口で到着確認済み");
+	  await demoWalkInDialog.getByRole("radio", { name: /デモスタッフA/u }).check();
+	  await demoWalkInDialog.getByRole("button", { name: "競合確認して保存" }).click();
   await demoWalkInDialog.waitFor({ state: "hidden" });
   await goToDemoWorkspace(demoWalkInPage, "list", "2026-07-31");
   const createdWalkInRow = demoWalkInPage.locator("tr", {
     hasText: "デモWalk-inテスト",
   });
   await createdWalkInRow.getByRole("button", { name: /の詳細を開く/u }).click();
-  if (viewport.width < 1024) {
-    await demoWalkInPage.getByRole("dialog", { name: "予約詳細" }).waitFor();
-  } else {
-    await demoWalkInPage.locator('[data-instance="desktop"]').waitFor();
-  }
+	  const createdWalkInInspector = viewport.width < 1024
+	    ? demoWalkInPage.getByRole("dialog", { name: "予約詳細" })
+	    : demoWalkInPage.locator('[data-instance="desktop"]');
+	  await createdWalkInInspector.waitFor();
+	  await createdWalkInInspector.getByText("デモスタッフA", { exact: true }).waitFor();
   await demoWalkInPage.getByRole("button", { name: "Walk-in取消", exact: true }).click();
   const cancelDialog = demoWalkInPage.getByRole("dialog", { name: "Walk-inを取り消す" });
   await cancelDialog.getByLabel("取消区分").selectOption("mistake");

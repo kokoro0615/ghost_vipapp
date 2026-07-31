@@ -257,6 +257,9 @@ function parseWalkIn(payload: Record<string, unknown>) {
     : null;
   const guestLabel = readNullableString(payload.guestLabel, 80);
   const operatorNote = readNullableString(payload.operatorNote, 500);
+  const bookingStaffMemberId = payload.bookingStaffMemberId === null
+    ? null
+    : readUuid(payload.bookingStaffMemberId);
 
   if (
     !eventDayId
@@ -270,6 +273,7 @@ function parseWalkIn(payload: Record<string, unknown>) {
     || expectedTableVersions.length !== tableIds.length
     || guestLabel === undefined
     || operatorNote === undefined
+    || (payload.bookingStaffMemberId !== null && !bookingStaffMemberId)
   ) {
     return { ok: false as const, error: "invalid_walk_in" };
   }
@@ -303,6 +307,7 @@ function parseWalkIn(payload: Record<string, unknown>) {
       tableIds,
       guestLabel,
       operatorNote,
+      bookingStaffMemberId,
       expectedTableVersions: versions,
       capacityOverride: false,
       reason: FIXED_REASON,
