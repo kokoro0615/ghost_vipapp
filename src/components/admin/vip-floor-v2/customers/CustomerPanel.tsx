@@ -166,7 +166,7 @@ export function CustomerPanel({
           </div>
           <DemoCue compact />
           <button type="button" onClick={onClose} aria-label="顧客詳細を閉じる">
-            <X size={19} />
+            <X size={20} />
           </button>
         </header>
 
@@ -193,7 +193,7 @@ export function CustomerPanel({
                     <label>記念日<input name="anniversaryDate" type="date" disabled={isDemo} defaultValue={isDemo ? "" : detail.attributes?.anniversaryDate ?? ""} /></label>
                   </div>
                   {isDemo ? <p className={styles.wizardHint}>DEMOでは個人日付を保存できません。国籍コードと「デモ」を含むVIP Rankだけを合成属性として保存できます。</p> : null}
-                  <button type="submit" className={styles.primaryButton}><Save size={15} />属性を保存</button>
+                  <button type="submit" className={styles.primaryButton}><Save size={16} />属性を保存</button>
                 </fieldset>
               </form>
 
@@ -244,7 +244,7 @@ export function CustomerPanel({
                 disabled={!isUuid(targetCustomerId)}
                 onClick={() => void relink(targetCustomerId)}
               >
-                <Link2 size={15} />再紐付け
+                <Link2 size={16} />再紐付け
               </button>
               <button
                 type="button"
@@ -252,7 +252,7 @@ export function CustomerPanel({
                 disabled={!reservation.customerId}
                 onClick={() => void relink(null)}
               >
-                <Unlink size={15} />解除
+                <Unlink size={16} />解除
               </button>
             </div>
           </section>

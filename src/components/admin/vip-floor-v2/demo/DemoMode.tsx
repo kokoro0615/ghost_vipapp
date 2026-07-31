@@ -77,7 +77,7 @@ export function DemoCue({
       {!compact ? <span>実在する個人・連絡先・決済情報は保存できません。</span> : null}
       {demo.expiresAt ? (
         <span>
-          <Clock3 size={13} aria-hidden />
+          <Clock3 size={14} aria-hidden />
           {expiryPhase === "near"
             ? "まもなく失効 · 2026-08-27 23:59:59 JST"
             : "2026-08-27 23:59:59 JST 失効"}

@@ -80,6 +80,25 @@ Measured before → after (dense 14-reservation board):
    the timeline.
 7. **The idle state costs no pixels.** The live region is visually hidden until
    there is something to say.
+8. **Nothing on screen is a browser default.** Selects, tick boxes and radios
+   are drawn from tokens (`DESIGN.md` §5.7b). The venue's floor artwork is the
+   one thing the app deliberately does not draw.
+9. **The interface does not narrate itself.** No subtitle under a label, no
+   eyebrow that repeats the title, no `01` without an `02` (`DESIGN.md` §5.7c).
+
+### The 2026-07-31 refinement — what made it read as generated
+
+The structure was already right; the surface still read as machine-assembled.
+Six habits caused it, and the fix in each case was to remove something:
+
+| Symptom | Cause | Now |
+|---|---|---|
+| The inspector read as nine equal facts | An icon and a hairline on every `dt` row | Three bands — 時間/人数/席, then identity, then the record trailer — separated by one rule, no icons |
+| Six commands read as six tiles | Centred `icon + label` in a 2×3 grid | Left-aligned on a shared icon column: a menu an operator scans |
+| Every list row carried helper copy | `title + subtitle` on menu items, form sections, staff rows | Label only, except where a qualifier bounds a destructive action |
+| SLO was a KPI dashboard | Seven metrics on an auto-fit tile grid, with a dead eighth cell | A ruled readout: one aligned figure column, comparable at a glance |
+| The form looked generated | `01 / 02 / 03` chips, stock select arrows, stock tick boxes | Ruled section marks; every control drawn from tokens |
+| A short board looked broken | The pane's white ran to the bottom of the viewport | The sheet ends after the last row and the desk shows below it |
 
 ### Owner access — Basic credentials, no PIN screen
 

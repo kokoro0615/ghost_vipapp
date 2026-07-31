@@ -536,7 +536,7 @@ export function ReservationWizard({
             <fieldset>
               <legend>顧客通知</legend>
               <label className={styles.choiceRow}><input type="radio" name="notify" checked={draft.notificationPreference === "none"} onChange={() => patch({ notificationPreference: "none" })} />送信しない</label>
-              <label className={styles.choiceRow}><input type="radio" name="notify" checked={draft.notificationPreference === "email"} disabled={demoMode.enabled} onChange={() => patch({ notificationPreference: "email" })} /><Mail size={15} />{demoMode.enabled ? "DEMOでは外部送信なし" : "Eメール送信"}</label>
+              <label className={styles.choiceRow}><input type="radio" name="notify" checked={draft.notificationPreference === "email"} disabled={demoMode.enabled} onChange={() => patch({ notificationPreference: "email" })} /><Mail size={16} />{demoMode.enabled ? "DEMOでは外部送信なし" : "Eメール送信"}</label>
             </fieldset>
             {emailMissing ? <p className={styles.wizardFieldError} role="alert">Eメール送信には顧客Eメールが必要です。手順5でEメールを入力してください。</p> : null}
             <p className={styles.wizardHint}>

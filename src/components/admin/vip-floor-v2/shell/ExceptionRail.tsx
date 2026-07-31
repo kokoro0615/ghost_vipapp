@@ -42,14 +42,14 @@ export function ExceptionRail({
           <span>{urgent > 0 ? `至急 ${urgent}件 / 全 ${reservations.length}件` : `全 ${reservations.length}件`}</span>
         </div>
         <button type="button" onClick={() => onCollapse(!collapsed)} aria-label="例外queueを閉じる">
-          <ChevronRight size={17} />
+          <ChevronRight size={18} />
         </button>
       </div>
 
       {showSearch ? (
         <label className={styles.searchField}>
           <span className="sr-only">予約を検索</span>
-          <Search size={15} aria-hidden />
+          <Search size={16} aria-hidden />
           <input value={query} onChange={(event) => onQuery(event.target.value)} placeholder="予約番号・ゲスト・席" />
         </label>
       ) : null}
@@ -59,7 +59,7 @@ export function ExceptionRail({
           <section key={group.key} className={styles.queueGroup} data-severity={group.severity}>
             <header>
               <span>
-                {group.severity === "critical" ? <CircleAlert size={13} aria-hidden /> : <AlertTriangle size={13} aria-hidden />}
+                {group.severity === "critical" ? <CircleAlert size={14} aria-hidden /> : <AlertTriangle size={14} aria-hidden />}
                 {group.label}
               </span>
               <strong>{group.reservationIds.length}</strong>

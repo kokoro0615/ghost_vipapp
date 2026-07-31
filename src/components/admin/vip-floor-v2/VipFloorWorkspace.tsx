@@ -500,7 +500,6 @@ export default function VipFloorWorkspace() {
               <section className={styles.loginPanel} aria-labelledby="owner-access-title">
                 <div className={styles.loginAccess}>
                   <span>OWNER ACCESS</span>
-                  <strong>01</strong>
                 </div>
                 <div className={styles.loginIntro}>
                   <h1 id="owner-access-title">
@@ -523,7 +522,7 @@ export default function VipFloorWorkspace() {
                 </div>
                 {!checkingOwnerAccess ? (
                   <button type="button" onClick={() => window.location.reload()}>
-                    <RefreshCw size={17} aria-hidden />
+                    <RefreshCw size={18} aria-hidden />
                     再接続
                   </button>
                 ) : null}
@@ -573,7 +572,6 @@ export default function VipFloorWorkspace() {
             <form className={styles.loginPanel} onSubmit={submitPin}>
               <div className={styles.loginAccess}>
                 <span>{demo.config ? "DEMO ACCESS" : "OWNER ACCESS"}</span>
-                <strong>01</strong>
               </div>
               <div className={styles.loginIntro}>
                 <h1>VIP予約デモに入る</h1>
@@ -621,7 +619,7 @@ export default function VipFloorWorkspace() {
                 aria-label="ログインしてフロアを開く"
                 disabled={state.pending || pin.length < 4}
               >
-                <ShieldCheck size={17} aria-hidden />
+                <ShieldCheck size={18} aria-hidden />
                 {state.pending || auth.status === "checking" ? "確認中…" : "フロアを開く"}
               </button>
               <p id="pin-security" className={styles.loginHint}>
@@ -684,7 +682,7 @@ export default function VipFloorWorkspace() {
         </div>
         <DemoCue compact className={styles.ribbonDemoCue} />
         <label className={styles.ribbonControl}>
-          <CalendarDays size={15} aria-hidden />
+          <CalendarDays size={16} aria-hidden />
           <span>営業日</span>
           <input
             type="date"
@@ -699,7 +697,7 @@ export default function VipFloorWorkspace() {
           />
         </label>
         <div className={styles.ribbonControl} data-optional aria-label="営業枠">
-          <Radio size={15} aria-hidden />
+          <Radio size={16} aria-hidden />
           <span>営業枠</span>
           <strong>22:00–05:00</strong>
         </div>
@@ -792,7 +790,7 @@ export default function VipFloorWorkspace() {
             disabled={state.pending}
             aria-label="台帳を再読込"
           >
-            <RefreshCw size={17} aria-hidden />
+            <RefreshCw size={18} aria-hidden />
           </button>
         </section>
 
@@ -804,7 +802,7 @@ export default function VipFloorWorkspace() {
             disabled={readOnly || !isOwner}
             aria-label={`新規オペレーション（${isOwner ? "Walk-inまたは受付ブロック" : "Owner専用"}）`}
           >
-            <CalendarPlus size={17} aria-hidden />新規受付
+            <CalendarPlus size={18} aria-hidden />新規受付
           </button>
           <div className={styles.viewSwitcher} role="group" aria-label="表示切替">
             <button type="button" aria-label="List" data-active={state.view === "list" || undefined} onClick={() => switchView("list")}>
@@ -873,7 +871,7 @@ export default function VipFloorWorkspace() {
             data-active={menuOpen || undefined}
             onClick={() => setMenuOpen((open) => !open)}
           >
-            <Menu size={17} />
+            <Menu size={18} />
           </button>
         </div>
 
@@ -1002,22 +1000,22 @@ export default function VipFloorWorkspace() {
           </header>
           <div className={styles.shellMenuGrid}>
             <button type="button" onClick={() => void loadBoard()} disabled={state.pending}>
-              <RefreshCw size={18} aria-hidden /><span>再読込</span><small>台帳同期</small>
+              <RefreshCw size={18} aria-hidden /><span>再読込</span>
             </button>
-            <button type="button" aria-label="Waitlist" onClick={() => void openWaitlist()}>
-              <BellRing size={18} aria-hidden /><span>待機リスト</span><small>呼出と期限</small>
+            <button type="button" aria-label="待機リスト" onClick={() => void openWaitlist()}>
+              <BellRing size={18} aria-hidden /><span>待機リスト</span>
             </button>
             <button type="button" onClick={openQueue}>
-              <AlertTriangle size={18} aria-hidden /><span>要対応</span><small>未割当と遅延</small>
+              <AlertTriangle size={18} aria-hidden /><span>要対応</span>
             </button>
             <button type="button" aria-label="SLO 稼働状況" onClick={() => {
               setMenuOpen(false);
               setObservabilityOpen(true);
             }}>
-              <Activity size={18} aria-hidden /><span>稼働状況</span><small>SLO / Alert</small>
+              <Activity size={18} aria-hidden /><span>稼働状況</span>
             </button>
             <button type="button" onClick={() => void openStaff()}>
-              <ShieldCheck size={18} aria-hidden /><span>担当卓</span><small>スタッフ設定</small>
+              <ShieldCheck size={18} aria-hidden /><span>担当卓</span>
             </button>
             {isDemo ? (
               <button type="button" onClick={() => {
@@ -1028,7 +1026,7 @@ export default function VipFloorWorkspace() {
               </button>
             ) : null}
             <button type="button" onClick={() => void logout()}>
-              <LogOut size={18} aria-hidden /><span>ログアウト</span><small>{isDemo ? "Demo session" : "Owner session"}</small>
+              <LogOut size={18} aria-hidden /><span>ログアウト</span>
             </button>
           </div>
         </section>
@@ -1041,16 +1039,19 @@ export default function VipFloorWorkspace() {
           aria-label={`新規オペレーション（${isOwner ? "Walk-inまたは受付ブロック" : "Owner専用"}）`}
           onClick={() => void openOperation()}
         >
-          <CalendarPlus size={19} aria-hidden /><span>受付</span><small>{isOwner ? "予約・Walk-in" : "Ownerのみ"}</small>
+          {/* Pinned by tests/contract/operations-adapter.test.mjs: on phones this
+              tab is the only place the entry point discloses that it covers both
+              reservations and walk-ins, so the qualifier is capability, not decoration. */}
+          <CalendarPlus size={20} aria-hidden /><span>受付</span><small>{isOwner ? "予約・Walk-in" : "Ownerのみ"}</small>
         </button>
         <button type="button" aria-label="List" aria-current={state.view === "list" ? "page" : undefined} data-active={state.view === "list" || undefined} onClick={() => switchView("list")}>
-          <ClipboardList size={19} aria-hidden /><span>一覧</span>
+          <ClipboardList size={20} aria-hidden /><span>一覧</span>
         </button>
         <button type="button" aria-label="Floor" aria-current={state.view === "floor" ? "page" : undefined} data-active={state.view === "floor" || undefined} onClick={() => switchView("floor")}>
-          <LayoutGrid size={19} aria-hidden /><span>フロア</span>
+          <LayoutGrid size={20} aria-hidden /><span>フロア</span>
         </button>
         <button type="button" aria-label="Chart" aria-current={state.view === "timeline" ? "page" : undefined} data-active={state.view === "timeline" || undefined} onClick={() => switchView("timeline")}>
-          <ChartNoAxesGantt size={19} aria-hidden /><span>時間軸</span>
+          <ChartNoAxesGantt size={20} aria-hidden /><span>時間軸</span>
         </button>
         <button
           ref={menuButtonRef}
@@ -1060,7 +1061,7 @@ export default function VipFloorWorkspace() {
           data-active={menuOpen || undefined}
           onClick={() => setMenuOpen((open) => !open)}
         >
-          <Menu size={19} aria-hidden /><span>メニュー</span>
+          <Menu size={20} aria-hidden /><span>メニュー</span>
         </button>
       </nav>
 
@@ -1078,7 +1079,7 @@ export default function VipFloorWorkspace() {
           className={styles.sheetClose}
           onClick={() => dispatch({ type: "mobileInspector", open: false })}
         >
-          <X size={17} aria-hidden />閉じる
+          <X size={18} aria-hidden />閉じる
         </button>
         <Inspector
           board={state.board}

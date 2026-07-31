@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowDownAZ, ChevronLeft, ChevronRight, ChevronsUpDown } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronsUpDown } from "lucide-react";
 
 import { getStatusMeta } from "../contract/statusModel";
 import type { UiReservation } from "../contract/uiTypes";
@@ -33,7 +33,7 @@ export default function ReservationListView({
         {attentionCount > 0 ? <span className={styles.exceptionText}>要対応 {attentionCount}</span> : null}
         <span className={styles.stripSpacer} />
         <button type="button" className={styles.secondaryButton} onClick={() => onDensity(density === "compact" ? "comfortable" : "compact")}>
-          <ArrowDownAZ size={15} aria-hidden /> {density === "compact" ? "ゆったり表示" : "コンパクト表示"}
+          {density === "compact" ? "ゆったり表示" : "コンパクト表示"}
         </button>
       </div>
 
@@ -42,7 +42,7 @@ export default function ReservationListView({
           <caption className="sr-only">VIP予約一覧。来店時刻の昇順。</caption>
           <thead>
             <tr>
-              <th scope="col" aria-sort="ascending">時刻 <ChevronsUpDown size={11} aria-hidden /></th>
+              <th scope="col" aria-sort="ascending">時刻 <ChevronsUpDown size={14} aria-hidden /></th>
               <th scope="col">状態</th>
               <th scope="col">予約番号</th>
               <th scope="col">ゲスト</th>
@@ -104,9 +104,9 @@ export default function ReservationListView({
             : `全 ${reservations.length} 件中 1–${reservations.length} 件を表示`}
         </span>
         <div aria-label="予約一覧ページ">
-          <button type="button" disabled aria-label="前のページ"><ChevronLeft size={15} /></button>
+          <button type="button" disabled aria-label="前のページ"><ChevronLeft size={16} /></button>
           <strong aria-current="page">1</strong>
-          <button type="button" disabled aria-label="次のページ"><ChevronRight size={15} /></button>
+          <button type="button" disabled aria-label="次のページ"><ChevronRight size={16} /></button>
         </div>
       </footer>
     </section>

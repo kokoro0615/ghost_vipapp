@@ -291,7 +291,7 @@ export function OperationCenter({
             <h2 id="operation-title">{editReservation ? "予約編集" : "新規予約"}</h2>
           </div>
           <button type="button" onClick={closePanel} aria-label="新規作成を閉じる">
-            <X size={19} />
+            <X size={20} />
           </button>
         </header>
         <DemoCue compact className={styles.dialogDemoCue} />
@@ -394,8 +394,7 @@ export function OperationCenter({
 	                  <div className={styles.walkInIntake}>
 	                    <section className={styles.walkInSection} aria-labelledby="walk-in-time-title">
 	                      <div className={styles.walkInSectionHeading}>
-	                        <span className="tabular-nums">01</span>
-	                        <div><strong id="walk-in-time-title">滞在時間</strong><small>現在時刻を基準に15分単位</small></div>
+	                        <strong id="walk-in-time-title">滞在時間</strong>
 	                      </div>
 	                      <BusinessTimeFormFields
 	                        key={`${kind}:${options.businessDay.businessDate}`}
@@ -407,8 +406,7 @@ export function OperationCenter({
 
 	                    <section className={styles.walkInSection} aria-labelledby="walk-in-guest-title">
 	                      <div className={styles.walkInSectionHeading}>
-	                        <span className="tabular-nums">02</span>
-	                        <div><strong id="walk-in-guest-title">来店情報</strong><small>人数と入口で呼ぶ名前</small></div>
+	                        <strong id="walk-in-guest-title">来店情報</strong>
 	                      </div>
 	                      <div className={styles.formColumns}>
 	                        <label>
@@ -467,8 +465,7 @@ export function OperationCenter({
 
 	                    <section className={styles.walkInSection} aria-labelledby="walk-in-table-title">
 	                      <div className={styles.walkInSectionHeading}>
-	                        <span className="tabular-nums">03</span>
-	                        <div><strong id="walk-in-table-title">配席</strong><small>人数に合う受付可能卓だけを選択</small></div>
+	                        <strong id="walk-in-table-title">配席</strong>
 	                      </div>
 	                      <div
 	                        className={styles.checkGrid}
@@ -544,8 +541,7 @@ export function OperationCenter({
 
 	                  <aside className={styles.walkInAttribution} aria-labelledby="walk-in-attribution-title">
 	                    <header>
-	                      <UserRoundCheck size={18} aria-hidden />
-	                      <div><h3 id="walk-in-attribution-title">集客担当</h3><small>来店経路を予約へ記録</small></div>
+	                      <h3 id="walk-in-attribution-title">集客担当</h3>
 	                    </header>
 	                    <fieldset>
 	                      <legend>このお客様の担当</legend>

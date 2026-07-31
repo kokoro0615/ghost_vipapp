@@ -117,9 +117,9 @@ export default function ChartView({ board, reservations, selectedReservationId, 
         {conflicts.length > 0 ? <span className={styles.exceptionText}>競合 {conflicts.length}</span> : null}
         <span className={styles.stripSpacer} />
         <div className={styles.zoomControl} role="group" aria-label="時間軸ズーム">
-          <button type="button" onClick={() => onZoom(zoom === 60 ? 30 : 15)} aria-label="時間軸を拡大"><Plus size={15} /></button>
+          <button type="button" onClick={() => onZoom(zoom === 60 ? 30 : 15)} aria-label="時間軸を拡大"><Plus size={16} /></button>
           <span className="tabular-nums">{zoom}m</span>
-          <button type="button" onClick={() => onZoom(zoom === 15 ? 30 : 60)} aria-label="時間軸を縮小"><Minus size={15} /></button>
+          <button type="button" onClick={() => onZoom(zoom === 15 ? 30 : 60)} aria-label="時間軸を縮小"><Minus size={16} /></button>
         </div>
       </div>
 
@@ -136,7 +136,7 @@ export default function ChartView({ board, reservations, selectedReservationId, 
 
       <div className={styles.timelineScroller} tabIndex={0} aria-label="VIP席の時間軸。左右にスクロールできます。" data-zoom={zoom}>
         <div className={styles.timelineGrid}>
-          <div className={styles.timelineCorner}><Clock3 size={13} aria-hidden /> 席 / 時刻</div>
+          <div className={styles.timelineCorner}><Clock3 size={14} aria-hidden /> 席 / 時刻</div>
           <div className={styles.timelineTicks} style={{ gridTemplateColumns: `repeat(${tickCount}, 1fr)` }}>
             {ticks.map((tick) => <span key={tick}>{tick}</span>)}
           </div>

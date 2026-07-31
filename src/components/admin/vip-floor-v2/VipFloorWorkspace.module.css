@@ -145,7 +145,9 @@
 }
 .searchField:focus-within, .toolbarSearch:focus-within { border-color: var(--focus); }
 .searchField input, .toolbarSearch input {
-  min-width: 0;
+  /* The 44px floor applies to the field itself, not only to its container: at
+     320px the toolbar squeezes this the hardest. */
+  min-width: var(--h-control);
   flex: 1;
   height: var(--h-control);
   border: 0;
@@ -169,6 +171,105 @@
 }
 .toolbarSelect span { font-size: var(--t-micro); font-weight: 500; letter-spacing: var(--track-caps); white-space: nowrap; }
 .toolbarSelect select { max-width: 132px; height: var(--h-control); border: 0; background: transparent; color: var(--ink); font-size: var(--t-body); }
+
+/* Native widget chrome is the loudest "nobody authored this" signal left on a
+   surface this deliberate: a stock select arrow, a stock tick box and a stock
+   date button are the only marks on screen the design does not own. Each one
+   is redrawn from tokens, so a control reads as part of the instrument. */
+.workspace select,
+.dialogBackdrop select {
+  appearance: none;
+  /* 20px is what the native arrow reserved. A wider default reserve grew the
+     two toolbar selects until the search field beside them fell under the 44px
+     floor at 320px — the gate caught it. Full-width form selects widen this
+     themselves in section 9, where the room is free. */
+  padding-right: var(--s-7);
+  /* Two triangles meeting at the baseline read as one engraved caret. */
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--ink-3) 50%),
+    linear-gradient(135deg, var(--ink-3) 50%, transparent 50%);
+  background-repeat: no-repeat;
+  background-position: right 13px center, right 9px center;
+  background-size: 4px 4px;
+  cursor: pointer;
+}
+.workspace select:hover:not(:disabled),
+.dialogBackdrop select:hover:not(:disabled) {
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--ink) 50%),
+    linear-gradient(135deg, var(--ink) 50%, transparent 50%);
+}
+.workspace select:disabled,
+.dialogBackdrop select:disabled { cursor: not-allowed; }
+
+/* The picker button is the browser's, so it is toned to the ink ramp rather
+   than left as a blue-grey glyph from another design system. Tone only — the
+   masthead date field sizes to its intrinsic width and does not shrink, so
+   padding here costs the 320px masthead real estate it has none of. */
+.workspace input::-webkit-calendar-picker-indicator,
+.dialogBackdrop input::-webkit-calendar-picker-indicator {
+  opacity: 0.55;
+  cursor: pointer;
+}
+.workspace input:hover::-webkit-calendar-picker-indicator,
+.dialogBackdrop input:hover::-webkit-calendar-picker-indicator { opacity: 1; }
+.workspace input[type="number"],
+.dialogBackdrop input[type="number"] { font-variant-numeric: tabular-nums; }
+
+.workspace input[type="checkbox"],
+.workspace input[type="radio"],
+.dialogBackdrop input[type="checkbox"],
+.dialogBackdrop input[type="radio"] {
+  display: grid;
+  width: 20px;
+  min-width: 20px;
+  height: 20px;
+  min-height: 20px;
+  flex: 0 0 auto;
+  appearance: none;
+  place-content: center;
+  border: 1px solid var(--rule-control);
+  border-radius: var(--r-chip);
+  background: var(--surface);
+  transition: border-color var(--dur-fast) var(--ease-ui);
+}
+.workspace input[type="radio"],
+.dialogBackdrop input[type="radio"] { border-radius: 50%; }
+/* Fixed pixel marks, never percentages: the box is a centred grid whose track
+   is sized by this child, so a percentage height has nothing to resolve
+   against and collapses the tick to nothing. */
+.workspace input[type="checkbox"]::before,
+.workspace input[type="radio"]::before,
+.dialogBackdrop input[type="checkbox"]::before,
+.dialogBackdrop input[type="radio"]::before {
+  content: "";
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--action);
+  transform: scale(0);
+  transition: transform var(--dur-fast) var(--ease-enter);
+}
+.workspace input[type="checkbox"]::before,
+.dialogBackdrop input[type="checkbox"]::before {
+  width: 12px;
+  height: 12px;
+  border-radius: 0;
+  background: var(--action-text);
+  clip-path: polygon(14% 46%, 0 60%, 38% 100%, 100% 22%, 86% 8%, 37% 71%);
+}
+.workspace input[type="checkbox"]:checked,
+.dialogBackdrop input[type="checkbox"]:checked { border-color: var(--action); background: var(--action); }
+.workspace input[type="radio"]:checked,
+.dialogBackdrop input[type="radio"]:checked { border-color: var(--action); }
+.workspace input[type="checkbox"]:checked::before,
+.workspace input[type="radio"]:checked::before,
+.dialogBackdrop input[type="checkbox"]:checked::before,
+.dialogBackdrop input[type="radio"]:checked::before { transform: scale(1); }
+.workspace input[type="checkbox"]:hover:not(:disabled),
+.workspace input[type="radio"]:hover:not(:disabled),
+.dialogBackdrop input[type="checkbox"]:hover:not(:disabled),
+.dialogBackdrop input[type="radio"]:hover:not(:disabled) { border-color: var(--action); }
 
 /* ── 2. auth + maintenance ─────────────────────────────────────────────── */
 
@@ -296,7 +397,7 @@
   font-weight: 700;
   letter-spacing: var(--track-caps);
 }
-.loginAccess strong { color: var(--ink-3); font-weight: 500; }
+/* A ruled label, not a numbered step: there was never an "02". */
 .loginIntro { display: grid; gap: var(--s-5); }
 .loginIntro h1 {
   margin: 0;
@@ -844,12 +945,17 @@
 
 /* ── 5. ledger (List) ──────────────────────────────────────────────────── */
 
-.listScroller { min-height: 0; flex: 1; overflow: auto; overscroll-behavior: contain; background: var(--surface); }
+/* The sheet ends where the ledger ends. Running the pane's white to the bottom
+   of the viewport made a short board look like a table that failed to load;
+   letting the desk show below the last row states the same fact as a finished
+   page — and it is the value separation the surface stack already owns. */
+.listScroller { min-height: 0; flex: 1; overflow: auto; overscroll-behavior: contain; background: var(--paper); }
 .reservationTable {
   width: 100%;
   min-width: 760px;
   border-collapse: separate;
   border-spacing: 0;
+  border-bottom: 1px solid var(--rule-strong);
   background: var(--surface);
   font-size: var(--t-body);
 }
@@ -903,7 +1009,9 @@
 
 /* Status: swatch glyph plus word. Never a pill that reads as a button. */
 .statusBadge { display: inline-flex; align-items: center; gap: var(--s-3); color: var(--ink-2); font-size: var(--t-mini); white-space: nowrap; }
-.statusBadge::before { width: 3px; height: 14px; border-radius: 1px; background: var(--ink-3); content: ""; }
+/* The swatch has to read across a dark room from a metre away, so it carries
+   real weight rather than a hairline tick. */
+.statusBadge::before { width: 4px; height: 16px; border-radius: 1px; background: var(--ink-3); content: ""; }
 .statusBadge[data-tone="danger"] { color: var(--alert); font-weight: 700; }
 .statusBadge[data-tone="danger"]::before { background: var(--alert); }
 .statusBadge[data-tone="warning"] { color: var(--warn); font-weight: 500; }
@@ -1777,22 +1885,41 @@
   border-bottom: 1px solid var(--rule);
   background: var(--rule);
 }
+/* Left-aligned on a shared icon column so six commands read as a menu an
+   operator scans, not as six co-equal tiles. Centring them was what made this
+   block look generated. */
 .commandGrid button {
-  display: flex;
+  display: grid;
   min-height: var(--h-control);
+  grid-template-columns: 18px minmax(0, 1fr);
   align-items: center;
-  justify-content: center;
-  gap: var(--s-3);
+  gap: var(--s-4);
+  padding: 0 var(--s-5);
   border: 0;
   background: var(--surface);
   color: var(--ink-2);
-  font-size: var(--t-mini);
+  font-size: var(--t-body);
+  text-align: left;
   transition: color var(--dur-fast) var(--ease-ui);
 }
+.commandGrid button svg { color: var(--ink-3); transition: color var(--dur-fast) var(--ease-ui); }
 .commandGrid button:hover:not(:disabled) { background: var(--surface-hover); color: var(--ink); }
-.commandGrid button:first-child { grid-column: 1 / -1; background: var(--action); color: var(--action-text); font-weight: 700; }
+.commandGrid button:hover:not(:disabled) svg { color: var(--accent-ink); }
+.commandGrid button:first-child {
+  grid-column: 1 / -1;
+  grid-template-columns: auto auto;
+  justify-content: center;
+  background: var(--action);
+  color: var(--action-text);
+  font-weight: 700;
+}
+.commandGrid button:first-child svg { color: var(--action-text); }
 .commandGrid button:first-child:hover:not(:disabled) { background: var(--action-hover); color: var(--action-text); }
+.commandGrid button:first-child:hover:not(:disabled) svg { color: var(--action-text); }
 .commandGrid button[data-danger] { color: var(--alert); }
+.commandGrid button[data-danger] svg { color: var(--alert); }
+.commandGrid button[data-danger]:hover:not(:disabled) { background: var(--alert-wash); color: var(--alert); }
+.commandGrid button[data-danger]:hover:not(:disabled) svg { color: var(--alert); }
 
 .inspectorTabs {
   display: flex;
@@ -1818,17 +1945,40 @@
 .inspectorTabs button[aria-selected="true"] { border-bottom-color: var(--ink); color: var(--ink); font-weight: 700; }
 
 .inspectorPanel { min-height: 0; flex: 1; overflow-y: auto; overscroll-behavior: contain; }
-.detailList { margin: 0; }
+
+/* Three bands, not nine identical stripes. A rule between bands separates what
+   the floor acts on (時間/人数/席) from who the booking belongs to and from the
+   record trailer, so rank is legible without an icon on every line. A rule
+   under every row would flatten all nine facts to the same importance. */
+.detailList { margin: 0; padding: var(--s-5) 0 var(--s-6); }
 .detailList div {
   display: grid;
-  min-height: 44px;
-  grid-template-columns: minmax(0, 40%) minmax(0, 1fr);
-  align-items: center;
-  padding: var(--s-3) var(--s-6);
-  border-bottom: 1px solid var(--rule);
+  min-height: 30px;
+  grid-template-columns: minmax(0, 36%) minmax(0, 1fr);
+  align-items: baseline;
+  gap: var(--s-4);
+  padding: var(--s-2) var(--s-6);
 }
-.detailList dt { display: flex; align-items: center; gap: var(--s-3); color: var(--ink-3); font-size: var(--t-mini); }
-.detailList dd { margin: 0; color: var(--ink); font-family: var(--font-figure); font-size: var(--t-mini); font-variant-numeric: tabular-nums; text-align: right; }
+.detailList div[data-band] { margin-top: var(--s-5); padding-top: var(--s-6); border-top: 1px solid var(--rule); }
+.detailList dt { color: var(--ink-3); font-size: var(--t-mini); }
+.detailList dd {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: var(--ink);
+  font-family: var(--font-figure);
+  font-size: var(--t-mini);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* The operational triad is what a runner reads across the room. */
+.detailList div[data-rank="lead"] { min-height: 34px; }
+.detailList div[data-rank="lead"] dd { color: var(--ink); font-size: var(--t-data); font-weight: 600; }
+/* Version and exception are provenance, not instructions. */
+.detailList div[data-rank="meta"] dt,
+.detailList div[data-rank="meta"] dd { color: var(--ink-3); font-size: var(--t-micro); font-weight: 400; }
 .detailStack { display: grid; gap: var(--s-5); padding: var(--s-6); }
 .detailStack p { display: flex; align-items: center; gap: var(--s-3); margin: 0; color: var(--ink-2); font-size: var(--t-mini); line-height: var(--lh-ui); }
 .detailStack small { color: var(--ink-3); font-size: var(--t-micro); line-height: var(--lh-ui); }
@@ -1983,10 +2133,14 @@
   border: 1px solid var(--rule-control);
   border-radius: var(--r-control);
   outline: 0;
-  background: var(--surface);
+  /* background-color, not the shorthand: the shorthand would erase the caret
+     drawn on these selects in section 1. */
+  background-color: var(--surface);
   color: var(--ink);
   font-size: var(--t-body);
 }
+.commandForm select, .wizardBody select,
+.staffAssignmentGrid select, .waitlistActions select { padding-right: var(--s-9); }
 .commandForm textarea, .wizardBody textarea { min-height: 88px; resize: vertical; }
 .commandForm input:focus-visible, .commandForm select:focus-visible, .commandForm textarea:focus-visible,
 .wizardBody input:focus-visible, .wizardBody select:focus-visible, .wizardBody textarea:focus-visible { border-color: var(--focus); }
@@ -2017,37 +2171,36 @@
 }
 .walkInIntake { min-width: 0; }
 .walkInSection { padding: var(--s-5) var(--s-6); border-bottom: 1px solid var(--rule); }
+/* A ruled section mark, the way a printed intake sheet divides a form. The
+   numbered 01/02/03 chips plus a caption under every title were a form
+   generator's idea of structure: the fields already say what they collect. */
 .walkInSectionHeading {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  display: flex;
   align-items: center;
   gap: var(--s-4);
   margin-bottom: var(--s-5);
 }
-.walkInSectionHeading > span {
-  display: grid;
-  width: var(--h-control);
-  height: var(--h-control);
-  place-items: center;
-  border: 1px solid var(--rule);
-  border-radius: var(--r-control);
-  background: var(--surface-sunken);
+.walkInSectionHeading strong {
+  flex: 0 0 auto;
   color: var(--ink-2);
-  font-size: var(--t-mini);
+  font-size: var(--t-micro);
   font-weight: 700;
+  letter-spacing: var(--track-caps);
 }
-.walkInSectionHeading > div { display: grid; gap: var(--s-1); }
-.walkInSectionHeading strong { color: var(--ink); font-size: var(--t-body); font-weight: 700; }
-.walkInSectionHeading small { color: var(--ink-3); font-size: var(--t-micro); }
+.walkInSectionHeading::after {
+  content: "";
+  height: 1px;
+  flex: 1;
+  background: var(--rule);
+}
 .walkInAttribution {
   min-width: 0;
   border-left: 1px solid var(--rule-strong);
   background: var(--surface-quiet);
 }
 .walkInAttribution > header {
-  display: grid;
-  min-height: calc(var(--h-control) + var(--s-6));
-  grid-template-columns: auto minmax(0, 1fr);
+  display: flex;
+  min-height: calc(var(--h-control) + var(--s-4));
   align-items: center;
   gap: var(--s-4);
   padding: var(--s-4) var(--s-5);
@@ -2055,9 +2208,7 @@
   background: var(--accent-wash);
   color: var(--accent-ink);
 }
-.walkInAttribution > header > div { display: grid; gap: var(--s-1); }
 .walkInAttribution > header h3 { margin: 0; color: var(--ink); font-size: var(--t-body); font-weight: 700; }
-.walkInAttribution > header small { color: var(--ink-2); font-size: var(--t-micro); }
 .walkInAttribution > fieldset { gap: var(--s-3); padding: var(--s-5); }
 .walkInAttribution > fieldset > legend { margin-bottom: var(--s-3); color: var(--ink-3); font-size: var(--t-micro); }
 .walkInAttributionOptions { display: grid; gap: 1px; overflow: hidden; border: 1px solid var(--rule); border-radius: var(--r-control); background: var(--rule); }
@@ -2372,10 +2523,14 @@
 .staffMemberRow { display: grid; min-height: 56px; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: var(--s-4); padding: var(--s-3) var(--s-6); border-bottom: 1px solid var(--rule); }
 .staffMemberRow small { color: var(--ink-3); font-size: var(--t-micro); }
 .staffMemberRow button { min-width: var(--h-control); min-height: var(--h-control); padding: 0 var(--s-4); border: 1px solid var(--rule); border-radius: var(--r-control); background: var(--surface); color: var(--ink); font-size: var(--t-mini); }
+/* A fixed trailing column, so the select edge is a straight line down all eight
+   rows. An `auto` column let "ASSIGN REV 1" and "未割当" set different widths
+   and every select started somewhere else. */
 .staffAssignmentGrid { display: grid; min-height: 0; overflow: auto; }
-.staffAssignmentGrid > label { display: grid; min-height: 58px; grid-template-columns: 110px minmax(140px, 1fr) auto; align-items: center; gap: var(--s-4); padding: var(--s-3) var(--s-6); border-bottom: 1px solid var(--rule); }
+.staffAssignmentGrid > label { display: grid; min-height: 56px; grid-template-columns: 76px minmax(140px, 1fr) 92px; align-items: center; gap: var(--s-4); padding: var(--s-3) var(--s-6); border-bottom: 1px solid var(--rule); }
 .staffAssignmentGrid > label > span { display: grid; gap: 1px; }
-.staffAssignmentGrid small { color: var(--ink-3); font-size: var(--t-micro); }
+.staffAssignmentGrid > label > span strong { font-family: var(--font-figure); font-size: var(--t-body); font-variant-numeric: tabular-nums; }
+.staffAssignmentGrid small { color: var(--ink-3); font-family: var(--font-figure); font-size: var(--t-micro); font-variant-numeric: tabular-nums; text-align: right; }
 
 .waitlistBody { padding: var(--s-5) var(--s-6); }
 .waitlistRow { margin-bottom: var(--s-4); border: 1px solid var(--rule); border-top: 3px solid var(--ink-3); border-radius: 0 0 var(--r-control) var(--r-control); background: var(--surface); }
@@ -2414,11 +2569,30 @@
 .sloStatus[data-alert] { border-top-color: var(--alert); background: var(--alert-wash); color: var(--alert); }
 .sloStatus div { display: grid; gap: var(--s-1); }
 .sloStatus span { color: var(--ink-2); font-size: var(--t-micro); }
-.sloGrid { display: grid; margin: var(--s-5) 0; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1px; overflow: hidden; border: 1px solid var(--rule); border-radius: var(--r-control); background: var(--rule); }
-.sloGrid div { min-height: 80px; padding: var(--s-5); background: var(--surface); }
-.sloGrid dt { color: var(--ink-3); font-size: var(--t-micro); letter-spacing: 0.05em; }
-.sloGrid dd { margin: var(--s-3) 0 0; color: var(--ink); font-family: var(--font-figure); font-size: var(--t-figure); font-weight: 600; font-variant-numeric: tabular-nums; }
-.sloGrid dd small { margin-left: var(--s-2); color: var(--ink-3); font-family: var(--font-ui); font-size: var(--t-micro); }
+/* An instrument readout, not KPI tiles. Seven metrics on an auto-fit tile grid
+   left a dead cell in the last row and spent 240px saying what 7 ruled lines
+   say better — and a reading is compared against its neighbours, which a
+   single aligned figure column supports and a tile grid does not. */
+.sloGrid {
+  display: grid;
+  margin: var(--s-5) 0;
+  overflow: hidden;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-control);
+  background: var(--surface);
+}
+.sloGrid div {
+  display: grid;
+  min-height: 38px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: var(--s-4);
+  padding: var(--s-3) var(--s-5);
+}
+.sloGrid div:nth-child(even) { background: var(--surface-quiet); }
+.sloGrid dt { color: var(--ink-2); font-size: var(--t-mini); }
+.sloGrid dd { margin: 0; color: var(--ink); font-family: var(--font-figure); font-size: var(--t-data); font-weight: 600; font-variant-numeric: tabular-nums; text-align: right; }
+.sloGrid dd small { margin-left: var(--s-2); color: var(--ink-3); font-family: var(--font-ui); font-size: var(--t-micro); font-weight: 400; }
 .alertRail { overflow: hidden; border: 1px solid var(--rule); border-radius: var(--r-control); }
 .alertRail h3 { margin: 0; padding: var(--s-3) var(--s-5); border-bottom: 1px solid var(--rule); background: var(--surface-sunken); color: var(--ink-3); font-size: var(--t-micro); font-weight: 700; letter-spacing: var(--track-caps); }
 .alertRail p { display: flex; min-height: var(--h-control); align-items: center; gap: var(--s-3); margin: 0; padding: var(--s-3) var(--s-5); border-bottom: 1px solid var(--rule); color: var(--ink-2); font-size: var(--t-mini); }
@@ -2488,12 +2662,14 @@
 .shellMenu > header span { color: var(--accent-ink); font-size: var(--t-micro); font-weight: 700; letter-spacing: var(--track-caps); }
 .shellMenu > header strong { font-size: var(--t-body); font-weight: 700; }
 .shellMenu > header button { display: grid; width: var(--h-control); height: var(--h-control); place-items: center; border: 1px solid var(--rule); border-radius: var(--r-control); background: var(--surface); color: var(--ink-2); }
+/* A destination list, not six rows of helper copy: only an item whose scope is
+   not obvious from its label (the demo reset) still carries a qualifier. */
 .shellMenuGrid { display: grid; min-height: 0; flex: 1; align-content: start; overflow-y: auto; }
 .shellMenuGrid > button, .shellMenuGrid > span {
   display: grid;
-  min-height: 60px;
+  min-height: 56px;
   grid-template-columns: 22px minmax(0, 1fr);
-  grid-template-rows: auto auto;
+  grid-template-rows: auto;
   align-content: center;
   gap: 1px var(--s-4);
   padding: var(--s-4) var(--s-6);
@@ -2782,6 +2958,11 @@
   .mobileSummary > [data-optional] { display: none; }
   .reservationTable th:nth-child(5), .reservationTable td:nth-child(5) { display: none; }
   .venueIdentity strong { font-size: var(--t-micro); }
+  /* Brand + business date + sync state + a logout is more than 320px carries,
+     and the masthead's items do not shrink — so the last one was painted half
+     off the edge. メニュー already owns ログアウト on the bottom nav, and the
+     sync state stays because it is the one thing here that changes. */
+  .operatorIdentity { display: none; }
 }
 
 /* ── 13. disabled overrides that must outrank later component rules ─────── */

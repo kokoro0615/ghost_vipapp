@@ -292,7 +292,7 @@ async function auditViewport(context, viewport) {
 
   const menuPage = await newQaPage(context);
   for (const [buttonName, dialogName, state] of [
-    [/Waitlist/u, "Waitlist", "waitlist"],
+    [/待機リスト/u, "待機リスト", "waitlist"],
     [/担当卓/u, "スタッフ担当卓", "staff"],
     [/SLO/u, "運用SLO / Alert", "slo"],
   ]) {

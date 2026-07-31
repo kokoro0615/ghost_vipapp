@@ -97,11 +97,11 @@ export function ObservabilityPanel({ open, onClose, onLoad }: Props) {
       >
         <header className={styles.commandHeader}>
           <div>
-            <span>{isDemo ? "DEMO · LOCAL LEDGER" : "GHOST MANAGER · LAST 60 MIN"}</span>
+            <span>{isDemo ? "デモ台帳 · 直近60分" : "直近60分"}</span>
             <h2 id="slo-panel-title">運用SLO / Alert</h2>
           </div>
           <DemoCue compact />
-          <button type="button" onClick={onClose} aria-label="SLOを閉じる"><X size={19} /></button>
+          <button type="button" onClick={onClose} aria-label="SLOを閉じる"><X size={20} /></button>
         </header>
         <div className={styles.observabilityBody}>
           <section className={styles.sloStatus} data-alert={alerts.length > 0 || undefined}>
@@ -115,7 +115,7 @@ export function ObservabilityPanel({ open, onClose, onLoad }: Props) {
               }).format(new Date(payload.generatedAt)) : "集計中"}</span>
             </div>
             <button type="button" className={styles.secondaryButton} onClick={() => void load()}>
-              <RefreshCw size={15} />更新
+              <RefreshCw size={16} />更新
             </button>
           </section>
           <dl className={styles.sloGrid}>
@@ -124,7 +124,7 @@ export function ObservabilityPanel({ open, onClose, onLoad }: Props) {
               const value = key === "commandErrorRate"
                 ? (rawValue * 100).toFixed(2)
                 : String(rawValue);
-              return <div key={key}><dt>{label}</dt><dd>{value}<small>{unit}</small></dd></div>;
+              return <div key={key}><dt>{label}</dt><dd className="tabular-nums">{value}<small>{unit}</small></dd></div>;
             })}
           </dl>
           <section className={styles.alertRail}>

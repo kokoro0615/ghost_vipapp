@@ -230,8 +230,8 @@ export function CommandCenter({
         onKeyDown={trapFocus}
       >
         <header className={styles.commandHeader}>
-          <div><span>GHOST 実行コマンド</span><h2 id="command-title">{commandLabels[kind]}</h2></div>
-          <button type="button" onClick={onClose} aria-label="操作画面を閉じる"><X size={19} /></button>
+          <div><h2 id="command-title">{commandLabels[kind]}</h2></div>
+          <button type="button" onClick={onClose} aria-label="操作画面を閉じる"><X size={20} /></button>
         </header>
         <DemoCue compact className={styles.dialogDemoCue} />
         <div className={styles.stepRail} aria-label="操作ステップ">
@@ -246,7 +246,9 @@ export function CommandCenter({
             <span>{reservation.guestLabel} / {reservation.startLabel} / 更新版 {reservation.version}</span>
           </div>
           <fieldset disabled={pending}>
-            <legend>{commandLabels[kind]}</legend>
+            {/* The dialog is already titled with this text. The legend stays for
+                the group's accessible name and stops printing it twice. */}
+            <legend className="sr-only">{commandLabels[kind]}</legend>
 
             {kind === "service_status" ? (
               <label>

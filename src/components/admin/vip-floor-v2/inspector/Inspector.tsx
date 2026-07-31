@@ -1,6 +1,6 @@
 "use client";
 
-import { Armchair, BellRing, CalendarClock, ChevronLeft, ChevronRight, CircleX, ClipboardList, Clock3, DoorOpen, MapPin, NotebookPen, Pencil, Route, ShieldCheck, Ticket, TimerReset, UserRound, UserRoundCheck, UsersRound } from "lucide-react";
+import { Armchair, BellRing, ChevronLeft, ChevronRight, CircleX, Clock3, DoorOpen, MapPin, NotebookPen, Pencil, ShieldCheck, TimerReset, UserRoundCheck } from "lucide-react";
 
 import type { VipFloorBoardV2 } from "@/lib/vipFloorV2Contract";
 
@@ -101,7 +101,7 @@ export function Inspector({
     <aside className={styles.inspector} aria-label="予約インスペクター" data-instance={instance}>
       <div className={styles.inspectorHeader}>
         <div><span>予約詳細</span><strong>{reservation?.publicCode ?? table?.displayCode ?? "予約を選択"}</strong></div>
-        {onCollapse ? <button type="button" onClick={() => onCollapse(true)} aria-label="インスペクターを閉じる"><ChevronRight size={17} /></button> : null}
+        {onCollapse ? <button type="button" onClick={() => onCollapse(true)} aria-label="インスペクターを閉じる"><ChevronRight size={18} /></button> : null}
       </div>
 
       {reservation ? (
@@ -151,7 +151,7 @@ export function Inspector({
               onClick={onEdit}
               disabled={readOnly || reservation.sourceChannel === "walk_in"}
             >
-              <Pencil size={14} aria-hidden />予約編集
+              <Pencil size={16} aria-hidden />予約編集
             </button>
             {commandButtons.filter((command) => (
               !(quickAction === "next_check_in" && command.kind === "check_in")
@@ -167,7 +167,7 @@ export function Inspector({
                 onClick={() => onCommand(command.kind)}
                 disabled={readOnly || unavailableForState || !canCommand(command.kind)}
               >
-                <CommandIcon size={14} aria-hidden />{command.label}
+                <CommandIcon size={16} aria-hidden />{command.label}
               </button>;
             })}
             {reservation.sourceChannel === "walk_in" ? (
@@ -183,7 +183,7 @@ export function Inspector({
                   || !canCommand("walk_in_cancel")
                 }
               >
-                <CircleX size={14} aria-hidden />Walk-in取消
+                <CircleX size={16} aria-hidden />Walk-in取消
               </button>
             ) : null}
           </div>
@@ -213,29 +213,32 @@ export function Inspector({
             tabIndex={0}
           >
             {activeTab === "overview" ? <>
+              {/* Three bands, not nine identical stripes: what the floor acts on,
+                  who the booking belongs to, and what the record says. An icon
+                  on every row would decorate rank differences away. */}
               <dl className={styles.detailList}>
-                <div><dt><CalendarClock size={14} aria-hidden /> 時間</dt><dd>{reservation.startLabel}–{reservation.endLabel}</dd></div>
-                <div><dt><UsersRound size={14} aria-hidden /> 人数</dt><dd>{reservation.guestCount}名</dd></div>
-                <div><dt><MapPin size={14} aria-hidden /> 席</dt><dd>{reservation.tableCodes.join(" + ") || "未割当"}</dd></div>
-                <div><dt><UserRound size={14} aria-hidden /> ゲスト</dt><dd>{reservation.guestLabel}</dd></div>
-                <div><dt><Ticket size={14} aria-hidden /> 予約番号</dt><dd>{reservation.publicCode}</dd></div>
-                <div><dt><Route size={14} aria-hidden /> 経路</dt><dd>{reservation.sourceLabel}</dd></div>
-                <div><dt><UserRoundCheck size={14} aria-hidden /> 集客担当</dt><dd>{bookingStaffName ?? (reservation.sourceChannel === "walk_in" ? "店舗へ直接来店" : "未指定")}</dd></div>
-                <div><dt><ShieldCheck size={14} aria-hidden /> 版</dt><dd>v{reservation.version}</dd></div>
-                <div><dt><ClipboardList size={14} aria-hidden /> 例外</dt><dd>{reservation.exceptionLabel ?? "なし"}</dd></div>
+                <div data-rank="lead"><dt>時間</dt><dd className="tabular-nums">{reservation.startLabel}–{reservation.endLabel}</dd></div>
+                <div data-rank="lead"><dt>人数</dt><dd className="tabular-nums">{reservation.guestCount}名</dd></div>
+                <div data-rank="lead"><dt>席</dt><dd className="tabular-nums">{reservation.tableCodes.join(" + ") || "未割当"}</dd></div>
+                <div data-band><dt>ゲスト</dt><dd>{reservation.guestLabel}</dd></div>
+                <div><dt>予約番号</dt><dd className="tabular-nums">{reservation.publicCode}</dd></div>
+                <div><dt>経路</dt><dd>{reservation.sourceLabel}</dd></div>
+                <div><dt>集客担当</dt><dd>{bookingStaffName ?? (reservation.sourceChannel === "walk_in" ? "店舗へ直接来店" : "未指定")}</dd></div>
+                <div data-band data-rank="meta"><dt>版</dt><dd className="tabular-nums">v{reservation.version}</dd></div>
+                <div data-rank="meta"><dt>例外</dt><dd>{reservation.exceptionLabel ?? "なし"}</dd></div>
               </dl>
               {reservation.operatorNote ? (
                 <div className={styles.noteList}>
                   <article>
-                    <strong><NotebookPen size={14} aria-hidden />現場メモ</strong>
+                    <strong>現場メモ</strong>
                     <p>{reservation.operatorNote}</p>
                   </article>
                 </div>
               ) : null}
             </> : null}
-            {activeTab === "guest" ? <div className={styles.detailStack}><p className={styles.maskedName}><UserRound size={17} />{reservation.guestLabel}</p><p>{demoMode.enabled ? "合成profileはこのbrowser-local workspaceだけで利用します。" : "Ownerは暗号化profileを必要時だけ復号できます。"}</p><small>閲覧、属性変更、解除・再紐付けはすべて監査対象です。</small><button type="button" className={styles.secondaryButton} onClick={onCustomerDetails} disabled={readOnly}>顧客詳細を開く</button></div> : null}
+            {activeTab === "guest" ? <div className={styles.detailStack}><p className={styles.maskedName}>{reservation.guestLabel}</p><p>{demoMode.enabled ? "合成profileはこのbrowser-local workspaceだけで利用します。" : "Ownerは暗号化profileを必要時だけ復号できます。"}</p><small>閲覧、属性変更、解除・再紐付けはすべて監査対象です。</small><button type="button" className={styles.secondaryButton} onClick={onCustomerDetails} disabled={readOnly}>顧客詳細を開く</button></div> : null}
             {activeTab === "service" ? <div className={styles.detailStack}><p><StatusIcon size={16} /> {meta.label}</p><p>元データ: {reservation.sourceLabel}</p><p>席ロック: {table?.operationalLocked ? table.lockReason : "なし"}</p><p>フラグ: {visibleFlags.join(", ") || "なし"}</p></div> : null}
-            {activeTab === "notes" ? <div className={styles.noteList}>{notes.length ? notes.map((note) => <article key={note.id}><strong><NotebookPen size={14} />{note.pinned ? "固定メモ" : "メモ"}</strong><p>{note.body}</p><small>v{note.version} / {note.kind}</small></article>) : <p>メモはありません。</p>}</div> : null}
+            {activeTab === "notes" ? <div className={styles.noteList}>{notes.length ? notes.map((note) => <article key={note.id}><strong>{note.pinned ? "固定メモ" : "メモ"}</strong><p>{note.body}</p><small>v{note.version} / {note.kind}</small></article>) : <p>メモはありません。</p>}</div> : null}
             {activeTab === "history" ? <ol className={styles.historyList}>{history.map((item) => <li key={item.id}><span>{new Intl.DateTimeFormat("ja-JP", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Tokyo" }).format(new Date(item.at))}</span><div><strong>{item.label}</strong><p>{item.detail}</p><small>{item.actor}</small></div></li>)}</ol> : null}
           </div>
         </>

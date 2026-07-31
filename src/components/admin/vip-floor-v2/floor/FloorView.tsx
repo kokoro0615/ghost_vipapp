@@ -80,7 +80,7 @@ export default function FloorView({
           onClick={onOpenAssignment}
           disabled={!selectedReservationId}
         >
-          <MoveRight aria-hidden size={15} /> 席割当先を選択
+          <MoveRight aria-hidden size={16} /> 席割当先を選択
         </button>
       </div>
 

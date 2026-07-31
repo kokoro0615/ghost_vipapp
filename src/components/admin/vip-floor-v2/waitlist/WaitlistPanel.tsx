@@ -133,11 +133,10 @@ export function WaitlistPanel({
       >
         <header className={styles.commandHeader}>
           <div>
-            <span>GHOST ARRIVAL QUEUE</span>
-            <h2 id="waitlist-title">Waitlist</h2>
+            <h2 id="waitlist-title">待機リスト</h2>
           </div>
-          <button type="button" onClick={onClose} aria-label="Waitlistを閉じる">
-            <X size={19} />
+          <button type="button" onClick={onClose} aria-label="待機リストを閉じる">
+            <X size={20} />
           </button>
         </header>
         <DemoCue compact className={styles.dialogDemoCue} />
@@ -273,7 +272,7 @@ function WaitlistRow({
             onClick={() => void onTransition(entry, "call")}
             disabled={pending}
           >
-            <BellRing size={15} />{demoMode.enabled
+            <BellRing size={16} />{demoMode.enabled
               ? entry.storedStatus === "called" ? "デモ再呼出" : "デモ呼出（実送信なし）"
               : entry.storedStatus === "called" ? "再通知" : "呼出（30分）"}
           </button>

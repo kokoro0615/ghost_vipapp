@@ -105,8 +105,8 @@ export function StaffPanel({ open, pending, board, data, onClose, onRefresh, onA
         onKeyDown={trapFocus}
       >
         <header className={styles.commandHeader}>
-          <div><span>GHOST FLOOR CREW</span><h2 id="staff-title">スタッフ担当卓</h2></div>
-          <button type="button" onClick={onClose} aria-label="スタッフ担当卓を閉じる"><X size={19} /></button>
+          <div><h2 id="staff-title">スタッフ担当卓</h2></div>
+          <button type="button" onClick={onClose} aria-label="スタッフ担当卓を閉じる"><X size={20} /></button>
         </header>
         <DemoCue compact className={styles.dialogDemoCue} />
         <div className={styles.operationTabs} role="tablist" aria-label="スタッフ管理">
@@ -162,7 +162,7 @@ export function StaffPanel({ open, pending, board, data, onClose, onRefresh, onA
               const assignment = data?.tableAssignments.find((item) => item.tableId === table.id);
               return (
                 <label key={table.id}>
-                  <span><strong>{table.displayCode}</strong><small>{table.name}</small></span>
+                  <span><strong>{table.displayCode}</strong></span>
                   <select
                     aria-label={`${table.displayCode}の担当スタッフ`}
                     value={assignment?.staffMemberId ?? ""}

@@ -296,9 +296,18 @@ lucide-react only, always `aria-hidden` when the control already has a text
 label or `aria-label`. Icons never carry meaning alone (L6).
 
 Sizes come from a fixed set tied to the type scale: **14 · 16 · 18 · 20**, plus
-**24** for empty/error states. Sizes `11 / 13 / 15 / 17 / 19` exist in the
-current code and are legacy drift — converge them opportunistically when you are
-already editing the component; do not open a mass refactor for it.
+**24** for empty/error states. The set was converged on 2026-07-31; the only
+remaining exceptions are two deliberate micro-glyphs inside fixed boxes too
+small for 14 (the wizard step ruler's completed tick, the floor node's status
+icon). Do not reintroduce an off-scale size elsewhere.
+
+An icon appears **on a control or nowhere**. It does not decorate a list row, a
+definition term, a section heading or a dialog title. The rule exists because
+the opposite is what an interface looks like when nobody decided: nine rows of
+`icon + label + value` read as nine equally important facts, which is exactly
+what the inspector is not. Where an icon does appear, its metaphor must be the
+control's actual job — a sort glyph on a density toggle is a defect, not a
+detail.
 
 ### 5.6 Numbers, time and identifiers
 
@@ -315,6 +324,48 @@ covers; `aria-expanded` / `aria-controls` on every toggle; dialogs take focus,
 `Escape` closes, focus returns; destructive confirmations open with the
 **least-destructive** control focused; status announced through the live region,
 which stays visually hidden while idle and costs zero pixels.
+
+### 5.7b Controls are drawn, not defaulted
+
+A stock `select` arrow, a stock tick box, a stock radio and a stock date button
+are the only marks the browser puts on screen that the design does not own, and
+they are the loudest remaining signal that a surface was assembled rather than
+authored. Every one of them is redrawn from tokens in §1 of the stylesheet:
+`appearance: none`, a token caret, a graphite tick, a graphite dot.
+
+Two constraints that are easy to get wrong:
+
+- **Fixed pixel marks inside the box, never percentages.** The box is a centred
+  grid whose track is sized by its own child, so a percentage height has nothing
+  to resolve against and silently collapses the tick to zero.
+- **A later `background:` shorthand erases the caret.** Component rules that
+  fill a select use `background-color`, not the shorthand.
+
+The floor plan is the one thing on screen the app deliberately does not draw
+(§2.3) — that is the venue's own artwork, and it is not a default.
+
+### 5.7c The interface does not narrate itself
+
+Operators read this board under time pressure in a dark room. Copy that
+explains the interface competes with copy that reports the floor.
+
+- **No explanatory subtitle under a label.** A menu row is `待機リスト`, not
+  `待機リスト / 呼出と期限`. A form section is `配席`, not `配席 / 人数に合う
+  受付可能卓だけを選択` — the fields already say what they collect, and the
+  validation hint already says what is filtered. A qualifier survives only when
+  it bounds a destructive or irreversible action (`デモ初期化 / 合成台帳のみ`) or
+  discloses a capability nothing else on that surface states — the phone
+  bottom-nav `受付 / 予約・Walk-in`, which `operations-adapter.test.mjs` pins.
+- **No decorative eyebrow and no decorative sequence number.** `GHOST 実行
+  コマンド` above a dialog already titled with its command, or an `01` where
+  there is no `02`, is branding spent on chrome. An eyebrow survives only when
+  it carries a fact the title does not — the SLO window (`直近60分`) or a data
+  boundary (`OWNER · ENCRYPTED CUSTOMER`).
+- **Section structure is a ruled label**, the way a printed intake sheet divides
+  a form: small caps plus a hairline to the edge. Numbered `01 / 02 / 03` chips
+  are a form generator's idea of structure.
+- **A title is printed once.** Where a `fieldset` inside an already-titled
+  dialog needs a group name, the `legend` is `sr-only`.
 
 ### 5.8 Destructive and financially adjacent actions
 
@@ -399,7 +450,10 @@ Four rules that used to rely on review discipline are now machine-enforced in
 
 | Rule | Status |
 |---|---|
-| Icon size set (§5.5) | **No test.** 43 usages at 11/13/15/17/19 remain; converge opportunistically |
+| Icon size set (§5.5) | **No test.** Converged 2026-07-31; two documented micro-glyph exceptions remain |
+| Icons only on controls (§5.5) | **No test.** Review the diff for an icon on a `dt`, a list row or a heading |
+| Drawn controls (§5.7b) | **No test.** A new `appearance`-less select or a `background:` shorthand on one regresses it silently |
+| No explanatory subtitle / decorative eyebrow (§5.7c) | **No test.** This is the rule the surface drifts back toward first |
 | Chrome budget ≤108px / ≤156px (§6) | Measured during the rebuild; **not asserted** |
 | Stylesheet split guardrail (§5.2) | **No test.** A split that leaves the contract test reading the old path disarms the whole gate silently |
 | Type scale adherence (§4.2) | Only hex is machine-checked; an off-scale `px` font-size still passes |

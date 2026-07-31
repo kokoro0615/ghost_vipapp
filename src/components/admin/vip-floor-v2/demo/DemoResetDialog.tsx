@@ -78,7 +78,7 @@ export function DemoResetDialog({
             <h2 id="demo-reset-title">合成データを初期状態へ戻す</h2>
           </div>
           <button type="button" onClick={onCancel} disabled={pending} aria-label="リセット確認を閉じる">
-            <X size={19} />
+            <X size={20} />
           </button>
         </header>
         <div className={styles.demoResetBody}>
