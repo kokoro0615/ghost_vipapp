@@ -60,7 +60,7 @@ function violetOklchOutsideFloorSection() {
 }
 
 test("VIP Manager keeps a white operator surface authored in OKLCH", () => {
-  assert.match(globals, /--paper:\s*oklch\(0\.9\d+ 0(?:\.\d+)? [\d.]+\)/u);
+  assert.match(globals, /--paper:\s*oklch\(0\.968 0\.0035 85\)/u);
   assert.match(globals, /--surface:\s*oklch\(1 0 0\)/u);
   assert.match(globals, /--canvas:\s*var\(--paper\)/u);
   // Graphite ink and one champagne accent — never a SaaS blue or a purple.
@@ -78,22 +78,37 @@ test("the surface is a real light system, not a renamed dark lacquer theme", () 
   assert.doesNotMatch(workspaceStyles, /Georgia|Times New Roman/u);
 });
 
-test("type is one Japanese-first family with tabular figures for every number", () => {
+test("type is one Japanese-first family with explicit roles and tabular figures", () => {
   // M PLUS 2 is pinned because it was the only humane Japanese candidate that
   // measured uniform digit advances AND an effective `tnum`. Zen Kaku Gothic
   // New/Antique, Murecho and BIZ UDPGothic drift 15-19px across a ten-digit
   // string, so a ledger column would jitter. BIZ UDPGothic also ships only
   // 400/700. See docs/ui/VIP_MANAGER_LIGHT_RESERVATION_RESEARCH.md section 4.
   assert.match(layout, /M_PLUS_2/u);
-  assert.match(layout, /weight:\s*\["400", "500", "700"\]/u);
+  assert.match(layout, /weight:\s*\["400", "500", "600", "700"\]/u);
   // The retired monospace face is what made the board read as a terminal.
   assert.doesNotMatch(layout, /IBM_Plex_Mono/u);
   assert.doesNotMatch(layout, /BIZ_UDPGothic|Noto_Sans_JP|Zen_Kaku|Murecho|Inter|Roboto/u);
   // Figures stay a distinct register inside that one family, never a re-import.
   assert.match(globals, /--font-figure:\s*var\(--font-ui\)/u);
+  assert.match(globals, /:root \{[\s\S]*?font-variant-numeric:\s*tabular-nums lining-nums/u);
   assert.match(globals, /font-variant-numeric:\s*tabular-nums/u);
-  // Proportional Japanese spacing must not undo the tabular advance.
-  assert.match(globals, /\.tabular-nums \{[\s\S]*?font-feature-settings:\s*"palt" 0/u);
+  // The built M PLUS 2 face measured no palt width delta on the audited mixed
+  // Japanese labels. Keep the font default instead of declaring a false role.
+  assert.doesNotMatch(globals, /font-feature-settings:[^;]*palt/u);
+  assert.match(globals, /font-synthesis:\s*none/u);
+  assert.match(globals, /--track-caps:\s*0\.04em/u);
+  for (const role of ["--weight-body: 400", "--weight-ui: 500", "--weight-strong: 600", "--weight-display: 700"]) {
+    assert.match(globals, new RegExp(role, "u"));
+  }
+  assert.match(workspaceStyles, /font-weight:\s*var\(--weight-display\)/u);
+  assert.match(workspaceStyles, /font-weight:\s*var\(--weight-strong\)/u);
+  assert.doesNotMatch(workspaceStyles, /font-weight:\s*(?:400|500|600|700)\b/u);
+  assert.match(workspaceStyles, /\.wizardRail small \{[^}]*font-size:\s*inherit;[^}]*line-height:\s*var\(--lh-ui\)/u);
+  // Narrower visible tracking must not move the frozen content-sized controls.
+  assert.match(workspaceStyles, /予約ステータス[^}]*padding-inline-end:\s*0\.25em/u);
+  assert.match(workspaceStyles, /担当スタッフでFloorを絞り込み[^}]*padding-inline-end:\s*0\.1em/u);
+  assert.match(workspaceStyles, /\.ribbonControl > span \{[^}]*padding-inline-end:\s*0\.15em/u);
   assert.doesNotMatch(globals, /font-family:[^;]*monospace/u);
   // Six-step scale, so component sizes are chosen from a system.
   for (const step of ["--t-micro", "--t-mini", "--t-body", "--t-data", "--t-lead", "--t-figure"]) {

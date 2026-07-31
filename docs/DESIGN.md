@@ -65,8 +65,8 @@ call inside a feature task.
 |---|---|---|
 | L1 | **Light surface only.** Warm-white ground, pure-white working panes. No dark mode, no theme toggle, no `prefers-color-scheme` branch. `color-scheme: light` is declared in `:root`. | Owner decision, reconfirmed 2026-07-31 |
 | L2 | **Graphite actions, single champagne accent.** No blue, no purple, no second accent. Champagne ≤8% of any screen and only means "you are here". | `OPERATIONS_PAPER.md` §3 |
-| L3 | **One type family: M PLUS 2** (400/500/700). No monospace. No Inter / Roboto / Noto Sans JP / BIZ UDPGothic / Zen Kaku / Murecho. | Only humane JP candidate with uniform digit advances *and* an effective `tnum`; research §4 |
-| L4 | **Every figure is tabular** via `.tabular-nums`, with `palt` switched off inside it. | A ledger column must never reflow when a digit changes |
+| L3 | **One type family: M PLUS 2** (400/500/600/700). No monospace. No Inter / Roboto / Noto Sans JP / BIZ UDPGothic / Zen Kaku / Murecho. 600 carries UI hierarchy; 700 is display-only. | Owner-requested 2026-07-31 bake-off retained the only humane JP candidate with uniform digit advances and effective `tnum`; `docs/research/vip-manager-apple-type-surface-study-2026-07-31.md` |
+| L4 | **Every figure is tabular** via `.tabular-nums`; Japanese spacing stays at the font default. | A ledger column must never reflow; built M PLUS 2 showed no effective `palt` delta on audited mixed labels |
 | L5 | **Planes separate by value + one hairline.** No glass, no backdrop-filter, no shadow stacks, no radius ≥12px, no coloured side tabs. | `OPERATIONS_PAPER.md` §3 |
 | L6 | **Status = swatch glyph + word.** Colour is never the sole carrier and never a pill that reads as a button. | WCAG 1.4.1 + operator scanability |
 | L7 | **Two columns ≥1024px, one below.** Chrome above the work area stays ≤108px desktop / ≤156px phone. | Measured regression fix; `OPERATIONS_PAPER.md` §2 |
@@ -189,7 +189,7 @@ Defined in `globals.css`, documented with contrast ratios in
 | Accent | `--accent` `--accent-ink` `--accent-line` `--accent-wash` | Champagne. `--accent-ink` is the only champagne allowed on text |
 | Action | `--action` `--action-hover` `--action-press` `--action-text` `--focus` | Graphite fill |
 | Status | `--alert` `--warn` `--live` + `-line` / `-wash` | Meaning only, always paired with a word (L6) |
-| Type | `--t-micro` 11 · `--t-mini` 12 · `--t-body` 13 · `--t-data` 15 · `--t-lead` 18 · `--t-figure` 22 · `--t-display` | Six steps + one fluid. **No size outside the scale** |
+| Type | `--t-micro` 11 · `--t-mini` 12 · `--t-body` 13 · `--t-data` 15 · `--t-lead` 18 · `--t-figure` 22 · `--t-display`; `--weight-body` 400 · `--weight-ui` 500 · `--weight-strong` 600 · `--weight-display` 700 | Six steps + one fluid; four explicit weight roles. **No size or raw weight outside the scale** |
 | Space | `--s-1` 2 … `--s-10` 40 | 4px rhythm |
 | Radius | `--r-chip` 2 · `--r-control` 3 · `--r-pane` 4 | Structural. Nothing larger exists |
 | Elevation | `--lift-raised` `--lift-dialog` `--scrim` | Only for things that actually float |
@@ -202,10 +202,24 @@ prefer the primary name in new code.
 
 ### 4.3 Type
 
-One family; hierarchy from weight (400/500/700), not size inflation. Figures use
+One family; hierarchy from explicit weight roles (400/500/600/700), not size
+inflation. Regular carries reading text, Medium carries quiet controls,
+Semibold carries section titles/actions/data, and Bold is reserved for the
+largest display copy. Loading 600 explicitly removes the prior browser weight
+substitution that made Semibold selectors render as Bold. Figures use
 `.tabular-nums`, which re-declares the family, turns on
-`tabular-nums lining-nums`, turns **off** `palt`, and adds `0.005em` tracking.
-`palt` stays on at `body` level for Japanese prose.
+`tabular-nums lining-nums`, and adds `0.005em` tracking.
+The same numeric feature is inherited from `:root` so mixed runs such as
+`VIP-1 7名` do not fall between prose and figure scopes.
+
+The Apple/HIG research measured a narrow 400/600 vocabulary and ordinary labels
+at normal tracking. GHOST therefore reduced `--track-caps` from `0.09em` to
+`0.04em`. A built-font specimen measured zero width change between default
+spacing and `palt` for the audited Japanese/mixed labels, so the global `palt`
+declarations were removed instead of preserving a non-operative contract.
+Content-sized masthead/toolbar labels retain the removed terminal advance as
+quiet end inset. This does not widen the visible glyph spacing; it preserves the
+frozen x-position of adjacent controls while the type texture becomes quieter.
 
 Verification that must keep holding: `1111111111` and `0000000000` render at
 identical width in the built app.
@@ -425,8 +439,8 @@ npm run ci   # lint · typecheck · unit+contract+PII · build · maintenance ·
 
 | Gate | Pins |
 |---|---|
-| `tests/contract/operator-light-ui.test.mjs` | The design itself: OKLCH light tokens, no revived dark aliases, no hex, M PLUS 2 + tabular figures, six-step scale, two-zone wizard with all eight steps, Owner lane with no PIN field, two-column shell, hidden idle live region, full-colour floor plan with ≥52×44 nodes, chart rows filling height, no coloured side tabs, no `backdrop-filter`, no radius ≥12px |
-| `npm run test:a11y` | 45 states × 9 viewports (405 screenshots) → axe 0 · horizontal overflow 0 · controls <44px 0 · legacy purple 0 · console errors 0 · 5xx 0. Counts are defined in `scripts/light-ui-qa-manifest.mjs` — read them from there, never from prose |
+| `tests/contract/operator-light-ui.test.mjs` | The design itself: OKLCH light tokens, no revived dark aliases, no hex, M PLUS 2 400/500/600/700 + explicit weight roles + tabular figures, six-step scale, two-zone wizard with all eight steps, Owner lane with no PIN field, two-column shell, hidden idle live region, full-colour floor plan with ≥52×44 nodes, chart rows filling height, no coloured side tabs, no `backdrop-filter`, no radius ≥12px |
+| `npm run test:a11y` | Required-state and viewport counts come from `scripts/light-ui-qa-manifest.mjs`; the harness currently captures the 45 required states plus one date-unavailable fixture state per viewport. Gate: axe 0 · horizontal overflow 0 · controls <44px 0 · legacy purple 0 · console errors 0 · 5xx 0. Read counts from artifacts, never this prose. |
 | `tests/contract/source-of-truth-guard.test.mjs` | The legacy website admin surface is never treated as this app's UI |
 | `tests/unit/inspector-accessibility.test.mjs`, `timeline-state`, `ghost-operating-hours`, `workspace-route-sync` | Focus order, timeline state model, the 22:00–翌05:00 window, URL/state sync |
 | `npm run test:maintenance` | The maintenance anchor still renders |

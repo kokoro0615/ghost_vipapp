@@ -10,7 +10,9 @@ import "./globals.css";
  * Type for the "OPERATIONS PAPER" direction: one Japanese-first family.
  *
  * M PLUS 2 (M+ FONTS, OFL) carries Japanese and Latin in one voice with
- * 400/500/700, so hierarchy comes from weight rather than from size inflation.
+ * 400/500/600/700, so hierarchy comes from weight rather than size inflation.
+ * 600 is loaded explicitly: the operator surface uses it for controls and
+ * section hierarchy, while 700 is reserved for the largest display copy.
  * It also has uniform digit advances and a working `tnum`, which is the one job
  * the retired IBM Plex Mono was doing: a ledger column must never reflow when a
  * digit changes. Keeping figures inside the text family additionally removes the
@@ -22,7 +24,7 @@ import "./globals.css";
  * Measurements: docs/ui/VIP_MANAGER_LIGHT_RESERVATION_RESEARCH.md §4.
  */
 const operatorFont = M_PLUS_2({
-  weight: ["400", "500", "700"],
+  weight: ["400", "500", "600", "700"],
   display: "swap",
   variable: "--font-operator",
   preload: false,
@@ -57,7 +59,7 @@ export const viewport: Viewport = {
   colorScheme: "light",
   /* sRGB equivalent of the --paper token, so mobile browser chrome matches the
    * application ground. Update both together. */
-  themeColor: "#f2f1ee",
+  themeColor: "#f5f4f2",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {

@@ -58,6 +58,7 @@ async function main() {
 
     await mkdir(artifactDirectory, { recursive: true, mode: 0o700 });
     const results = [];
+    const notRunViewports = [];
     const selectedViewports = targetedViewport
       ? QA_VIEWPORTS.filter(({ browser, width, height }) =>
           `${browser}-${width}x${height}` === targetedViewport)
@@ -66,10 +67,20 @@ async function main() {
     for (const viewport of selectedViewports) {
       if (!browsers.has(viewport.browser)) {
         assert.equal(viewport.browser, "webkit", `unsupported QA browser: ${viewport.browser}`);
-        browsers.set("webkit", await webkit.launch({
-          headless: true,
-          ...(webkitExecutablePath ? { executablePath: webkitExecutablePath } : {}),
-        }));
+        try {
+          browsers.set("webkit", await webkit.launch({
+            headless: true,
+            ...(webkitExecutablePath ? { executablePath: webkitExecutablePath } : {}),
+          }));
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          if (!message.includes("Host system is missing dependencies to run browsers")) throw error;
+          notRunViewports.push({
+            viewport: `${viewport.browser}-${viewport.width}x${viewport.height}`,
+            reason: "host-system-missing-dependencies",
+          });
+          continue;
+        }
       }
       const browser = browsers.get(viewport.browser);
       const context = await browser.newContext({
@@ -88,7 +99,11 @@ async function main() {
       assert.deepEqual(summary.missingStates, [], "required UI QA states missing");
     }
     if (!targetedViewport) {
-      assert.deepEqual(summary.missingViewports, [], "required UI QA viewports missing");
+      assert.deepEqual(
+        summary.missingViewports,
+        notRunViewports.map(({ viewport }) => viewport).sort(),
+        "required UI QA viewports missing without an explicit launch-time not-run record",
+      );
     }
     const reportedSummary = targetedViewport || targetedState
       ? {
@@ -99,7 +114,7 @@ async function main() {
           ...(targetedViewport ? { targetedViewport } : {}),
           ...(targetedState ? { targetedState } : {}),
         }
-      : summary;
+      : { ...summary, notRunViewports };
     await writeFile(
       path.join(artifactDirectory, "qa-summary.json"),
       `${JSON.stringify({ ...reportedSummary, results }, null, 2)}\n`,
@@ -791,6 +806,10 @@ async function installSyntheticRoutes(page, scenario = {}) {
 async function auditPage(page, { state, viewport }) {
   const viewportKey = `${viewport.browser}-${viewport.width}x${viewport.height}`;
   const label = `${viewportKey}:${state}`;
+  // Screenshots and geometry must witness the self-hosted operator face, not a
+  // transient fallback frame. This also makes before/after text signatures
+  // deterministic on slower CI/font-shard loads.
+  await page.evaluate(() => document.fonts.ready);
   await page.addScriptTag({ path: axePath });
   const report = await page.evaluate(async () =>
     window.axe.run(document, {

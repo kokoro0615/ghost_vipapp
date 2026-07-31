@@ -125,17 +125,19 @@ or submits an Owner PIN.
 ### Surface stack (value separation)
 
 ```
---paper           oklch(0.958 0.0035 85)   application ground
+--paper           oklch(0.968 0.0035 85)   application ground (#f5f4f2)
 --surface         oklch(1 0 0)             working pane
---surface-quiet   oklch(0.981 0.0025 85)   zebra rows, inset blocks
---surface-sunken  oklch(0.944 0.004 85)    pane headers, rails
+--surface-quiet   oklch(0.984 0.0025 85)   zebra rows, inset blocks
+--surface-sunken  oklch(0.952 0.004 85)    pane headers, rails
 --surface-hover / --surface-active         interaction states
 ```
 
-The ground sits a clear step below pure white so a working pane reads as paper
-laid on a desk. The first light ramp put `--paper` at `0.968` against a `1.0`
-pane — a 1.6% step that read as one flat field, which is why no pane looked like
-the focal object. Every step stays warm white; none of them is grey.
+The ground is a warm translation of the measured Apple `#f5f5f7` canvas, not a
+copy: `#f5f4f2` keeps GHOST's champagne temperature. White working panes remain
+distinct through the solid value step and authored hairlines; hierarchy does
+not need a dark beige desk or a shadow stack. `--rule` is correspondingly
+restrained at `oklch(0.92 0.003 82)`. Every step stays warm white; none is a
+generic blue-grey SaaS surface.
 
 ### Ink (all verified against WCAG 2.2 AA)
 
@@ -164,8 +166,10 @@ the focal object. Every step stays warm white; none of them is grey.
 
 ### Type
 
-One Japanese-first family: **M PLUS 2** (400/500/700) for Japanese, Latin and
-every figure. Hierarchy comes from weight, not from size inflation.
+One Japanese-first family: **M PLUS 2** (400/500/600/700) for Japanese, Latin
+and every figure. Hierarchy comes from four explicit roles, not size inflation:
+Regular reading text, Medium quiet controls, Semibold section/action/data, Bold
+display copy only.
 `display: swap`, `preload: false`, with next/font's metrics-matched fallback in
 front of a Hiragino-first system stack.
 
@@ -184,10 +188,23 @@ all (15–19.5px drift across a ten-digit string), so a ledger column would jitt
 BIZ UDPGothic also ships only 400/700. Full matrix and method:
 `docs/ui/VIP_MANAGER_LIGHT_RESERVATION_RESEARCH.md` §4.
 
-`palt` is enabled on `body` for Japanese prose but switched **off** inside
-`.tabular-nums`, because proportional spacing would undo the tabular advance the
-ledger depends on. Verified in the built app: `1111111111` and `0000000000`
-render at identical width.
+The 2026-07-31 Owner-requested bake-off retained M PLUS 2 rather than copying an
+Apple system stack: true Apple/Hiragino rendering was unavailable on this Linux
+host, while M PLUS 2 kept licensed, consistent Japanese and effective tabular
+digits. The earlier 600 declarations had no 600 face to resolve to; loading it
+explicitly now prevents Bold substitution. Apple product-page measurements also
+showed 400/600 as the main vocabulary, with ordinary labels at normal tracking,
+so GHOST reserves 700 and reduces caps tracking from `0.09em` to `0.04em`.
+Where a label's intrinsic width anchors the next masthead/toolbar control, the
+removed terminal advance is retained as invisible end inset. Visible tracking
+still resolves to `0.04em`; the inset exists only to hold audited geometry.
+
+The built M PLUS 2 face measured no width delta between default spacing and
+`palt` on the audited Japanese/mixed labels. Both global `palt` declarations
+were therefore removed; `.tabular-nums` keeps the actual invariant,
+`tabular-nums lining-nums`, inherited by the operator root so mixed runs stay
+inside the same numeric scope. The utility adds figure-role tracking. Verified
+in the built app: `1111111111` and `0000000000` render at identical width.
 
 Six-step scale: `--t-micro 11 · --t-mini 12 · --t-body 13 · --t-data 15 ·
 --t-lead 18 · --t-figure 22` plus a fluid `--t-display`.

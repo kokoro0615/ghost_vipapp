@@ -16,18 +16,18 @@
 
   /* ---- Surface stack (value separation, lightest → most sunken) ----
    *
-   * The ground sits a clear step below pure white so a working pane reads as
-   * paper laid on a desk. The previous ramp put paper at 0.968 against a 1.0
-   * pane — a 1.6% step that read as one flat field, which is why no pane looked
-   * like the focal object. Every step here stays warm white; none is grey.
+   * The ground is the warm GHOST translation of the measured #f5f5f7 solid
+   * canvas. White panes remain distinct through value plus the structural
+   * hairline; the desk does not need to become a heavy beige field. Every step
+   * stays warm white; none is a generic blue-grey.
    */
-  --paper: oklch(0.958 0.0035 85); /* application ground */
+  --paper: oklch(0.968 0.0035 85); /* application ground — #f5f4f2 */
   --surface: oklch(1 0 0); /* working pane */
   --surface-raised: oklch(1 0 0); /* popovers, dialogs */
-  --surface-quiet: oklch(0.981 0.0025 85); /* zebra / inset rows */
-  --surface-sunken: oklch(0.944 0.004 85); /* pane headers, rails */
-  --surface-hover: oklch(0.955 0.004 85);
-  --surface-active: oklch(0.932 0.005 85);
+  --surface-quiet: oklch(0.984 0.0025 85); /* zebra / inset rows */
+  --surface-sunken: oklch(0.952 0.004 85); /* pane headers, rails */
+  --surface-hover: oklch(0.966 0.004 85);
+  --surface-active: oklch(0.944 0.005 85);
 
   /* Legacy alias kept so route-level shells resolve to the same ground. */
   --canvas: var(--paper);
@@ -42,7 +42,7 @@
   --text-tertiary: var(--ink-3);
 
   /* ---- Rules (hairlines carry structure, so only two weights exist) ---- */
-  --rule: oklch(0.912 0.003 82);
+  --rule: oklch(0.92 0.003 82);
   --rule-strong: oklch(0.822 0.004 82);
   /* Control boundaries must clear WCAG 2.2 1.4.11 (3:1) on every surface. */
   --rule-control: oklch(0.635 0.005 82);
@@ -93,7 +93,14 @@
   --lh-tight: 1.15;
   --lh-ui: 1.35;
   --lh-prose: 1.7;
-  --track-caps: 0.09em;
+  --track-caps: 0.04em;
+
+  /* Four deliberate registers. Semibold carries controls and section titles;
+   * bold is a scarce display accent, not the default way to make UI legible. */
+  --weight-body: 400;
+  --weight-ui: 500;
+  --weight-strong: 600;
+  --weight-display: 700;
 
   /* ---- Spacing (4px rhythm) ---- */
   --s-1: 2px;
@@ -113,8 +120,8 @@
   --r-pane: 4px;
 
   /* ---- Elevation: value + hairline. No decorative shadow clouds. ---- */
-  --lift-raised: 0 1px 2px -1px oklch(0.3 0.01 70 / 0.14), 0 8px 20px -16px oklch(0.3 0.01 70 / 0.3);
-  --lift-dialog: 0 1px 0 oklch(0.3 0.01 70 / 0.06), 0 28px 64px -30px oklch(0.28 0.012 70 / 0.42);
+  --lift-raised: 0 1px 2px -1px oklch(0.3 0.01 70 / 0.1), 0 8px 20px -16px oklch(0.3 0.01 70 / 0.22);
+  --lift-dialog: 0 1px 0 oklch(0.3 0.01 70 / 0.05), 0 28px 64px -30px oklch(0.28 0.012 70 / 0.32);
   --scrim: oklch(0.26 0.012 70 / 0.44);
 
   /* ---- Motion ---- */
@@ -142,6 +149,10 @@
   background: var(--paper);
   color: var(--ink);
   font-family: var(--font-ui);
+  /* The whole operator surface is data-bearing. Applying the numeric feature
+   * at the root closes mixed runs such as `VIP-1 7名`; the utility adds only
+   * the figure role's tighter tracking. */
+  font-variant-numeric: tabular-nums lining-nums;
 }
 
 html,
@@ -156,8 +167,9 @@ body {
   overflow: hidden;
   background: var(--paper);
   -webkit-font-smoothing: antialiased;
+  font-kerning: normal;
+  font-synthesis: none;
   text-rendering: optimizeLegibility;
-  font-feature-settings: "palt" 1;
 }
 
 button,
@@ -168,12 +180,12 @@ textarea {
 }
 
 /* Figures never reflow a column: one rule, applied everywhere numbers live.
- * `palt` is switched off here on purpose — proportional Japanese spacing is
- * right for prose but would undo the tabular advance the ledger depends on. */
+ * M PLUS 2's built output has no effective `palt` delta for the audited mixed
+ * Japanese labels, so spacing stays at the font default instead of pretending
+ * to enable an unsupported role. `tnum` remains the ledger invariant. */
 .tabular-nums {
   font-family: var(--font-figure);
   font-variant-numeric: tabular-nums lining-nums;
-  font-feature-settings: "palt" 0;
   letter-spacing: 0.005em;
 }
 
