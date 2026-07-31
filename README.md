@@ -4,6 +4,7 @@ GHOST OsakaのVIPフロア現場オペレーション画面を、公開サイト
 
 ## Canonical documents
 
+- [デザイン・規約・技術スタック正本（UI作業はここから）](docs/DESIGN.md)
 - [GHOST VIP Manager 正本仕様書](docs/GHOST_VIP_MANAGER_SPEC.md)
 - [GHOST VIP Manager 正本実装計画](docs/GHOST_VIP_MANAGER_IMPLEMENTATION_PLAN.md)
 - [2026-07-26 実装完了度監査](docs/GHOST_VIP_MANAGER_IMPLEMENTATION_AUDIT_2026-07-26.md)

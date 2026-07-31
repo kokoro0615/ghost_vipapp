@@ -24,11 +24,19 @@ the source boundary, and keep `README.md` aligned with this file.
 
 ## Operator UI
 
-Follow `docs/ui/OPERATIONS_PAPER.md`: warm-white paper, white panes, graphite
-actions, restrained champagne hairlines, real GHOST floor geometry, dense
-List / Floor / Chart / queue / inspector workflows. Do not copy TableCheck
-assets or branding, and do not introduce generic SaaS cards, glassmorphism,
-large radius, decorative gradients, or soft shadow stacks.
+Read `docs/DESIGN.md` first. It is the canonical contract for this app's locked
+decisions, tech stack and authoring conventions, and it takes precedence over
+the workspace-wide `.claude/rules/ui-ux-excellence.md`, which is written for the
+public marketing site and assumes Tailwind and an animation runtime that this
+app does not have. Styling here is CSS Modules plus the OKLCH tokens in
+`src/app/globals.css`; Tailwind, CSS-in-JS, component libraries and animation
+libraries are banned.
+
+`docs/ui/OPERATIONS_PAPER.md` carries the visual language: warm-white paper,
+white panes, graphite actions, restrained champagne hairlines, real GHOST floor
+geometry, dense List / Floor / Chart / queue / inspector workflows. Do not copy
+TableCheck assets or branding, and do not introduce generic SaaS cards,
+glassmorphism, large radius, decorative gradients, or soft shadow stacks.
 
 Destructive or financially adjacent actions require an explicit confirmation
 step, least-destructive initial focus, version/idempotency checks, a durable

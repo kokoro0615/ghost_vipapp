@@ -1,15 +1,63 @@
 import assert from "node:assert/strict";
+import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-const [globals, layout, workspace, workspaceStyles, floorView, reservationWizard] = await Promise.all([
+import { QA_VIEWPORTS } from "../../scripts/light-ui-qa-manifest.mjs";
+
+const [
+  globals,
+  layout,
+  workspace,
+  workspaceStyles,
+  floorView,
+  reservationWizard,
+  packageJsonSource,
+  middlewareSource,
+] = await Promise.all([
   readFile(new URL("../../src/app/globals.css", import.meta.url), "utf8"),
   readFile(new URL("../../src/app/layout.tsx", import.meta.url), "utf8"),
   readFile(new URL("../../src/components/admin/vip-floor-v2/VipFloorWorkspace.tsx", import.meta.url), "utf8"),
   readFile(new URL("../../src/components/admin/vip-floor-v2/VipFloorWorkspace.module.css", import.meta.url), "utf8"),
   readFile(new URL("../../src/components/admin/vip-floor-v2/floor/FloorView.tsx", import.meta.url), "utf8"),
   readFile(new URL("../../src/components/admin/vip-floor-v2/operations/ReservationWizard.tsx", import.meta.url), "utf8"),
+  readFile(new URL("../../package.json", import.meta.url), "utf8"),
+  readFile(new URL("../../middleware.ts", import.meta.url), "utf8"),
 ]);
+
+const packageJson = JSON.parse(packageJsonSource);
+
+/*
+ * The floor plan is the one dark object on this white surface: it reproduces the
+ * real GHOST venue drawing, so its nodes are authored in the venue's own
+ * black-violet. That palette is legal INSIDE section 6 of the stylesheet and
+ * nowhere else. Slicing the file here is what lets the tests below prove the
+ * containment instead of assuming it. See docs/DESIGN.md section 4.1.
+ */
+const floorSectionStart = workspaceStyles.indexOf("── 6. floor map");
+const floorSectionEnd = workspaceStyles.indexOf("── 7. chart");
+assert.ok(
+  floorSectionStart > 0 && floorSectionEnd > floorSectionStart,
+  "the numbered section map in VipFloorWorkspace.module.css is the anchor for "
+  + "the floor-palette containment checks — keep the banner comments intact",
+);
+
+function rawOklchOutsideFloorSection() {
+  const found = [];
+  for (const match of workspaceStyles.matchAll(/oklch\([^)]*\)/gu)) {
+    const index = match.index ?? 0;
+    if (index > floorSectionStart && index < floorSectionEnd) continue;
+    found.push(match[0]);
+  }
+  return found;
+}
+
+function violetOklchOutsideFloorSection() {
+  return rawOklchOutsideFloorSection().filter((value) => {
+    const hue = Number(/^oklch\(\s*[\d.]+\s+[\d.]+\s+([\d.]+)/u.exec(value)?.[1] ?? Number.NaN);
+    return Number.isFinite(hue) && hue >= 300 && hue <= 340;
+  });
+}
 
 test("VIP Manager keeps a white operator surface authored in OKLCH", () => {
   assert.match(globals, /--paper:\s*oklch\(0\.9\d+ 0(?:\.\d+)? [\d.]+\)/u);
@@ -159,4 +207,103 @@ test("banned AI-slop surfaces never reach the operator screen", () => {
   assert.doesNotMatch(workspaceStyles, /backdrop-filter/u);
   assert.doesNotMatch(workspaceStyles, /border-radius:\s*(?:1[2-9]|[2-9]\d)px/u);
   assert.doesNotMatch(globals, /backdrop-filter/u);
+});
+
+test("the public website's black-violet never leaks onto the operator surface", () => {
+  // The Owner decision is a light operator surface. The venue's black-violet is
+  // the public website's palette and belongs in this app only as the floor-plan
+  // artwork, which is a dark drawing laid on the white desk.
+  assert.match(globals, /color-scheme:\s*light/u);
+  assert.doesNotMatch(globals, /prefers-color-scheme/u);
+  assert.doesNotMatch(workspaceStyles, /prefers-color-scheme/u);
+
+  const strays = violetOklchOutsideFloorSection();
+  assert.deepEqual(strays, [],
+    `violet/purple authored outside the floor-plan section: ${strays.join(", ")}`);
+
+  // Ratchet: exactly one raw colour survives outside section 6 (a graphite
+  // shadow). Everything else must come from a token, so a new raw value fails
+  // here instead of quietly starting a second palette. docs/DESIGN.md 4.1.
+  const raw = rawOklchOutsideFloorSection();
+  assert.ok(raw.length <= 1,
+    `raw oklch() outside the floor section must stay <= 1, found ${raw.length}: ${raw.join(", ")}`);
+});
+
+test("banned styling and animation runtimes cannot enter the dependency tree", () => {
+  // This surface is hand-authored CSS carrying an audited contrast and density
+  // model. Every package below would ship a second, conflicting model whose
+  // defaults the assertions above forbid. docs/DESIGN.md 2.2.
+  const installed = new Set([
+    ...Object.keys(packageJson.dependencies ?? {}),
+    ...Object.keys(packageJson.devDependencies ?? {}),
+  ]);
+  const banned = [
+    "tailwindcss", "@tailwindcss/postcss", "postcss", "autoprefixer", "sass", "less",
+    "styled-components", "@emotion/react", "@emotion/styled", "@vanilla-extract/css",
+    "motion", "framer-motion", "gsap", "@gsap/react", "lenis", "@studio-freight/lenis",
+    "three", "@react-three/fiber", "@react-three/drei",
+    "@radix-ui/react-dialog", "@mui/material", "@chakra-ui/react", "antd", "bootstrap",
+    "@heroicons/react", "react-icons", "@tabler/icons-react", "@phosphor-icons/react",
+    "recharts", "chart.js", "d3",
+  ];
+  for (const name of banned) {
+    assert.equal(installed.has(name), false, `banned dependency installed: ${name}`);
+  }
+  for (const name of installed) {
+    assert.doesNotMatch(name, /^@radix-ui\//u, `banned dependency installed: ${name}`);
+  }
+  // lucide-react is the only icon source.
+  assert.equal(installed.has("lucide-react"), true);
+  // A config file is the other way these arrive.
+  for (const config of [
+    "tailwind.config.js", "tailwind.config.ts", "tailwind.config.mjs",
+    "postcss.config.js", "postcss.config.mjs", "postcss.config.json",
+  ]) {
+    assert.equal(existsSync(new URL(`../../${config}`, import.meta.url)), false,
+      `banned config present: ${config}`);
+  }
+});
+
+test("build invariants that look like mistakes stay in place", () => {
+  // Each of these has been "cleaned up" by a well-meaning change before.
+  // docs/DESIGN.md 2.3 records why every one of them is deliberate.
+  const build = packageJson.scripts?.build ?? "";
+  assert.match(build, /provision-basic-owner\.mjs/u, "Owner access is provisioned pre-build");
+  assert.match(build, /next build --webpack/u, "the production build is pinned to webpack");
+  assert.match(build, /fix-middleware-trace\.mjs/u, "the middleware trace fix runs post-build");
+  assert.ok(
+    build.indexOf("provision-basic-owner") < build.indexOf("next build")
+    && build.indexOf("next build") < build.indexOf("fix-middleware-trace"),
+    "build steps must stay in provision -> build -> trace-fix order",
+  );
+
+  // Preloading the webfont would cost the first paint the Hiragino-first
+  // fallback list exists to protect on the venue's iPads.
+  assert.match(layout, /preload:\s*false/u);
+
+  // Widening the matcher puts the Basic challenge in front of the floor plan.
+  for (const excluded of ["_next/static", "_next/image", "media/", "icon.svg"]) {
+    assert.ok(middlewareSource.includes(excluded),
+      `middleware matcher must keep excluding ${excluded}`);
+  }
+
+  // The workspace owns its scroll regions; page-level scroll is a layout bug
+  // and the QA harness fails on horizontal overflow.
+  assert.match(globals, /body \{[\s\S]*?overflow:\s*hidden/u);
+});
+
+test("the 1023px shell breakpoint stays in sync on every side", () => {
+  // The stylesheet switches to one column, the workspace switches its
+  // interaction model, and the harness brackets the threshold. Changing one
+  // side alone makes the audit report on a layout no operator ever sees.
+  const scriptBreakpoints = [...workspace.matchAll(/matchMedia\("\(max-width:\s*(\d+)px\)"\)/gu)]
+    .map((match) => match[1]);
+  assert.ok(scriptBreakpoints.length >= 1, "the workspace must resolve the shell breakpoint");
+  assert.deepEqual([...new Set(scriptBreakpoints)], ["1023"],
+    "every matchMedia in the workspace must use the same 1023px threshold");
+  assert.match(workspaceStyles, /@media \(max-width: 1023px\)/u);
+
+  const widths = new Set(QA_VIEWPORTS.map(({ width }) => width));
+  assert.ok(widths.has(1024), "the audit must cover the first two-column width");
+  assert.ok(widths.has(768), "the audit must cover a single-column width");
 });

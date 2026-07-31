@@ -1,7 +1,9 @@
 # GHOST VIP Manager — "OPERATIONS PAPER" design system
 
 Owner-approved light operator surface for `ghost-vipapp.vercel.app`.
-This document is the source of truth for the operator UI. Tokens live in
+This document is the source of truth for the **visual language**. The locked
+decisions, tech stack and authoring conventions live one level up in
+[`docs/DESIGN.md`](../DESIGN.md) — read that first. Tokens live in
 `src/app/globals.css`; the surface lives in
 `src/components/admin/vip-floor-v2/VipFloorWorkspace.module.css`.
 
@@ -318,7 +320,9 @@ below the final table.
 npm run ci     # lint · typecheck · unit+contract+PII · build · maintenance · a11y
 ```
 
-`npm run test:a11y` audits **46 states × 9 viewports** and asserts zero axe
+`npm run test:a11y` audits **45 states × 9 viewports** (405 screenshots; the
+authoritative counts are `QA_REQUIRED_STATES` and `QA_VIEWPORTS` in
+`scripts/light-ui-qa-manifest.mjs`) and asserts zero axe
 violations, zero horizontal overflow, zero controls under 44×44, zero legacy
 purple chrome, zero console errors and zero 5xx.
 
