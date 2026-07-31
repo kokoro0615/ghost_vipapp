@@ -61,7 +61,7 @@ export type OperationOptions = {
     minGuests: number;
     maxGuests: number;
     minSpendYen: number;
-    compatibleTableIds: string[] | null;
+    compatibleTableIds?: string[] | null;
   }>;
 };
 

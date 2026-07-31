@@ -12,7 +12,7 @@ test("Walk-in and reservation creation enforce offering-table compatibility", as
     read("src/lib/vipFloorClientErrors.ts"),
   ]);
 
-  assert.match(types, /compatibleTableIds:\s*string\[\]\s*\|\s*null/u);
+  assert.match(types, /compatibleTableIds\?:\s*string\[\]\s*\|\s*null/u);
   assert.match(operationCenter, /walkInCompatibleTableIds/u);
   assert.match(operationCenter, /walkInTables/u);
   assert.match(operationCenter, /このプランに対応する卓を選び直してください/u);

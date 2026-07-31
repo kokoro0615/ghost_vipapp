@@ -108,6 +108,7 @@ export function ReservationWizard({
       selectedTableId
       && (
         offering.compatibleTableIds === null
+        || offering.compatibleTableIds === undefined
         || offering.compatibleTableIds.includes(selectedTableId)
       ))?.id
     ?? options.offerings[0]?.id
@@ -116,6 +117,7 @@ export function ReservationWizard({
   const initialTableIds = (reservation?.tableIds ?? (selectedTableId ? [selectedTableId] : []))
     .filter((tableId) =>
       initialOffering?.compatibleTableIds === null
+      || initialOffering?.compatibleTableIds === undefined
       || initialOffering?.compatibleTableIds.includes(tableId));
   const [step, setStep] = useState(0);
   const [dateError, setDateError] = useState<string | null>(null);
@@ -138,6 +140,7 @@ export function ReservationWizard({
   }));
   const selectedOffering = options.offerings.find((offering) => offering.id === draft.offeringId);
   const compatibleTableIds = selectedOffering?.compatibleTableIds === null
+    || selectedOffering?.compatibleTableIds === undefined
     ? null
     : new Set(selectedOffering?.compatibleTableIds ?? []);
   const availableTables = board.tables.filter((table) =>
@@ -365,6 +368,7 @@ export function ReservationWizard({
                       offeringId,
                       tableIds: draft.tableIds.filter((tableId) =>
                         offering?.compatibleTableIds === null
+                        || offering?.compatibleTableIds === undefined
                         || offering?.compatibleTableIds.includes(tableId)),
                     });
                   }}

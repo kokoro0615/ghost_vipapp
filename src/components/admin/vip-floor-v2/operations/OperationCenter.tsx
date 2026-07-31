@@ -77,12 +77,14 @@ export function OperationCenter({
       selectedTableId
       && (
         offering.compatibleTableIds === null
+        || offering.compatibleTableIds === undefined
         || offering.compatibleTableIds.includes(selectedTableId)
       ))
     ?? options?.offerings[0]
     ?? null;
   const resolvedWalkInOfferingId = walkInOffering?.id ?? "";
   const walkInCompatibleTableIds = walkInOffering?.compatibleTableIds === null
+    || walkInOffering?.compatibleTableIds === undefined
     ? null
     : new Set(walkInOffering?.compatibleTableIds ?? []);
   const walkInTables = kind === "walk_in"
@@ -141,8 +143,8 @@ export function OperationCenter({
       const operatorNote = nullableText(data.get("operatorNote"));
       const offering = options.offerings.find((item) => item.id === resolvedWalkInOfferingId);
       const incompatibleTable = tableIds.some((tableId) =>
-        offering?.compatibleTableIds !== null
-        && !offering?.compatibleTableIds.includes(tableId));
+        Array.isArray(offering?.compatibleTableIds)
+        && !offering.compatibleTableIds.includes(tableId));
       if (tableIds.length === 0 || !offering || incompatibleTable) {
         setWalkInErrors((current) => ({
           ...current,
