@@ -19,6 +19,7 @@ export const QA_REQUIRED_STATES = Object.freeze([
   "list",
   "floor",
   "chart",
+  "chart-phases",
   "menu",
   "queue",
   "inspector",

@@ -24,6 +24,7 @@ const artifactDirectory = path.resolve(
     ?? "/tmp/ghost-vip-light-ui-qa",
 );
 const targetedViewport = process.env.GHOST_VIP_QA_VIEWPORT?.trim() || null;
+const targetedState = process.env.GHOST_VIP_QA_STATE?.trim() || null;
 const webkitExecutablePath = process.env.GHOST_VIP_WEBKIT_EXECUTABLE?.trim() || null;
 
 let server;
@@ -83,15 +84,20 @@ async function main() {
       await context.close();
     }
     const summary = buildQaSummary(results, artifactDirectory);
-    assert.deepEqual(summary.missingStates, [], "required UI QA states missing");
+    if (!targetedState) {
+      assert.deepEqual(summary.missingStates, [], "required UI QA states missing");
+    }
     if (!targetedViewport) {
       assert.deepEqual(summary.missingViewports, [], "required UI QA viewports missing");
     }
-    const reportedSummary = targetedViewport
+    const reportedSummary = targetedViewport || targetedState
       ? {
           ...summary,
-          ok: summary.missingStates.length === 0,
-          targetedViewport,
+          ok: targetedState
+            ? results.some((result) => result.state === targetedState)
+            : summary.missingStates.length === 0,
+          ...(targetedViewport ? { targetedViewport } : {}),
+          ...(targetedState ? { targetedState } : {}),
         }
       : summary;
     await writeFile(
@@ -116,6 +122,19 @@ async function auditViewport(context, viewport) {
     results.push(await auditPage(page, { state, viewport }));
   };
 
+  if (targetedState) {
+    assert.equal(targetedState, "chart-phases", `unknown targeted QA state: ${targetedState}`);
+    const phasePage = await newQaPage(context, {
+      boardPayload: timelinePhaseBoard,
+      fixedNow: timelinePhaseNow,
+    });
+    await goToWorkspace(phasePage, "chart");
+    await assertTimelinePhases(phasePage);
+    await capture(phasePage, "chart-phases");
+    await phasePage.close();
+    return results;
+  }
+
   const loginPage = await newQaPage(context, { authenticated: false });
   await loginPage.goto(origin, { waitUntil: "domcontentloaded" });
   await loginPage.getByRole("heading", { name: "接続を完了できませんでした" }).waitFor();
@@ -127,6 +146,15 @@ async function auditViewport(context, viewport) {
     await goToWorkspace(page, view);
     await capture(page, view);
   }
+
+  const phasePage = await newQaPage(context, {
+    boardPayload: timelinePhaseBoard,
+    fixedNow: timelinePhaseNow,
+  });
+  await goToWorkspace(phasePage, "chart");
+  await assertTimelinePhases(phasePage);
+  await capture(phasePage, "chart-phases");
+  await phasePage.close();
 
   await goToWorkspace(page, "list");
   await capture(page, "queue");
@@ -456,6 +484,17 @@ async function auditViewport(context, viewport) {
   await demoExpiredPage.close();
 
   return results;
+}
+
+async function assertTimelinePhases(page) {
+  await page.locator("button[data-phase]").first().waitFor();
+  const renderedPhases = await page.locator("button[data-phase]").evaluateAll((buttons) =>
+    buttons.map((button) => button.getAttribute("data-phase")).sort());
+  assert.deepEqual(
+    renderedPhases,
+    ["active", "arrival_soon", "closing_soon", "overdue", "resolved", "scheduled"],
+    "chart must render all six reservation band phases exactly once",
+  );
 }
 
 async function newQaPage(context, scenario = {}) {
@@ -1116,6 +1155,92 @@ const board = {
     adminMutationEnabled: true,
     webhookProcessingEnabled: true,
     publicBookingEnabled: true,
+  },
+};
+
+const timelinePhaseNow = "2026-07-26T15:00:00.000Z";
+const timelinePhaseSpecs = [
+  {
+    publicCode: "PHASE-01",
+    serviceStatus: "expected",
+    lifecycleStatus: "confirmed",
+    scheduledStartAt: "2026-07-26T17:00:00.000Z",
+    scheduledEndAt: "2026-07-26T19:00:00.000Z",
+  },
+  {
+    publicCode: "PHASE-02",
+    serviceStatus: "expected",
+    lifecycleStatus: "confirmed",
+    scheduledStartAt: "2026-07-26T15:15:00.000Z",
+    scheduledEndAt: "2026-07-26T17:15:00.000Z",
+  },
+  {
+    publicCode: "PHASE-03",
+    serviceStatus: "seated",
+    lifecycleStatus: "checked_in",
+    scheduledStartAt: "2026-07-26T14:00:00.000Z",
+    scheduledEndAt: "2026-07-26T16:30:00.000Z",
+  },
+  {
+    publicCode: "PHASE-04",
+    serviceStatus: "seated",
+    lifecycleStatus: "checked_in",
+    scheduledStartAt: "2026-07-26T13:15:00.000Z",
+    scheduledEndAt: "2026-07-26T15:15:00.000Z",
+  },
+  {
+    publicCode: "PHASE-05",
+    serviceStatus: "seated",
+    lifecycleStatus: "checked_in",
+    scheduledStartAt: "2026-07-26T13:00:00.000Z",
+    scheduledEndAt: "2026-07-26T14:30:00.000Z",
+  },
+  {
+    publicCode: "PHASE-06",
+    serviceStatus: "completed",
+    lifecycleStatus: "completed",
+    scheduledStartAt: "2026-07-26T14:00:00.000Z",
+    scheduledEndAt: "2026-07-26T16:00:00.000Z",
+  },
+];
+const timelinePhaseReservations = timelinePhaseSpecs.map((spec, index) => ({
+  ...board.reservations[0],
+  ...spec,
+  id: `21000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
+  businessDate: board.businessDay.businessDate,
+  expectedReleaseAt: spec.scheduledEndAt,
+  actualSeatedAt: spec.lifecycleStatus === "checked_in"
+    ? spec.scheduledStartAt
+    : null,
+  completedAt: spec.lifecycleStatus === "completed"
+    ? timelinePhaseNow
+    : null,
+  tableIds: [tableIds[index]],
+  assignmentIds: [`synthetic-phase-assignment-${index + 1}`],
+  guestCount: { total: index + 2, adults: null, children: null },
+  customer: {
+    customerId: `71000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
+    displayLabel: `PHASE GUEST ${index + 1}`,
+    masked: false,
+  },
+}));
+const timelinePhaseBoard = {
+  ...board,
+  generatedAt: timelinePhaseNow,
+  tables: board.tables.map((table, index) => ({
+    ...table,
+    reservationIds: index < timelinePhaseReservations.length
+      ? [timelinePhaseReservations[index].id]
+      : [],
+  })),
+  reservations: timelinePhaseReservations,
+  totals: {
+    ...board.totals,
+    reservationCount: timelinePhaseReservations.length,
+    activeReservationCount: timelinePhaseReservations.length - 1,
+    assignmentCount: timelinePhaseReservations.length,
+    guestCount: timelinePhaseReservations.reduce((total, item) => total + item.guestCount.total, 0),
+    serviceStatusCounts: { expected: 2, seated: 3, completed: 1 },
   },
 };
 

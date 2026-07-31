@@ -1297,6 +1297,51 @@
 
 /* ── 7. chart ──────────────────────────────────────────────────────────── */
 
+.timelineLegend {
+  display: flex;
+  min-height: 32px;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--s-6);
+  padding: 0 var(--s-5) 0 var(--s-6);
+  border-bottom: 1px solid var(--rule-strong);
+  background: var(--surface);
+  color: var(--ink-2);
+  font-size: var(--t-micro);
+}
+.timelineLegend > strong {
+  color: var(--ink-3);
+  font-size: var(--t-micro);
+  font-weight: 700;
+  letter-spacing: var(--track-caps);
+}
+.timelineLegend > span {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--s-2);
+  white-space: nowrap;
+}
+.timelineLegend i {
+  display: inline-grid;
+  width: 16px;
+  height: 16px;
+  place-items: center;
+  border-bottom: 2px solid var(--rule-strong);
+  color: var(--ink-2);
+  font-family: var(--font-figure);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 700;
+  line-height: 1;
+}
+.timelineLegend b { color: var(--ink-3); font-weight: 500; }
+.timelineLegend [data-phase="arrival_soon"] i { border-bottom-color: var(--accent); color: var(--accent-ink); }
+.timelineLegend [data-phase="active"] i { border-bottom-color: var(--live); color: var(--live); }
+.timelineLegend [data-phase="closing_soon"] i { border-bottom-color: var(--warn); color: var(--warn); }
+.timelineLegend [data-phase="overdue"] i { border-bottom-color: var(--alert); color: var(--alert); }
+.timelineLegend [data-phase="resolved"] i { border-bottom-color: var(--ink-3); color: var(--live); }
+
 .timelineScroller { min-height: 0; flex: 1; overflow: auto; overscroll-behavior: contain; background: var(--surface); }
 .timelineGrid {
   display: flex;
@@ -1390,18 +1435,172 @@
   border: 1px solid var(--rule-strong);
   border-top: 3px solid var(--ink-3);
   border-radius: var(--r-chip);
-  background: var(--surface);
+  background-color: var(--surface);
+  color: var(--ink);
   text-align: left;
   transform: translateY(-50%);
+  transition:
+    border-color var(--dur-ui) var(--ease-ui),
+    color var(--dur-ui) var(--ease-ui);
+  container-type: inline-size;
 }
-.timelineBar span { overflow: hidden; font-family: var(--font-figure); font-size: var(--t-micro); font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
-.timelineBar small { color: var(--ink-3); font-family: var(--font-figure); font-size: var(--t-micro); }
+.timelineBarTime,
+.timelineBarPhase,
+.timelineBar small {
+  position: relative;
+  z-index: 2;
+  overflow: hidden;
+  font-family: var(--font-figure);
+  font-size: var(--t-micro);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.timelineBarTime { flex: 0 0 auto; font-weight: 500; }
+.timelineBarPhase { min-width: 0; font-weight: 700; }
+.timelineBar small { min-width: 0; color: var(--ink-3); font-weight: 500; }
+.timelineClosingWindow,
+.timelineBarSignal {
+  position: absolute;
+  z-index: 1;
+  pointer-events: none;
+}
+.timelineClosingWindow {
+  inset: 0 0 0 auto;
+  width: var(--closing-window);
+  border-left: 1px solid var(--rule-strong);
+  background: var(--surface-sunken);
+}
+.timelineBarSignal { opacity: 0; }
 .timelineBar[data-tone="danger"] { border-top-color: var(--alert); }
 .timelineBar[data-tone="warning"] { border-top-color: var(--warn); }
 .timelineBar[data-tone="success"] { border-top-color: var(--live); }
 .timelineBar[data-tone="active"] { border-top-color: var(--accent); }
 .timelineBar[data-cue="stripe"] { background-image: repeating-linear-gradient(135deg, var(--alert-wash) 0 4px, transparent 4px 9px); }
-.timelineBar[data-selected] { border-color: var(--accent); background: var(--accent-wash); outline: 2px solid var(--accent); outline-offset: 1px; }
+.timelineBar[data-phase="arrival_soon"] {
+  border-bottom-color: var(--accent-line);
+  background-color: var(--accent-wash);
+}
+.timelineBar[data-phase="arrival_soon"] .timelineClosingWindow {
+  border-left-color: var(--accent-line);
+  background: color-mix(in oklch, var(--accent) 20%, var(--surface));
+}
+.timelineBar[data-phase="active"] {
+  border-color: var(--live-line);
+  border-top-color: var(--live);
+  background-color: var(--live);
+  background-image: none;
+  color: var(--ink-inverse);
+}
+.timelineBar[data-phase="active"] small { color: var(--ink-inverse); }
+.timelineBar[data-phase="active"] .timelineClosingWindow {
+  border-left-color: var(--ink-inverse);
+  background: var(--warn);
+}
+.timelineBar[data-phase="closing_soon"] {
+  border-color: var(--warn-line);
+  border-top-color: var(--warn);
+  background-color: var(--warn);
+  background-image: none;
+  color: var(--ink-inverse);
+}
+.timelineBar[data-phase="closing_soon"] small { color: var(--ink-inverse); }
+.timelineBar[data-phase="closing_soon"] .timelineClosingWindow {
+  border-left-color: var(--ink-inverse);
+  background: var(--action);
+}
+.timelineBar[data-phase="overdue"] {
+  border-color: var(--alert-line);
+  border-top-color: var(--alert);
+  background-color: var(--alert);
+  background-image: none;
+  color: var(--ink-inverse);
+}
+.timelineBar[data-phase="overdue"] small { color: var(--ink-inverse); }
+.timelineBar[data-phase="overdue"] .timelineClosingWindow {
+  border-left-color: var(--ink-inverse);
+  background: var(--action);
+}
+.timelineBar[data-phase="resolved"] {
+  border-color: var(--rule-strong);
+  border-top-color: var(--live);
+  background-color: var(--surface-sunken);
+  color: var(--ink-2);
+}
+.timelineBar[data-phase="resolved"] .timelineClosingWindow { background: var(--surface-active); }
+.timelineBar[data-selected] {
+  z-index: 3;
+  border-color: var(--accent);
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  box-shadow: inset 0 -3px var(--accent);
+}
+
+@keyframes timelineArrivalBeacon {
+  0%, 100% { opacity: 0.18; transform: scaleY(0.42); }
+  48% { opacity: 0.9; transform: scaleY(1); }
+}
+@keyframes timelineServiceSweep {
+  0% { opacity: 0; transform: translateX(-120%); }
+  14% { opacity: 0.62; }
+  58% { opacity: 0.62; }
+  74%, 100% { opacity: 0; transform: translateX(860%); }
+}
+@keyframes timelineClosingPulse {
+  0%, 56%, 100% { opacity: 0.08; transform: scaleX(0.94); }
+  14% { opacity: 0.34; transform: scaleX(1); }
+  28% { opacity: 0.12; transform: scaleX(0.97); }
+  40% { opacity: 0.28; transform: scaleX(1); }
+}
+@keyframes timelineOverdueSignal {
+  0%, 100% { opacity: 0.04; }
+  50% { opacity: 0.22; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .timelineBar[data-phase="arrival_soon"] .timelineBarSignal {
+    inset: 3px auto 3px 2px;
+    width: 4px;
+    border-top: 4px solid var(--accent);
+    border-bottom: 4px solid var(--accent);
+    opacity: 0.2;
+    transform-origin: center;
+    animation: timelineArrivalBeacon 2.4s var(--ease-ui) infinite;
+  }
+  .timelineBar[data-phase="active"] .timelineBarSignal {
+    inset: 2px auto 2px 0;
+    width: 12%;
+    border-right: 1px solid var(--ink-inverse);
+    animation: timelineServiceSweep 4.8s linear infinite;
+  }
+  .timelineBar[data-phase="closing_soon"] .timelineBarSignal {
+    inset: 0 0 0 auto;
+    width: var(--closing-window);
+    background: var(--ink-inverse);
+    transform-origin: right center;
+    animation: timelineClosingPulse 2.8s var(--ease-ui) infinite;
+  }
+  .timelineBar[data-phase="overdue"] .timelineBarSignal {
+    inset: 0;
+    background: var(--ink-inverse);
+    animation: timelineOverdueSignal 1.8s var(--ease-ui) infinite;
+  }
+}
+.timelineView[data-motion="paused"] .timelineBarSignal { animation-play-state: paused; }
+@media (prefers-reduced-motion: reduce) {
+  .timelineBarSignal { opacity: 0 !important; transform: none !important; }
+  .timelineBar[data-phase="arrival_soon"] .timelineBarSignal {
+    inset: 5px auto 5px 3px;
+    width: 2px;
+    background: var(--accent);
+    opacity: 1 !important;
+  }
+}
+@container (max-width: 178px) {
+  .timelineBar small { display: none; }
+}
+@container (max-width: 118px) {
+  .timelineBarTime { display: none; }
+  .timelineBarPhase { text-align: center; }
+}
 .timelineBlock {
   position: absolute;
   z-index: 1;
@@ -2419,6 +2618,22 @@
   .operatorIdentity button svg { flex: 0 0 auto; }
   .viewStrip { min-height: 44px; gap: var(--s-3); padding: 0 var(--s-4); }
   .viewStrip .secondaryButton { padding: 0 var(--s-4); font-size: var(--t-micro); }
+  .timelineLegend {
+    display: grid;
+    min-height: 52px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0;
+    padding: 0 var(--s-4);
+  }
+  .timelineLegend > strong { display: none; }
+  .timelineLegend > span {
+    gap: var(--s-2);
+    padding: var(--s-1) var(--s-2);
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .timelineLegend i { width: 13px; height: 13px; font-size: 9px; }
+  .timelineLegend b { margin-left: auto; }
   .reservationTable { min-width: 0; }
   .reservationTable th:nth-child(3), .reservationTable td:nth-child(3),
   .reservationTable th:nth-child(7), .reservationTable td:nth-child(7) { display: none; }

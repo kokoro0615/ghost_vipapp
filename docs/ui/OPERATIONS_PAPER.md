@@ -318,7 +318,7 @@ below the final table.
 npm run ci     # lint · typecheck · unit+contract+PII · build · maintenance · a11y
 ```
 
-`npm run test:a11y` audits **44 states × 9 viewports** and asserts zero axe
+`npm run test:a11y` audits **46 states × 9 viewports** and asserts zero axe
 violations, zero horizontal overflow, zero controls under 44×44, zero legacy
 purple chrome, zero console errors and zero 5xx.
 

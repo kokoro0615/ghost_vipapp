@@ -32,6 +32,7 @@ test("light UI QA freezes the exact Chromium and WebKit release matrix", () => {
     "list",
     "floor",
     "chart",
+    "chart-phases",
     "menu",
     "queue",
     "inspector",

@@ -1,6 +1,6 @@
 "use client";
 
-import { type CSSProperties, useEffect, useState } from "react";
+import { type CSSProperties, useEffect, useMemo, useState } from "react";
 import { Clock3, Minus, Plus } from "lucide-react";
 
 import { getGhostOperatingWindow } from "@/lib/ghostOperatingHours";
@@ -9,6 +9,12 @@ import type { VipFloorBoardV2 } from "@/lib/vipFloorV2Contract";
 import { getStatusMeta } from "../contract/statusModel";
 import type { UiReservation } from "../contract/uiTypes";
 import styles from "../VipFloorWorkspace.module.css";
+import {
+  getClosingWindowPercent,
+  getTimelinePhase,
+  TIMELINE_PHASE_META,
+  TIMELINE_PHASE_ORDER,
+} from "./timelineState";
 
 type ChartProps = {
   board: VipFloorBoardV2;
@@ -36,14 +42,22 @@ function positionStyle(startAt: string, endAt: string, operatingStartAt: string,
   return {
     "--bar-start": `${(offset / totalMinutes) * 100}%`,
     "--bar-width": `${(duration / totalMinutes) * 100}%`,
+    "--closing-window": `${getClosingWindowPercent(startAt, endAt)}%`,
   } as CSSProperties;
 }
 
 export default function ChartView({ board, reservations, selectedReservationId, zoom, onZoom, onSelect }: ChartProps) {
   const [renderedAt, setRenderedAt] = useState(() => Date.now());
+  const [motionPaused, setMotionPaused] = useState(false);
   useEffect(() => {
     const timer = window.setInterval(() => setRenderedAt(Date.now()), 30_000);
-    return () => window.clearInterval(timer);
+    const syncMotion = () => setMotionPaused(document.hidden);
+    syncMotion();
+    document.addEventListener("visibilitychange", syncMotion);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", syncMotion);
+    };
   }, []);
   const operatingWindow = getGhostOperatingWindow(board.businessDay.businessDate);
   const operatingStart = new Date(operatingWindow.startAt);
@@ -76,9 +90,27 @@ export default function ChartView({ board, reservations, selectedReservationId, 
     && new Date(item.startAt).getTime() < new Date(other.endAt).getTime()
     && new Date(other.startAt).getTime() < new Date(item.endAt).getTime(),
   ));
+  const phaseByReservation = useMemo(() => new Map(reservations.map((reservation) => [
+    reservation.id,
+    getTimelinePhase({
+      nowMs: renderedAt,
+      startAt: reservation.startAt,
+      endAt: reservation.endAt,
+      serviceStatus: reservation.serviceStatus,
+    }),
+  ])), [renderedAt, reservations]);
+  const phaseCounts = TIMELINE_PHASE_ORDER.reduce<Record<string, number>>((counts, phase) => {
+    counts[phase] = reservations.filter((reservation) =>
+      phaseByReservation.get(reservation.id)?.key === phase).length;
+    return counts;
+  }, {});
 
   return (
-    <section className={styles.timelineView} aria-labelledby="chart-view-title">
+    <section
+      className={styles.timelineView}
+      aria-labelledby="chart-view-title"
+      data-motion={motionPaused ? "paused" : "running"}
+    >
       <div className={styles.viewStrip}>
         <h2 id="chart-view-title">席の時間軸</h2>
         <span className="tabular-nums">{board.tables.length}席 / {reservations.length}件</span>
@@ -89,6 +121,17 @@ export default function ChartView({ board, reservations, selectedReservationId, 
           <span className="tabular-nums">{zoom}m</span>
           <button type="button" onClick={() => onZoom(zoom === 15 ? 30 : 60)} aria-label="時間軸を縮小"><Minus size={15} /></button>
         </div>
+      </div>
+
+      <div className={styles.timelineLegend} aria-label="予約帯ステータス">
+        <strong>運行帯</strong>
+        {TIMELINE_PHASE_ORDER.map((phase) => (
+          <span key={phase} data-phase={phase}>
+            <i aria-hidden>{TIMELINE_PHASE_META[phase].glyph}</i>
+            {TIMELINE_PHASE_META[phase].shortLabel}
+            <b className="tabular-nums">{phaseCounts[phase]}</b>
+          </span>
+        ))}
       </div>
 
       <div className={styles.timelineScroller} tabIndex={0} aria-label="VIP席の時間軸。左右にスクロールできます。" data-zoom={zoom}>
@@ -109,6 +152,13 @@ export default function ChartView({ board, reservations, selectedReservationId, 
                 <div className={styles.timelineTrack}>
                   {items.map((reservation) => {
                     const meta = getStatusMeta(reservation.serviceStatus);
+                    const phase = phaseByReservation.get(reservation.id)
+                      ?? getTimelinePhase({
+                        nowMs: renderedAt,
+                        startAt: reservation.startAt,
+                        endAt: reservation.endAt,
+                        serviceStatus: reservation.serviceStatus,
+                      });
                     return (
                       <button
                         key={reservation.id}
@@ -117,12 +167,16 @@ export default function ChartView({ board, reservations, selectedReservationId, 
                         style={positionStyle(reservation.startAt, reservation.endAt, operatingWindow.startAt, operatingWindow.endAt)}
                         data-tone={meta.tone}
                         data-cue={meta.cue}
+                        data-phase={phase.key}
                         data-selected={reservation.id === selectedReservationId || undefined}
                         onClick={() => onSelect(reservation.id)}
-                        aria-label={`${reservation.publicCode}、${reservation.guestLabel}、${reservation.startLabel}から${reservation.endLabel}、${meta.label}`}
+                        aria-label={`${reservation.publicCode}、${reservation.guestLabel}、${reservation.startLabel}から${reservation.endLabel}、${meta.label}。${phase.description}`}
                       >
-                        <span>{reservation.startLabel}</span>
-                        <small>{reservation.publicCode}</small>
+                        <i className={styles.timelineClosingWindow} aria-hidden />
+                        <i className={styles.timelineBarSignal} aria-hidden />
+                        <span className={styles.timelineBarTime}>{reservation.startLabel}</span>
+                        <strong className={styles.timelineBarPhase}>{phase.label}</strong>
+                        <small>{meta.shortLabel} · {reservation.publicCode}</small>
                       </button>
                     );
                   })}
