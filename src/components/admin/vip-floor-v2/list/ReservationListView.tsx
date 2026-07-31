@@ -98,7 +98,11 @@ export default function ReservationListView({
       </div>
 
       <footer className={styles.listFooter}>
-        <span>全 {reservations.length} 件中 1–{reservations.length} 件を表示</span>
+        <span>
+          {reservations.length === 0
+            ? "全 0 件"
+            : `全 ${reservations.length} 件中 1–${reservations.length} 件を表示`}
+        </span>
         <div aria-label="予約一覧ページ">
           <button type="button" disabled aria-label="前のページ"><ChevronLeft size={15} /></button>
           <strong aria-current="page">1</strong>

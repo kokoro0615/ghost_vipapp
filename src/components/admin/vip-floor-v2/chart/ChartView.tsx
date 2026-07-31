@@ -1,6 +1,6 @@
 "use client";
 
-import { type CSSProperties, useState } from "react";
+import { type CSSProperties, useEffect, useState } from "react";
 import { Clock3, Minus, Plus } from "lucide-react";
 
 import { getGhostOperatingWindow } from "@/lib/ghostOperatingHours";
@@ -40,7 +40,11 @@ function positionStyle(startAt: string, endAt: string, operatingStartAt: string,
 }
 
 export default function ChartView({ board, reservations, selectedReservationId, zoom, onZoom, onSelect }: ChartProps) {
-  const [renderedAt] = useState(() => Date.now());
+  const [renderedAt, setRenderedAt] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = window.setInterval(() => setRenderedAt(Date.now()), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
   const operatingWindow = getGhostOperatingWindow(board.businessDay.businessDate);
   const operatingStart = new Date(operatingWindow.startAt);
   const operatingEnd = new Date(operatingWindow.endAt);
@@ -67,7 +71,7 @@ export default function ChartView({ board, reservations, selectedReservationId, 
   const unassigned = reservations.filter((item) => item.tableIds.length === 0);
   const delayed = reservations.filter((item) => item.serviceStatus === "late");
   const conflicts = reservations.filter((item, index) => reservations.some((other, otherIndex) =>
-    otherIndex > index
+    otherIndex !== index
     && item.tableIds.some((tableId) => other.tableIds.includes(tableId))
     && new Date(item.startAt).getTime() < new Date(other.endAt).getTime()
     && new Date(other.startAt).getTime() < new Date(item.endAt).getTime(),

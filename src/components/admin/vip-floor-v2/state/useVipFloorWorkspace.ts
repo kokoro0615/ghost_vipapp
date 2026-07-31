@@ -115,14 +115,14 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
   const loadBoard = useCallback(async (date: string, mode: "initial" | "refresh" = "refresh") => {
     const demoTransport = demoTransportRef.current;
     if (demoTransport) {
-      dispatch(mode === "initial"
-        ? {
-            type: "globalState",
-            state: "loading",
-            description: "browser-local合成台帳を読み込んでいます。",
-            message: "DEMO · 合成予約を読み込んでいます",
-          }
-        : { type: "pending", pending: true });
+      if (mode === "initial") {
+        dispatch({
+          type: "globalState",
+          state: "loading",
+          description: "browser-local合成台帳を読み込んでいます。",
+          message: "DEMO · 合成予約を読み込んでいます",
+        });
+      }
       const result = await demoTransport.loadBoard(date);
       if (!result.ok) {
         const payload = result.payload as unknown as Record<string, unknown>;
@@ -164,8 +164,6 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
         description: "GHOST予約台帳を読み込んでいます。",
         message: "実予約を読み込んでいます",
       });
-    } else {
-      dispatch({ type: "pending", pending: true });
     }
 
     try {

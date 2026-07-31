@@ -30,7 +30,7 @@ import { ReservationWizard } from "./ReservationWizard";
 import styles from "../VipFloorWorkspace.module.css";
 
 type OperationKind = "walk_in" | "block_create" | "reservation_create";
-type WalkInField = "guestLabel" | "operatorNote";
+type WalkInField = "guestLabel" | "operatorNote" | "tableIds";
 type WalkInErrors = Partial<Record<WalkInField, string>>;
 
 type Props = {
@@ -66,11 +66,29 @@ export function OperationCenter({
   const [kind, setKind] = useState<OperationKind>("walk_in");
   const [venueWide, setVenueWide] = useState(false);
   const [editingBlockId, setEditingBlockId] = useState<string | null>(null);
+  const [walkInOfferingId, setWalkInOfferingId] = useState("");
   const [walkInErrors, setWalkInErrors] = useState<WalkInErrors>({});
   const panelRef = useRef<HTMLDivElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
   const defaults = useMemo(() => operationDefaults(board), [board]);
   const editingBlock = board.blocks.find((block) => block.id === editingBlockId) ?? null;
+  const walkInOffering = options?.offerings.find((offering) => offering.id === walkInOfferingId)
+    ?? options?.offerings.find((offering) =>
+      selectedTableId
+      && (
+        offering.compatibleTableIds === null
+        || offering.compatibleTableIds.includes(selectedTableId)
+      ))
+    ?? options?.offerings[0]
+    ?? null;
+  const resolvedWalkInOfferingId = walkInOffering?.id ?? "";
+  const walkInCompatibleTableIds = walkInOffering?.compatibleTableIds === null
+    ? null
+    : new Set(walkInOffering?.compatibleTableIds ?? []);
+  const walkInTables = kind === "walk_in"
+    ? board.tables.filter((table) =>
+        walkInCompatibleTableIds === null || walkInCompatibleTableIds.has(table.id))
+    : board.tables;
 
   useEffect(() => {
     if (!open) return;
@@ -121,6 +139,22 @@ export function OperationCenter({
     if (kind === "walk_in") {
       const guestLabel = nullableText(data.get("guestLabel"));
       const operatorNote = nullableText(data.get("operatorNote"));
+      const offering = options.offerings.find((item) => item.id === resolvedWalkInOfferingId);
+      const incompatibleTable = tableIds.some((tableId) =>
+        offering?.compatibleTableIds !== null
+        && !offering?.compatibleTableIds.includes(tableId));
+      if (tableIds.length === 0 || !offering || incompatibleTable) {
+        setWalkInErrors((current) => ({
+          ...current,
+          tableIds: tableIds.length === 0
+            ? "登録する卓を1つ以上選択してください。"
+            : "このプランに対応する卓を選び直してください。",
+        }));
+        window.requestAnimationFrame(() => {
+          form.querySelector<HTMLElement>('input[name="tableIds"]')?.focus();
+        });
+        return;
+      }
       if (demoMode.enabled) {
         const errors = validateSyntheticWalkIn(guestLabel, operatorNote);
         if (Object.keys(errors).length > 0) {
@@ -138,7 +172,7 @@ export function OperationCenter({
         kind,
         payload: {
           eventDayId: options.businessDay.id,
-          offeringId: String(data.get("offeringId") ?? ""),
+          offeringId: resolvedWalkInOfferingId,
           scheduledStartAt: startAt,
           scheduledEndAt: endAt,
           guestCount: Number(data.get("guestCount")),
@@ -197,7 +231,7 @@ export function OperationCenter({
   }
 
   function validateWalkInField(field: WalkInField, value: string) {
-    if (!demoMode.enabled) return;
+    if (!demoMode.enabled || field === "tableIds") return;
     const issue = getSyntheticTextIssue(value, {
       required: field === "guestLabel",
       maximum: field === "guestLabel" ? 80 : 500,
@@ -208,6 +242,21 @@ export function OperationCenter({
       else delete next[field];
       return next;
     });
+  }
+
+  function handleOperationTabKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
+    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+    const tabs = [...event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]')];
+    const current = tabs.indexOf(document.activeElement as HTMLButtonElement);
+    if (current < 0) return;
+    event.preventDefault();
+    const next = event.key === "Home"
+      ? 0
+      : event.key === "End"
+        ? tabs.length - 1
+        : (current + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length;
+    tabs[next]?.focus();
+    tabs[next]?.click();
   }
 
   async function cancelBlock(blockId: string, expectedVersion: number) {
@@ -247,11 +296,19 @@ export function OperationCenter({
         </header>
         <DemoCue compact className={styles.dialogDemoCue} />
 
-        {!editReservation ? <div className={styles.operationTabs} role="tablist" aria-label="作成種別">
+        {!editReservation ? <div
+          className={styles.operationTabs}
+          role="tablist"
+          aria-label="作成種別"
+          onKeyDown={handleOperationTabKeyDown}
+        >
           <button
+            id="operation-tab-walk-in"
             type="button"
             role="tab"
+            aria-controls="operation-panel"
             aria-selected={kind === "walk_in"}
+            tabIndex={kind === "walk_in" ? 0 : -1}
             data-active={kind === "walk_in" || undefined}
             onClick={() => {
               setKind("walk_in");
@@ -261,9 +318,12 @@ export function OperationCenter({
             <Footprints size={16} />Walk-in
           </button>
           <button
+            id="operation-tab-block"
             type="button"
             role="tab"
+            aria-controls="operation-panel"
             aria-selected={kind === "block_create"}
+            tabIndex={kind === "block_create" ? 0 : -1}
             data-active={kind === "block_create" || undefined}
             onClick={() => {
               setKind("block_create");
@@ -273,9 +333,12 @@ export function OperationCenter({
             <Ban size={16} />受付ブロック
           </button>
           <button
+            id="operation-tab-reservation"
             type="button"
             role="tab"
+            aria-controls="operation-panel"
             aria-selected={kind === "reservation_create"}
+            tabIndex={kind === "reservation_create" ? 0 : -1}
             data-active={kind === "reservation_create" || undefined}
             onClick={() => {
               setKind("reservation_create");
@@ -302,6 +365,9 @@ export function OperationCenter({
           />
         ) : (
           <form
+            id="operation-panel"
+            role="tabpanel"
+            aria-labelledby={kind === "walk_in" ? "operation-tab-walk-in" : "operation-tab-block"}
             key={`${kind}:${editingBlockId ?? "new"}`}
             className={styles.commandForm}
             onSubmit={submit}
@@ -338,7 +404,15 @@ export function OperationCenter({
                   <div className={styles.formColumns}>
                     <label>
                       プラン
-                      <select name="offeringId" required defaultValue={options.offerings[0]?.id}>
+                      <select
+                        name="offeringId"
+                        required
+                        value={resolvedWalkInOfferingId}
+                        onChange={(event) => {
+                          setWalkInOfferingId(event.target.value);
+                          clearWalkInError("tableIds");
+                        }}
+                      >
                         {options.offerings.map((offering) => (
                           <option key={offering.id} value={offering.id}>
                             {offering.name} / {offering.minGuests}–{offering.maxGuests}名
@@ -460,8 +534,14 @@ export function OperationCenter({
               )}
 
               {!venueWide ? (
-                <div className={styles.checkGrid} role="group" aria-label="対象卓">
-                  {board.tables.map((table) => (
+                <>
+                <div
+                  className={styles.checkGrid}
+                  role="group"
+                  aria-label={kind === "walk_in" ? "登録可能な対象卓" : "対象卓"}
+                  aria-describedby={walkInErrors.tableIds ? "walk-in-table-error" : undefined}
+                >
+                  {walkInTables.map((table) => (
                     <label key={table.id}>
                       <input
                         type="checkbox"
@@ -472,12 +552,25 @@ export function OperationCenter({
                             ? editingBlock.targets.tableIds.includes(table.id)
                             : table.id === selectedTableId
                         }
+                        onChange={() => clearWalkInError("tableIds")}
                       />
                       <span>{table.displayCode}</span>
                       <small>{table.capacityMax}名</small>
                     </label>
                   ))}
                 </div>
+                {kind === "walk_in" ? (
+                  walkInErrors.tableIds ? (
+                    <small id="walk-in-table-error" className={styles.fieldError} role="alert">
+                      {walkInErrors.tableIds}
+                    </small>
+                  ) : (
+                    <small className={styles.syntheticInputHint}>
+                      選択したプランで登録できる卓だけを表示しています。
+                    </small>
+                  )
+                ) : null}
+                </>
               ) : null}
             </fieldset>
           )}

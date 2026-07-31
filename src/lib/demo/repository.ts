@@ -712,6 +712,7 @@ export class BrowserDemoRepository {
         minGuests: 1,
         maxGuests: 24,
         minSpendYen: 0,
+        compatibleTableIds: null,
       }],
     };
   }

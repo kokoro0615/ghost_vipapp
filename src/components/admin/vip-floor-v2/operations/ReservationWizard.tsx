@@ -103,14 +103,28 @@ export function ReservationWizard({
       : scheduleDefaults(board),
     [board, reservation],
   );
+  const initialOfferingId = reservation?.bookingOfferingId
+    ?? options.offerings.find((offering) =>
+      selectedTableId
+      && (
+        offering.compatibleTableIds === null
+        || offering.compatibleTableIds.includes(selectedTableId)
+      ))?.id
+    ?? options.offerings[0]?.id
+    ?? "";
+  const initialOffering = options.offerings.find((offering) => offering.id === initialOfferingId);
+  const initialTableIds = (reservation?.tableIds ?? (selectedTableId ? [selectedTableId] : []))
+    .filter((tableId) =>
+      initialOffering?.compatibleTableIds === null
+      || initialOffering?.compatibleTableIds.includes(tableId));
   const [step, setStep] = useState(0);
   const [dateError, setDateError] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft>(() => ({
     startAt: defaults.start,
     endAt: defaults.end,
-    offeringId: reservation?.bookingOfferingId ?? options.offerings[0]?.id ?? "",
+    offeringId: initialOfferingId,
     guestCount: reservation?.guestCount ?? 2,
-    tableIds: reservation?.tableIds ?? (selectedTableId ? [selectedTableId] : []),
+    tableIds: initialTableIds,
     displayName: reservation?.guestLabel ?? "",
     phone: "",
     email: "",
@@ -122,10 +136,19 @@ export function ReservationWizard({
     bookingStaffMemberId: reservation?.bookingStaffMemberId ?? "",
     notificationPreference: reservation?.notificationPreference ?? "none",
   }));
+  const selectedOffering = options.offerings.find((offering) => offering.id === draft.offeringId);
+  const compatibleTableIds = selectedOffering?.compatibleTableIds === null
+    ? null
+    : new Set(selectedOffering?.compatibleTableIds ?? []);
+  const availableTables = board.tables.filter((table) =>
+    compatibleTableIds === null || compatibleTableIds.has(table.id));
+  const hasTableMismatch = draft.tableIds.some((tableId) =>
+    compatibleTableIds !== null && !compatibleTableIds.has(tableId));
   const selectedTables = board.tables.filter((table) => draft.tableIds.includes(table.id));
   const capacity = selectedTables.reduce((sum, table) => sum + table.capacityMax, 0);
   const canContinue = !datePending
     && !dateError
+    && (step < 3 || !hasTableMismatch)
     && stepValid(step, draft, Boolean(reservation), options.businessDay.businessDate);
 
   const phase = PHASES.find((entry) => step >= entry.firstStep && step <= entry.lastStep) ?? PHASES[0];
@@ -208,7 +231,11 @@ export function ReservationWizard({
   }
 
   return (
-    <section className={styles.reservationWizard} aria-label={`予約${reservation ? "編集" : "作成"} ${step + 1}/8 ${STEPS[step]}`}>
+    <section
+      id="operation-panel"
+      className={styles.reservationWizard}
+      aria-label={`予約${reservation ? "編集" : "作成"} ${step + 1}/8 ${STEPS[step]}`}
+    >
       <div className={styles.wizardProgress}>
         <p className={styles.wizardPhase}>
           <strong>{phase.label}</strong>
@@ -329,7 +356,19 @@ export function ReservationWizard({
             <div className={styles.formColumns}>
               <label>
                 プラン
-                <select value={draft.offeringId} onChange={(event) => patch({ offeringId: event.target.value })}>
+                <select
+                  value={draft.offeringId}
+                  onChange={(event) => {
+                    const offeringId = event.target.value;
+                    const offering = options.offerings.find((item) => item.id === offeringId);
+                    patch({
+                      offeringId,
+                      tableIds: draft.tableIds.filter((tableId) =>
+                        offering?.compatibleTableIds === null
+                        || offering?.compatibleTableIds.includes(tableId)),
+                    });
+                  }}
+                >
                   {options.offerings.map((offering) => (
                     <option key={offering.id} value={offering.id}>{offering.name} / {offering.minGuests}–{offering.maxGuests}名</option>
                   ))}
@@ -343,7 +382,7 @@ export function ReservationWizard({
           <fieldset>
             <legend>卓を選ぶ</legend>
             <div className={styles.checkGrid} role="group" aria-label="予約卓">
-              {board.tables.map((table) => (
+              {availableTables.map((table) => (
                 <label key={table.id} data-selected={draft.tableIds.includes(table.id) || undefined}>
                   <input
                     type="checkbox"
@@ -359,6 +398,9 @@ export function ReservationWizard({
                 </label>
               ))}
             </div>
+            <p className={styles.wizardHint}>
+              選択したプランで登録できる卓だけを表示しています。
+            </p>
             <p className={capacityShort ? styles.wizardWarning : styles.wizardHint}>
               選択 <span className="tabular-nums">{selectedTables.length}</span>卓 / 定員{" "}
               <span className="tabular-nums">{capacity}</span>名 / 予約{" "}

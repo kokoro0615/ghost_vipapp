@@ -11,12 +11,10 @@ import {
 const ORIGIN = process.env.GHOST_VIPAPP_ORIGIN ?? "https://ghost-vipapp.vercel.app";
 const basicUser = process.env.VIPAPP_BASIC_USER ?? "";
 const basicPassword = process.env.VIPAPP_BASIC_PASSWORD ?? "";
-const pin = process.env.VIPAPP_OWNER_PIN ?? "";
 const ADMIN_SESSION_COOKIE = "ghost_vipapp_admin_session";
 
 export const PRODUCTION_READ_ONLY_RULES = Object.freeze([
   { method: "GET", path: "/" },
-  { method: "POST", path: "/api/admin/session/pin" },
   { method: "GET", path: "/api/admin/session" },
   { method: "DELETE", path: "/api/admin/session" },
   { method: "GET", path: "/api/admin/vip-floor" },
@@ -57,7 +55,6 @@ function countLocalSearchHits(board, query) {
 async function main() {
   const origin = parseOrigin();
   assert(basicUser && basicPassword, "basic_auth_missing");
-  assert(pin, "owner_pin_missing");
 
   const client = new SafeHttpClient({
     origin,
@@ -65,7 +62,7 @@ async function main() {
     basicPassword,
     rules: PRODUCTION_READ_ONLY_RULES,
   });
-  let loggedIn = false;
+  let sessionIssued = false;
 
   try {
     emit("production_read_only_smoke_started", { mutationRequests: 0 });
@@ -73,16 +70,10 @@ async function main() {
     const unauthenticated = await client.request("/", { basic: false });
     assert(unauthenticated.status === 401, "unauthenticated_guard_not_401");
 
-    const login = await client.requestJson("/api/admin/session/pin", {
-      method: "POST",
-      json: { pin },
-    });
-    assert(login.response.ok && login.payload?.ok === true, `pin_login_failed:${login.response.status}`);
-    assert(client.jar.size > 0, "pin_login_cookie_missing");
-    loggedIn = true;
-
     const session = await client.requestJson("/api/admin/session");
     assert(session.response.ok && session.payload?.ok === true, `session_read_failed:${session.response.status}`);
+    assert(client.jar.value(ADMIN_SESSION_COOKIE), "basic_owner_session_cookie_missing");
+    sessionIssued = true;
 
     const today = asTokyoDate(new Date());
     const alternateDate = asTokyoDate(new Date(Date.now() - 86_400_000));
@@ -97,23 +88,20 @@ async function main() {
 
     const logout = await client.requestJson("/api/admin/session", { method: "DELETE" });
     assert(logout.response.ok, `logout_failed:${logout.response.status}`);
-    loggedIn = false;
+    sessionIssued = false;
     // Basic access intentionally survives Owner logout for up to eight hours.
     // Only the backend admin session must be removed here.
     assert(client.jar.value(ADMIN_SESSION_COOKIE) === null, "logout_session_cookie_not_cleared");
 
-    const afterLogout = await client.requestJson("/api/admin/session");
-    assert(afterLogout.response.status === 401, "session_survived_logout");
-
     const businessMutations = client.ledger.filter(({ method, pathname }) => (
       method !== "GET"
-      && pathname !== "/api/admin/session/pin"
       && pathname !== "/api/admin/session"
     ));
     assert(businessMutations.length === 0, "business_mutation_detected");
 
     emit("production_read_only_smoke_completed", {
       authenticatedRead: true,
+      authMode: "basic_only",
       currentBoardRead: true,
       alternateDateRead: true,
       localSearchChecked: true,
@@ -124,7 +112,7 @@ async function main() {
       mutationRequests: 0,
     });
   } finally {
-    if (loggedIn) {
+    if (sessionIssued) {
       await client.request("/api/admin/session", { method: "DELETE" }).catch(() => undefined);
     }
   }

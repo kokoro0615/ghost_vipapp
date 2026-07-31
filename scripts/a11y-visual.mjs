@@ -1268,6 +1268,7 @@ const operationOptions = {
     minGuests: 1,
     maxGuests: 20,
     minSpendYen: 0,
+    compatibleTableIds: null,
   }],
 };
 

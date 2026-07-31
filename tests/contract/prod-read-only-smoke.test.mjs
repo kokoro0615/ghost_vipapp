@@ -19,14 +19,6 @@ test("production smoke performs auth lifecycle and reads without business mutati
       response.end(JSON.stringify({ ok: false }));
       return;
     }
-    if (url.pathname === "/api/admin/session/pin" && request.method === "POST" && hasBasic) {
-      response.setHeader(
-        "set-cookie",
-        `ghost_vipapp_admin_session=${sessionCookie}; HttpOnly; Path=/api; SameSite=Strict`,
-      );
-      response.end(JSON.stringify({ ok: true }));
-      return;
-    }
     if (url.pathname === "/api/admin/session" && request.method === "DELETE" && hasBasic && hasSession) {
       response.setHeader(
         "set-cookie",
@@ -35,9 +27,12 @@ test("production smoke performs auth lifecycle and reads without business mutati
       response.end(JSON.stringify({ ok: true }));
       return;
     }
-    if (url.pathname === "/api/admin/session" && request.method === "GET") {
-      response.statusCode = hasBasic && hasSession ? 200 : 401;
-      response.end(JSON.stringify(hasBasic && hasSession ? { ok: true, role: "owner" } : { ok: false }));
+    if (url.pathname === "/api/admin/session" && request.method === "GET" && hasBasic) {
+      response.setHeader(
+        "set-cookie",
+        `ghost_vipapp_admin_session=${sessionCookie}; HttpOnly; Path=/api; SameSite=Strict`,
+      );
+      response.end(JSON.stringify({ ok: true, role: "owner" }));
       return;
     }
     if (url.pathname === "/api/admin/vip-floor" && request.method === "GET" && hasBasic && hasSession) {
@@ -58,18 +53,18 @@ test("production smoke performs auth lifecycle and reads without business mutati
     GHOST_VIPAPP_SMOKE_ALLOW_INSECURE_LOCALHOST: "1",
     VIPAPP_BASIC_USER: "user",
     VIPAPP_BASIC_PASSWORD: "password",
-    VIPAPP_OWNER_PIN: "123456",
   });
 
   assert.equal(result.code, 0, result.stderr || result.stdout);
-  assert.doesNotMatch(result.stdout, /session-secret-never-log|123456|password/u);
+  assert.doesNotMatch(result.stdout, /session-secret-never-log|password/u);
   assert.match(result.stdout, /"mutationRequests":0/u);
+  assert.match(result.stdout, /"authMode":"basic_only"/u);
   assert.equal(
     requests.some(({ pathname }) => pathname.includes("commands")),
     false,
   );
   assert.deepEqual(
     [...new Set(requests.filter(({ method }) => method !== "GET").map(({ method, pathname }) => `${method} ${pathname}`))],
-    ["POST /api/admin/session/pin", "DELETE /api/admin/session"],
+    ["DELETE /api/admin/session"],
   );
 });

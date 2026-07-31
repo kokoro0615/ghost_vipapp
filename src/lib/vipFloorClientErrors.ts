@@ -132,6 +132,14 @@ export function readVipOperationFailure(
     };
   }
 
+  if (code === "OFFERING_TABLE_MISMATCH") {
+    return {
+      code,
+      message: "選択したプランでは指定した卓を利用できないため保存していません。",
+      recovery: "プランに対応する卓だけが表示されます。プランと卓を選び直してください。",
+    };
+  }
+
   if (status === 409) {
     return {
       code,
