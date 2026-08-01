@@ -14,6 +14,8 @@ test("revision stream is authenticated, day-scoped, PII-free, and bounded", asyn
   assert.match(stream, /readAdminToken\(request\)/u);
   assert.match(stream, /readAdminSession\(token\)/u);
   assert.match(stream, /businessDate=/u);
+  assert.match(stream, /\/api\/admin\/v2\/vip-floor\/revision\?businessDate=/u);
+  assert.doesNotMatch(stream, /\/api\/admin\/v2\/vip-floor\?businessDate=/u);
   assert.match(stream, /setTimeout\(poll, 1_500\)/u);
   assert.match(stream, /setTimeout\(close, 25_000\)/u);
   assert.match(stream, /retry: 1000/u);
@@ -26,7 +28,10 @@ test("revision stream is authenticated, day-scoped, PII-free, and bounded", asyn
   assert.match(hook, /addEventListener\("open"/u);
   assert.match(hook, /addEventListener\("error", scheduleStreamUnavailable\)/u);
   assert.match(hook, /window\.clearTimeout\(reconnectTimer\)/u);
-  assert.match(hook, /if \(isReconnect\)[\s\S]*loadBoard\(businessDate\)/u);
+  assert.match(hook, /addEventListener\("ready"/u);
+  const openStart = hook.indexOf('addEventListener("open"');
+  const revisionStart = hook.indexOf('addEventListener("revision"', openStart);
+  assert.doesNotMatch(hook.slice(openStart, revisionStart), /loadBoard\(businessDate\)/u);
   assert.match(hook, /classifyBoardRevision/u);
   assert.match(hook, /decision === "gap_refresh"/u);
   assert.match(hook, /const workspaceMutationBlocked = offline/u);

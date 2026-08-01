@@ -23,7 +23,7 @@ test("healthy cached-board refresh never enters mutation pending", async () => {
   assert.match(loadBoard, /mode === "initial"/u);
 });
 
-test("normal EventSource reconnect refreshes without declaring a global block", async () => {
+test("normal EventSource reconnect resumes on a matching revision without a board read", async () => {
   const source = await readFile(
     path.join(root, "src/components/admin/vip-floor-v2/state/useVipFloorWorkspace.ts"),
     "utf8",
@@ -33,10 +33,16 @@ test("normal EventSource reconnect refreshes without declaring a global block", 
   const eventSource = source.slice(eventSourceStart, eventSourceEnd);
   const openHandler = eventSource.slice(
     eventSource.indexOf('events.addEventListener("open"'),
+    eventSource.indexOf('events.addEventListener("ready"'),
+  );
+  const readyHandler = eventSource.slice(
+    eventSource.indexOf('events.addEventListener("ready"'),
     eventSource.indexOf('events.addEventListener("revision"'),
   );
 
-  assert.match(openHandler, /void loadBoard\(businessDate\)/u);
+  assert.doesNotMatch(openHandler, /loadBoard\(businessDate\)/u);
   assert.doesNotMatch(openHandler, /type:\s*"globalState"/u);
+  assert.match(readyHandler, /payload\.revision !== revisionAtConnect/u);
+  assert.match(readyHandler, /state:\s*globalState/u);
   assert.match(eventSource, /STREAM_RECONNECT_GRACE_MS/u);
 });
