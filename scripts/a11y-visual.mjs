@@ -83,13 +83,23 @@ async function main() {
         }
       }
       const browser = browsers.get(viewport.browser);
+      /* A touch viewport must be driven as a touch device. Emulating only the
+       * size leaves `hover: hover` matching, which is exactly the condition
+       * under which the iPad's sticky-hover defect is invisible to the audit. */
       const context = await browser.newContext({
         viewport: { width: viewport.width, height: viewport.height },
+        ...(viewport.touch
+          ? { hasTouch: true, isMobile: viewport.browser === "chromium" }
+          : {}),
+        ...(viewport.scale ? { deviceScaleFactor: viewport.scale } : {}),
         httpCredentials: {
           username: "a11y",
           password: "synthetic-only",
         },
-        reducedMotion: "reduce",
+        /* The venue device is audited the way the venue runs it — motion on.
+         * Everything else stays reduced, which keeps the authored static
+         * fallbacks under test. */
+        reducedMotion: viewport.motion ? "no-preference" : "reduce",
       });
       results.push(...await auditViewport(context, viewport));
       await context.close();
@@ -1002,10 +1012,26 @@ async function auditPage(page, { state, viewport }) {
         tag: element.tagName,
         className: typeof element.className === "string" ? element.className : "",
       }));
+    /* Safari on iOS/iPadOS zooms the layout viewport when focus enters a text
+     * control whose computed font-size is below 16px. This app sets
+     * `body { overflow: hidden }`, so that zoom strands the operator in a panned
+     * board with no scroll affordance to get out of it — one tap into a search
+     * field, mid-service. Before `--t-field` existed, every text control on this
+     * surface except the login field would have failed this gate. */
+    const zoomTriggeringFields = [...document.querySelectorAll("input, select, textarea")]
+      .filter(visible)
+      .filter((element) => !["checkbox", "radio", "hidden"].includes(element.type))
+      .map((element) => ({
+        tag: element.tagName,
+        className: typeof element.className === "string" ? element.className : "",
+        fontSize: Number.parseFloat(getComputedStyle(element).fontSize),
+      }))
+      .filter((entry) => entry.fontSize < 16);
     return {
       documentWidth: document.documentElement.scrollWidth,
       viewportWidth: window.innerWidth,
       undersizedControls: controls,
+      zoomTriggeringFields,
       colorScheme: {
         root: getComputedStyle(document.documentElement).colorScheme,
         body: getComputedStyle(document.body).colorScheme,
@@ -1020,6 +1046,11 @@ async function auditPage(page, { state, viewport }) {
   });
   assert.equal(layout.documentWidth, layout.viewportWidth, `horizontal overflow in ${label}`);
   assert.deepEqual(layout.undersizedControls, [], `undersized controls in ${label}`);
+  assert.deepEqual(
+    layout.zoomTriggeringFields,
+    [],
+    `text controls below the 16px iOS zoom threshold in ${label}`,
+  );
   assert.match(layout.colorScheme.root, /light/u, `root color-scheme must be light in ${label}`);
   assert.match(layout.colorScheme.body, /light/u, `body color-scheme must be light in ${label}`);
   assert.deepEqual(layout.majorSurfaceFailures, [], `dark major surfaces in ${label}`);

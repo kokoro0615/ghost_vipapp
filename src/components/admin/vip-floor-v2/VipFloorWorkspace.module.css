@@ -110,9 +110,7 @@
    on the same element makes contrast tooling resolve the wrong layer. */
 .secondaryButton { background: var(--surface); }
 .primaryButton { border-color: var(--action); background: var(--action); color: var(--action-text); font-weight: var(--weight-strong); }
-.primaryButton:hover:not(:disabled) { background: var(--action-hover); border-color: var(--action-hover); }
 .primaryButton:active:not(:disabled) { background: var(--action-press); }
-.secondaryButton:hover:not(:disabled) { background: var(--surface-hover); }
 .secondaryButton:active:not(:disabled) { background: var(--surface-active); }
 .dangerButton { border-color: var(--alert); background: var(--alert); color: var(--action-text); font-weight: var(--weight-strong); }
 
@@ -128,7 +126,6 @@
   color: var(--ink-2);
   transition: color var(--dur-fast) var(--ease-ui);
 }
-.paneButton:hover, .sheetClose:hover, .rowAction:hover { background: var(--surface-hover); color: var(--ink); }
 .paneButton[data-active] { border-color: var(--accent); background: var(--accent-wash); color: var(--accent-ink); }
 
 .searchField, .toolbarSearch {
@@ -154,7 +151,7 @@
   outline: 0;
   background: transparent;
   color: var(--ink);
-  font-size: var(--t-body);
+  font-size: var(--t-field);
 }
 .searchField input::placeholder, .toolbarSearch input::placeholder { color: var(--ink-3); }
 
@@ -173,7 +170,7 @@
 /* Keep the old terminal advance as quiet inset while visible tracking is .04em. */
 .toolbarSelect:has(select[aria-label="予約ステータス"]) span { padding-inline-end: 0.25em; }
 .toolbarSelect:has(select[aria-label="担当スタッフでFloorを絞り込み"]) span { padding-inline-end: 0.1em; }
-.toolbarSelect select { max-width: 132px; height: var(--h-control); border: 0; background: transparent; color: var(--ink); font-size: var(--t-body); }
+.toolbarSelect select { max-width: 132px; height: var(--h-control); border: 0; background: transparent; color: var(--ink); font-size: var(--t-field); }
 
 /* Native widget chrome is the loudest "nobody authored this" signal left on a
    surface this deliberate: a stock select arrow, a stock tick box and a stock
@@ -196,12 +193,6 @@
   background-size: 4px 4px;
   cursor: pointer;
 }
-.workspace select:hover:not(:disabled),
-.dialogBackdrop select:hover:not(:disabled) {
-  background-image:
-    linear-gradient(45deg, transparent 50%, var(--ink) 50%),
-    linear-gradient(135deg, var(--ink) 50%, transparent 50%);
-}
 .workspace select:disabled,
 .dialogBackdrop select:disabled { cursor: not-allowed; }
 
@@ -214,8 +205,6 @@
   opacity: 0.55;
   cursor: pointer;
 }
-.workspace input:hover::-webkit-calendar-picker-indicator,
-.dialogBackdrop input:hover::-webkit-calendar-picker-indicator { opacity: 1; }
 .workspace input[type="number"],
 .dialogBackdrop input[type="number"] { font-variant-numeric: tabular-nums; }
 
@@ -224,10 +213,14 @@
 .dialogBackdrop input[type="checkbox"],
 .dialogBackdrop input[type="radio"] {
   display: grid;
-  width: 20px;
-  min-width: 20px;
-  height: 20px;
-  min-height: 20px;
+  /* 24px is the WCAG 2.2 2.5.8 floor for a target, and it is the box itself
+     that is measured — the 44px label around it does not rescue a 20px box
+     whose neighbours sit closer than 24px. The venue is touch-only, so this is
+     the size the finger actually gets. */
+  width: 24px;
+  min-width: 24px;
+  height: 24px;
+  min-height: 24px;
   flex: 0 0 auto;
   appearance: none;
   place-content: center;
@@ -246,8 +239,8 @@
 .dialogBackdrop input[type="checkbox"]::before,
 .dialogBackdrop input[type="radio"]::before {
   content: "";
-  width: 9px;
-  height: 9px;
+  width: 11px;
+  height: 11px;
   border-radius: 50%;
   background: var(--action);
   transform: scale(0);
@@ -255,8 +248,8 @@
 }
 .workspace input[type="checkbox"]::before,
 .dialogBackdrop input[type="checkbox"]::before {
-  width: 12px;
-  height: 12px;
+  width: 14px;
+  height: 14px;
   border-radius: 0;
   background: var(--action-text);
   clip-path: polygon(14% 46%, 0 60%, 38% 100%, 100% 22%, 86% 8%, 37% 71%);
@@ -269,10 +262,6 @@
 .workspace input[type="radio"]:checked::before,
 .dialogBackdrop input[type="checkbox"]:checked::before,
 .dialogBackdrop input[type="radio"]:checked::before { transform: scale(1); }
-.workspace input[type="checkbox"]:hover:not(:disabled),
-.workspace input[type="radio"]:hover:not(:disabled),
-.dialogBackdrop input[type="checkbox"]:hover:not(:disabled),
-.dialogBackdrop input[type="radio"]:hover:not(:disabled) { border-color: var(--action); }
 
 /* ── 2. auth + maintenance ─────────────────────────────────────────────── */
 
@@ -451,7 +440,6 @@
   letter-spacing: 0.34em;
   text-align: center;
 }
-.loginPanel input:hover { border-color: var(--ink-2); }
 .loginPanel input:focus-visible {
   border-color: var(--focus);
   outline: 2px solid var(--focus);
@@ -485,10 +473,6 @@
   transition:
     border-color var(--dur-fast) var(--ease-ui),
     color var(--dur-fast) var(--ease-ui);
-}
-.loginPanel > button:hover:not(:disabled) {
-  border-color: var(--action-hover);
-  background: var(--action-hover);
 }
 .loginPanel > button:active:not(:disabled) { background: var(--action-press); }
 .loginHint {
@@ -654,6 +638,10 @@
   padding: 0 var(--s-4) 0 var(--s-6);
   border-bottom: 1px solid var(--rule-strong);
   background: var(--surface);
+  /* Chrome that stays while the board moves under it. The contact shadow is a
+     z-relationship, not decoration — without it the masthead reads as a band
+     printed into the paper rather than as a fixed rail. */
+  box-shadow: var(--lift-pane);
 }
 .venueIdentity {
   display: grid;
@@ -678,10 +666,9 @@
   background: var(--surface-quiet);
   color: var(--ink);
   font-family: var(--font-figure);
-  font-size: var(--t-mini);
+  font-size: var(--t-field);
   font-variant-numeric: tabular-nums;
 }
-.ribbonControl input:hover { border-color: var(--rule-control); }
 .ribbonControl strong { color: var(--ink-2); font-family: var(--font-figure); font-size: var(--t-mini); font-weight: var(--weight-ui); white-space: nowrap; }
 
 /* Live counters double as filters, so the queue and the ledger stay one list. */
@@ -698,7 +685,6 @@
   text-align: left;
 }
 .pulseCluster button { transition: color var(--dur-fast) var(--ease-ui); }
-.pulseCluster button:hover { background: var(--surface-hover); }
 .pulseCluster button[data-active] { background: var(--accent-wash); box-shadow: inset 0 -2px var(--accent); }
 .pulseCluster span { color: var(--ink-3); font-size: var(--t-micro); letter-spacing: 0.04em; white-space: nowrap; }
 .pulseCluster strong { color: var(--ink); font-family: var(--font-figure); font-size: var(--t-data); font-weight: var(--weight-strong); font-variant-numeric: tabular-nums; }
@@ -724,7 +710,6 @@
   font-size: var(--t-mini);
   white-space: nowrap;
 }
-.operatorIdentity button:hover { background: var(--surface-hover); }
 
 .ribbonDemoCue {
   display: flex;
@@ -763,6 +748,7 @@
   padding: 0 var(--s-5);
   border-bottom: 1px solid var(--rule);
   background: var(--surface);
+  box-shadow: var(--lift-pane);
 }
 .desktopCreate { flex: 0 0 auto; }
 .viewSwitcher {
@@ -789,7 +775,6 @@
   white-space: nowrap;
   transition: color var(--dur-fast) var(--ease-ui);
 }
-.viewSwitcher button:hover { color: var(--ink); }
 .viewSwitcher button[data-active] {
   background: var(--surface);
   color: var(--ink);
@@ -875,7 +860,6 @@
 
 .zoomControl { display: flex; align-items: center; border: 1px solid var(--rule); border-radius: var(--r-control); background: var(--surface); }
 .zoomControl button { display: grid; width: var(--h-control); height: var(--h-control); place-items: center; border: 0; background: transparent; color: var(--ink-2); }
-.zoomControl button:hover { background: var(--surface-hover); color: var(--ink); }
 .zoomControl span { min-width: 42px; color: var(--ink-2); font-size: var(--t-mini); text-align: center; }
 
 /* ── 4. attention queue ────────────────────────────────────────────────── */
@@ -935,7 +919,6 @@
   text-align: left;
   transition: background var(--dur-fast) var(--ease-ui);
 }
-.queueItem:hover { background: var(--surface-hover); }
 .queueItem[data-selected] { background: var(--accent-wash); box-shadow: inset 0 -2px var(--accent); }
 .queueTime { color: var(--ink); font-family: var(--font-figure); font-size: var(--t-data); font-weight: var(--weight-strong); font-variant-numeric: tabular-nums; }
 .queueMain { display: grid; min-width: 0; gap: 1px; }
@@ -970,6 +953,8 @@
   padding: 0 var(--s-5);
   border-bottom: 1px solid var(--rule-strong);
   background: var(--surface-sunken);
+  /* It is genuinely sticky over the rows, so it genuinely casts. */
+  box-shadow: var(--lift-pane);
   color: var(--ink-3);
   font-size: var(--t-micro);
   font-weight: var(--weight-ui);
@@ -988,11 +973,8 @@
 .listView[data-density="comfortable"] .reservationTable td { height: 64px; }
 .reservationTable tbody tr { position: relative; transition: background var(--dur-fast) var(--ease-ui); }
 .reservationTable tbody tr:nth-child(even) { background: var(--surface-quiet); }
-.reservationTable tbody tr:hover { background: var(--surface-hover); }
 .reservationTable tr[data-attention] { background: var(--alert-wash); }
-.reservationTable tr[data-attention]:hover { background: color-mix(in oklch, var(--alert) 13%, var(--surface)); }
 .reservationTable tr[data-selected],
-.reservationTable tr[data-selected]:hover { background: var(--accent-wash); box-shadow: inset 0 -2px var(--accent); }
 .emptyTableRow td { height: 140px; color: var(--ink-3); text-align: center; white-space: normal; }
 
 /* Time is the hero of every row, and it is the row's single control. */
@@ -1114,7 +1096,6 @@
 }
 .tableAnchor[data-occupied] { z-index: 4; }
 .tableAnchor[data-staff-filtered] { opacity: 0.28; }
-.tableAnchor:has(.tableNode:hover),
 .tableAnchor:has(.tableNode:focus-visible),
 .tableAnchor[data-selected] { z-index: 8; }
 .tableAnchor[data-tone="active"] { --floor-tone: var(--live-line); }
@@ -1138,6 +1119,14 @@
   animation: boothAlert 1700ms var(--ease-ui) infinite;
 }
 
+/* Named here rather than inline because the cursor affordance that uses them
+   lives in the capability-guarded section 12b, and the venue palette is not
+   allowed to leak out of this section (DESIGN.md §4.1). */
+.floorPlan {
+  --floor-node-hover-edge: oklch(0.83 0.07 78);
+  --floor-node-hover-inner: oklch(0.9 0.06 78 / 0.18);
+  --floor-node-hover-drop: oklch(0.05 0.02 318 / 0.94);
+}
 .tableNode {
   position: absolute;
   z-index: 2;
@@ -1188,12 +1177,6 @@
   background:
     repeating-linear-gradient(45deg, oklch(0.49 0.176 27 / 0.2) 0 3px, transparent 3px 8px),
     oklch(0.17 0.018 318 / 0.96);
-}
-.tableNode:hover {
-  border-color: oklch(0.83 0.07 78);
-  box-shadow:
-    inset 0 1px 0 oklch(0.9 0.06 78 / 0.18),
-    0 10px 20px -12px oklch(0.05 0.02 318 / 0.94);
 }
 .tableNode:active { scale: 0.965; }
 .tableNode:focus-visible {
@@ -1324,11 +1307,20 @@
   bottom: auto;
   translate: -50% -5px;
 }
-.tableNode:hover ~ .nodeCard,
 .tableNode:focus-visible ~ .nodeCard {
   opacity: 1;
   scale: 1;
   translate: -50% 0;
+}
+/* Touch has no hover, so the detail a cursor reveals on the way past is
+   revealed by the selection the operator already makes. Without this the
+   floor plan's only detail affordance is unreachable on the venue iPad. */
+@media (hover: none) {
+  .tableAnchor[data-selected] .nodeCard {
+    opacity: 1;
+    scale: 1;
+    translate: -50% 0;
+  }
 }
 .nodeCardHead { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s-4); }
 .nodeCardHead b { font-family: var(--font-figure); font-size: var(--t-body); }
@@ -1490,6 +1482,7 @@
   margin-left: 116px;
   border-bottom: 1px solid var(--rule-strong);
   background: var(--surface-sunken);
+  box-shadow: var(--lift-pane);
   flex: 0 0 32px;
 }
 .timelineTicks span {
@@ -1788,7 +1781,6 @@
   font-size: var(--t-micro);
   text-align: left;
 }
-.chartExceptions button:hover { background: var(--surface-hover); }
 .chartExceptions button small { color: var(--alert); font-family: var(--font-ui); }
 .chartExceptions p { margin: 0; padding: var(--s-4) var(--s-5); color: var(--ink-3); font-size: var(--t-micro); }
 .chartMobileFocus { display: none; }
@@ -1874,7 +1866,6 @@
   color: var(--action-text);
   text-align: left;
 }
-.turnoverAction button:hover:not(:disabled) { border-color: var(--action-hover); background: var(--action-hover); }
 .turnoverAction button > span { display: grid; min-width: 0; gap: 1px; }
 .turnoverAction strong { font-size: var(--t-body); font-weight: var(--weight-strong); }
 .turnoverAction small { overflow: hidden; color: var(--action-text); font-size: var(--t-micro); text-overflow: ellipsis; white-space: nowrap; }
@@ -1906,8 +1897,6 @@
   transition: color var(--dur-fast) var(--ease-ui);
 }
 .commandGrid button svg { color: var(--ink-3); transition: color var(--dur-fast) var(--ease-ui); }
-.commandGrid button:hover:not(:disabled) { background: var(--surface-hover); color: var(--ink); }
-.commandGrid button:hover:not(:disabled) svg { color: var(--accent-ink); }
 .commandGrid button:first-child {
   grid-column: 1 / -1;
   grid-template-columns: auto auto;
@@ -1917,12 +1906,8 @@
   font-weight: var(--weight-strong);
 }
 .commandGrid button:first-child svg { color: var(--action-text); }
-.commandGrid button:first-child:hover:not(:disabled) { background: var(--action-hover); color: var(--action-text); }
-.commandGrid button:first-child:hover:not(:disabled) svg { color: var(--action-text); }
 .commandGrid button[data-danger] { color: var(--alert); }
 .commandGrid button[data-danger] svg { color: var(--alert); }
-.commandGrid button[data-danger]:hover:not(:disabled) { background: var(--alert-wash); color: var(--alert); }
-.commandGrid button[data-danger]:hover:not(:disabled) svg { color: var(--alert); }
 
 .inspectorTabs {
   display: flex;
@@ -1944,7 +1929,6 @@
   font-size: var(--t-mini);
   white-space: nowrap;
 }
-.inspectorTabs button:hover { color: var(--ink); }
 .inspectorTabs button[aria-selected="true"] { border-bottom-color: var(--ink); color: var(--ink); font-weight: var(--weight-strong); }
 
 .inspectorPanel { min-height: 0; flex: 1; overflow-y: auto; overscroll-behavior: contain; }
@@ -2072,7 +2056,6 @@
   background: var(--surface);
   color: var(--ink-2);
 }
-.commandHeader button:hover { background: var(--surface-hover); }
 .commandHeader [data-lease-state] {
   display: flex;
   align-items: center;
@@ -2140,7 +2123,7 @@
      drawn on these selects in section 1. */
   background-color: var(--surface);
   color: var(--ink);
-  font-size: var(--t-body);
+  font-size: var(--t-field);
 }
 .commandForm select, .wizardBody select,
 .staffAssignmentGrid select, .waitlistActions select { padding-right: var(--s-9); }
@@ -2318,11 +2301,22 @@
   border-top: 1px solid var(--rule);
   background: var(--surface-quiet);
 }
+/* The operation dialog scrolls its body, not its whole form, so the footer is
+   pinned by the flex column rather than by `position: sticky`. Sticky kept it in
+   view but also kept it *over* the form, and a control that scrolls underneath
+   an opaque bar is one the operator cannot press. */
+.operationDialog .commandScroll {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.operationDialog .commandForm { overflow: visible; display: flex; flex-direction: column; }
 .operationDialog .commandFooter {
-  position: sticky;
   z-index: 2;
-  bottom: 0;
-  margin: var(--s-5) calc(var(--s-6) * -1) calc(var(--s-6) * -1);
+  margin: 0 calc(var(--s-6) * -1) calc(var(--s-6) * -1);
 }
 
 .operationTabs { display: grid; min-height: 48px; flex: 0 0 auto; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; border-bottom: 1px solid var(--rule); background: var(--rule); }
@@ -2449,7 +2443,7 @@
 
 .wizardLockedValue { margin: 0; color: var(--ink); font-size: var(--t-figure); font-weight: var(--weight-ui); }
 .wizardDateControl { width: min(100%, 260px); }
-.wizardDateControl input { font-size: var(--t-data) !important; font-variant-numeric: tabular-nums; }
+.wizardDateControl input { font-size: var(--t-field) !important; font-variant-numeric: tabular-nums; }
 .wizardHint { margin: 0; color: var(--ink-2); font-size: var(--t-micro); line-height: var(--lh-ui); }
 .wizardWarning { margin: 0; color: var(--alert); font-size: var(--t-mini); font-weight: var(--weight-strong); line-height: var(--lh-ui); }
 /* Validation sits with the field it concerns, never in a standing side panel. */
@@ -2622,7 +2616,23 @@
 .skeletonState div:nth-child(3) { animation-delay: 120ms; }
 .skeletonState div:nth-child(4) { animation-delay: 180ms; }
 .skeletonState div:nth-child(5) { animation-delay: 240ms; }
-.skeletonState span { position: absolute; left: 50%; top: 50%; color: var(--ink-3); font-size: var(--t-mini); transform: translate(-50%, -50%); }
+/* The bars behind this label pulse, so a transparent label's contrast is a
+   function of the animation phase: it cleared AA at the bright end of
+   `paperPulse` and fell to 4.0:1 at the dim end. Sitting the label on its own
+   opaque chip makes the ratio deterministic — and reads as a placed object
+   rather than as text stranded over stripes. */
+.skeletonState span {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  padding: var(--s-3) var(--s-5);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-control);
+  background: var(--surface);
+  color: var(--ink-2);
+  font-size: var(--t-mini);
+  transform: translate(-50%, -50%);
+}
 @keyframes paperPulse { from { opacity: 0.5; } to { opacity: 1; } }
 
 .routeState, .routeError {
@@ -2683,7 +2693,6 @@
   text-align: left;
   transition: background var(--dur-fast) var(--ease-ui);
 }
-.shellMenuGrid > button:hover { background: var(--surface-hover); }
 .shellMenuGrid > button[data-active] { background: var(--accent-wash); }
 .shellMenuGrid > span[aria-disabled="true"] { color: var(--ink-3); }
 .shellMenuGrid svg { grid-row: 1 / -1; align-self: center; color: var(--ink-2); }
@@ -2710,6 +2719,33 @@
   .toolbarSearch { width: min(210px, 24vw); }
   .viewSwitcher button span { display: none; }
   .viewSwitcher button { min-width: var(--h-control); padding: 0 var(--s-5); }
+}
+
+/* ── The timeline fits the night ───────────────────────────────────────────
+ *
+ * The floor is run from the 時間軸, so the whole operating window — 22:00 to
+ * 翌05:00, seven hours — has to be on screen at once. It was not: the grid
+ * carries a hard `min-width` (1020px at 30m, 860px even at 60m) against roughly
+ * 780pt of usable width on the venue iPad in landscape, so the night ran off the
+ * right edge from about 03:00 and the operator had to scroll to see the end of
+ * their own shift.
+ *
+ * Nothing about the timeline actually needs that width. Bars, blocks and the
+ * now-line are all positioned in **percent** of the operating window
+ * (`positionStyle` in `ChartView.tsx`) and the ticks are `repeat(n, 1fr)`, so
+ * the whole thing is already fluid — the `min-width` was the only thing pinning
+ * it. Released here, seven hours land inside the viewport and every mark stays
+ * where it belongs.
+ *
+ * 15m stays scrollable on purpose: 28 columns is a detail zoom, not an
+ * at-a-glance one, and squeezing `22:15` into 24pt would cost more than the
+ * scroll does.
+ */
+@media (min-width: 768px) and (max-width: 1439px) {
+  .timelineGrid,
+  .timelineScroller[data-zoom="60"] .timelineGrid { min-width: 0; }
+  .timelineScroller[data-zoom="15"] .timelineGrid { min-width: 1360px; }
+  .timelineRow { grid-template-columns: 116px minmax(0, 1fr); }
 }
 
 /* Tablet portrait and below: one column, inspector becomes a full sheet. */
@@ -2747,72 +2783,20 @@
 
   .workspace {
     grid-template-columns: minmax(0, 1fr);
+    /* The third track carries the phone's bottom nav and collapses to 0
+       wherever that nav is not rendered. */
     grid-template-rows: var(--h-masthead) minmax(0, 1fr) auto;
   }
   .serviceRibbon { gap: var(--s-4); padding: 0 var(--s-4); }
   .venueIdentity { padding-right: var(--s-4); }
-  .venueIdentity strong { font-size: var(--t-mini); }
   .primaryArea { grid-column: 1; grid-row: 2; }
-  .desktopInspector, .pulseCluster { display: none; }
+  .desktopInspector { display: none; }
   .syncStatus { margin-left: auto; padding: 0 var(--s-3); }
+  /* Width, not phone idiom: at 810pt the masthead cannot seat the counters,
+     the sync label, the operator name and logout at once, and the row
+     collides rather than wraps. The icons keep the meaning. */
   .syncStatus span, .operatorIdentity span { display: none; }
   .shellMenu { width: 100vw; border-left: 0; }
-
-  .mobileSummary {
-    display: grid;
-    min-height: 52px;
-    flex: 0 0 auto;
-    grid-template-columns: repeat(4, minmax(0, 1fr)) auto;
-    align-items: stretch;
-    border-bottom: 1px solid var(--rule);
-    background: var(--surface);
-  }
-  .mobileSummary > div, .mobileSummary > button:not(.summaryRefresh) {
-    display: grid;
-    min-width: 0;
-    align-content: center;
-    gap: 1px;
-    padding: var(--s-2) var(--s-4);
-    border: 0;
-    border-right: 1px solid var(--rule);
-    background: transparent;
-    text-align: left;
-  }
-  .mobileSummary button[data-active] { background: var(--accent-wash); box-shadow: inset 0 -2px var(--accent); }
-  .mobileSummary span { overflow: hidden; color: var(--ink-3); font-size: var(--t-micro); text-overflow: ellipsis; white-space: nowrap; }
-  .mobileSummary strong { color: var(--ink); font-family: var(--font-figure); font-size: var(--t-data); font-weight: var(--weight-strong); font-variant-numeric: tabular-nums; }
-  .mobileSummary [data-alert] strong { color: var(--alert); }
-  .summaryRefresh { display: grid; width: 52px; place-items: center; border: 0; background: transparent; color: var(--ink-2); font-size: 0; }
-
-  .primaryNav {
-    display: grid;
-    grid-column: 1;
-    grid-row: 3;
-    z-index: 40;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-    border-top: 1px solid var(--rule-strong);
-    background: var(--surface);
-    padding-bottom: env(safe-area-inset-bottom);
-  }
-  .primaryNav button {
-    display: grid;
-    min-height: 58px;
-    align-content: center;
-    justify-items: center;
-    gap: var(--s-1);
-    border: 0;
-    border-top: 2px solid transparent;
-    background: transparent;
-    color: var(--ink-3);
-    font-size: var(--t-micro);
-  }
-  .primaryNav button small { display: none; }
-  .primaryNav button[data-active] { border-top-color: var(--ink); color: var(--ink); font-weight: var(--weight-strong); }
-  .primaryNav button:first-child { color: var(--accent-ink); }
-
-  .workspaceToolbar { min-height: 48px; gap: var(--s-3); padding: 0 var(--s-4); }
-  .desktopCreate, .desktopMenu, .viewSwitcher { display: none; }
-  .toolbarSearch { width: auto; min-width: 0; flex: 1; margin-left: 0; }
 
   .mobileQueue { position: fixed; z-index: 70; inset: 0; flex-direction: column; background: var(--surface); }
   .mobileQueue[data-open] { display: flex; animation: sheetUp var(--dur-panel) var(--ease-enter); }
@@ -2884,12 +2868,113 @@
   .nodeCard { width: 164px; }
 }
 
+/* ── The venue device, portrait ────────────────────────────────────────────
+ *
+ * iPad (8th generation): 1080×810pt landscape, 810×1080pt portrait, touch only.
+ * Landscape clears 1024 and keeps the two-column shell; portrait lands here.
+ *
+ * 810pt is too narrow to hold a second column, but it is nowhere near narrow
+ * enough to justify replacing the board. So the inspector and the queue overlay
+ * the work area from the trailing edge — the way a supplementary column behaves
+ * on iPadOS when the split view collapses — instead of covering it edge to edge.
+ * The operator keeps the board in view while reading a reservation, and rotating
+ * the device reflows one panel rather than swapping the whole interaction model.
+ */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .mobileSheet, .mobileQueue {
+    inset: var(--h-masthead) 0 0 auto;
+    width: min(420px, 54vw);
+    border-left: 1px solid var(--rule-strong);
+    box-shadow: var(--lift-dialog);
+  }
+  .mobileSheet[data-open], .mobileQueue[data-open] {
+    animation: sheetIn var(--dur-panel) var(--ease-enter);
+  }
+  /* Full-bleed dialogs are a phone concession; at 810pt a dialog can stay a
+     dialog and keep the board visible behind its scrim. */
+  .dialogBackdrop, .operationsBackdrop { padding: var(--s-8); place-items: center; }
+  .operationsDialog, .commandDialog, .customerDialog,
+  .observabilityDialog, .demoResetDialog, .operationDialog {
+    width: min(720px, 100%);
+    max-width: none;
+    height: auto;
+    max-height: calc(100dvh - var(--s-10));
+    border: 1px solid var(--rule-strong);
+    border-radius: var(--r-pane);
+  }
+}
+
 /* Phones: the ledger and the map own the viewport. */
 @media (max-width: 767px) {
+  /* Moved down from the 1023px tier: a five-item bottom nav, a counter
+     strip standing in for the masthead cluster and a toolbar stripped of
+     its view switcher are phone idiom. A 10.2" iPad in portrait is 810pt
+     wide and keeps the operator toolbar. */
+  .mobileSummary {
+    display: grid;
+    min-height: 52px;
+    flex: 0 0 auto;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) auto;
+    align-items: stretch;
+    border-bottom: 1px solid var(--rule);
+    background: var(--surface);
+  }
+  .mobileSummary > div, .mobileSummary > button:not(.summaryRefresh) {
+    display: grid;
+    min-width: 0;
+    align-content: center;
+    gap: 1px;
+    padding: var(--s-2) var(--s-4);
+    border: 0;
+    border-right: 1px solid var(--rule);
+    background: transparent;
+    text-align: left;
+  }
+  .mobileSummary button[data-active] { background: var(--accent-wash); box-shadow: inset 0 -2px var(--accent); }
+  .mobileSummary span { overflow: hidden; color: var(--ink-3); font-size: var(--t-micro); text-overflow: ellipsis; white-space: nowrap; }
+  .mobileSummary strong { color: var(--ink); font-family: var(--font-figure); font-size: var(--t-data); font-weight: var(--weight-strong); font-variant-numeric: tabular-nums; }
+  .mobileSummary [data-alert] strong { color: var(--alert); }
+  .summaryRefresh { display: grid; width: 52px; place-items: center; border: 0; background: transparent; color: var(--ink-2); font-size: 0; }
+
+  .primaryNav {
+    display: grid;
+    grid-column: 1;
+    grid-row: 3;
+    z-index: 40;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    border-top: 1px solid var(--rule-strong);
+    background: var(--surface);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .primaryNav button {
+    display: grid;
+    min-height: 58px;
+    align-content: center;
+    justify-items: center;
+    gap: var(--s-1);
+    border: 0;
+    border-top: 2px solid transparent;
+    background: transparent;
+    color: var(--ink-3);
+    font-size: var(--t-micro);
+  }
+  .primaryNav button small { display: none; }
+  .primaryNav button[data-active] { border-top-color: var(--ink); color: var(--ink); font-weight: var(--weight-strong); }
+  .primaryNav button:first-child { color: var(--accent-ink); }
+
+  .workspaceToolbar { min-height: 48px; gap: var(--s-3); padding: 0 var(--s-4); }
+  .desktopCreate, .desktopMenu, .viewSwitcher { display: none; }
+  .toolbarSearch { width: auto; min-width: 0; flex: 1; margin-left: 0; }
+
+  .venueIdentity strong { font-size: var(--t-mini); }
+  .pulseCluster { display: none; }
+
   .workspace { --inspector-w: 0px; }
   .serviceRibbon { min-height: 52px; gap: var(--s-3); padding: 0 var(--s-3); }
   .ribbonControl > span, .ribbonControl > svg { display: none; }
-  .ribbonControl input { font-size: var(--t-micro); }
+  /* Never below --t-field, even where the phone toolbar is tightest: a
+     focused sub-16px control zooms Safari's layout viewport. */
+  .ribbonControl input { font-size: var(--t-field); }
   .operatorIdentity button { width: var(--h-control); padding: 0; font-size: 0; }
   .operatorIdentity button svg { flex: 0 0 auto; }
   .viewStrip { min-height: 44px; gap: var(--s-3); padding: 0 var(--s-4); }
@@ -2968,6 +3053,106 @@
      off the edge. メニュー already owns ログアウト on the bottom nav, and the
      sync state stays because it is the one thing here that changes. */
   .operatorIdentity { display: none; }
+}
+
+/* ── 12b. pointer hover ────────────────────────────────────────────────
+ *
+ * Hover feedback exists for a cursor and only for a cursor. On the venue
+ * iPad there is no pointer to leave, so an unguarded `:hover` latches on tap
+ * and the board grows a second, false "current row". Every rule below is the
+ * cursor's affordance; touch gets its feedback from `:active` and from
+ * selection instead. */
+@media (hover: hover) and (pointer: fine) {
+  .tableAnchor:has(.tableNode:hover) { z-index: 8; }
+  .tableNode:hover ~ .nodeCard {
+    opacity: 1;
+    scale: 1;
+    translate: -50% 0;
+  }
+  .primaryButton:hover:not(:disabled) { background: var(--action-hover); border-color: var(--action-hover); }
+  .secondaryButton:hover:not(:disabled) { background: var(--surface-hover); }
+  .paneButton:hover, .sheetClose:hover, .rowAction:hover { background: var(--surface-hover); color: var(--ink); }
+  .workspace select:hover:not(:disabled),
+  .dialogBackdrop select:hover:not(:disabled) {
+    background-image:
+      linear-gradient(45deg, transparent 50%, var(--ink) 50%),
+      linear-gradient(135deg, var(--ink) 50%, transparent 50%);
+  }
+  .workspace input:hover::-webkit-calendar-picker-indicator,
+  .dialogBackdrop input:hover::-webkit-calendar-picker-indicator { opacity: 1; }
+  .workspace input[type="checkbox"]:hover:not(:disabled),
+  .workspace input[type="radio"]:hover:not(:disabled),
+  .dialogBackdrop input[type="checkbox"]:hover:not(:disabled),
+  .dialogBackdrop input[type="radio"]:hover:not(:disabled) { border-color: var(--action); }
+  .loginPanel input:hover { border-color: var(--ink-2); }
+  .loginPanel > button:hover:not(:disabled) {
+    border-color: var(--action-hover);
+    background: var(--action-hover);
+  }
+  .ribbonControl input:hover { border-color: var(--rule-control); }
+  .pulseCluster button:hover { background: var(--surface-hover); }
+  .operatorIdentity button:hover { background: var(--surface-hover); }
+  .viewSwitcher button:hover { color: var(--ink); }
+  .zoomControl button:hover { background: var(--surface-hover); color: var(--ink); }
+  .queueItem:hover { background: var(--surface-hover); }
+  .reservationTable tbody tr:hover { background: var(--surface-hover); }
+  .reservationTable tr[data-attention]:hover { background: color-mix(in oklch, var(--alert) 13%, var(--surface)); }
+  .reservationTable tr[data-selected]:hover { background: var(--accent-wash); box-shadow: inset 0 -2px var(--accent); }
+  .tableNode:hover {
+    border-color: var(--floor-node-hover-edge);
+    box-shadow:
+      inset 0 1px 0 var(--floor-node-hover-inner),
+      0 10px 20px -12px var(--floor-node-hover-drop);
+  }
+  .chartExceptions button:hover { background: var(--surface-hover); }
+  .turnoverAction button:hover:not(:disabled) { border-color: var(--action-hover); background: var(--action-hover); }
+  .commandGrid button:hover:not(:disabled) { background: var(--surface-hover); color: var(--ink); }
+  .commandGrid button:hover:not(:disabled) svg { color: var(--accent-ink); }
+  .commandGrid button:first-child:hover:not(:disabled) { background: var(--action-hover); color: var(--action-text); }
+  .commandGrid button:first-child:hover:not(:disabled) svg { color: var(--action-text); }
+  .commandGrid button[data-danger]:hover:not(:disabled) { background: var(--alert-wash); color: var(--alert); }
+  .commandGrid button[data-danger]:hover:not(:disabled) svg { color: var(--alert); }
+  .inspectorTabs button:hover { color: var(--ink); }
+  .commandHeader button:hover { background: var(--surface-hover); }
+  .shellMenuGrid > button:hover { background: var(--surface-hover); }
+}
+
+/* ── 12c. touch ────────────────────────────────────────────────────────────
+ *
+ * The board runs on a venue iPad, so most presses arrive without a pointer ever
+ * having been over the target. Two things follow.
+ *
+ * First, acknowledgement has to be authored. globals.css drops iOS's grey tap
+ * flash because it reads as a rendering fault on 2–3px controls, and §12b just
+ * took hover away from touch — so every control whose only acknowledgement was
+ * hover gets a press state here. Entering the press is instant
+ * (`transition-duration: 0s`); the release keeps the base transition, so a tap
+ * reads as a press rather than as a fade.
+ *
+ * Second, a hit area is only real if a finger can land on it.
+ */
+
+.paneButton:active, .sheetClose:active, .rowAction:active,
+.pulseCluster button:active, .operatorIdentity button:active,
+.zoomControl button:active, .chartExceptions button:active,
+.commandHeader button:active, .shellMenuGrid > button:active,
+.queueItem:active { background: var(--surface-active); transition-duration: 0s; }
+.commandGrid button:active:not(:disabled) { background: var(--surface-active); transition-duration: 0s; }
+.commandGrid button:first-child:active:not(:disabled) { background: var(--action-press); color: var(--action-text); transition-duration: 0s; }
+.commandGrid button[data-danger]:active:not(:disabled) { background: var(--alert-wash); color: var(--alert); transition-duration: 0s; }
+.turnoverAction button:active:not(:disabled) { border-color: var(--action-press); background: var(--action-press); transition-duration: 0s; }
+.viewSwitcher button:active, .inspectorTabs button:active { color: var(--ink); }
+.reservationTable tbody tr:has(.rowOpen:active) { background: var(--surface-active); transition-duration: 0s; }
+
+@media (hover: none) {
+  /* The ledger row reads as one object and, under a cursor, highlighted as one.
+     Only the time cell was ever pressable, so on touch the operator aims at the
+     middle of a 52px row and nothing happens. The accessible control stays one
+     button with one name; its hit area is stretched to the row it already
+     stands for. The row carries no other interactive element, so the overlay
+     covers nothing. */
+  .reservationTable tbody tr { position: relative; }
+  .rowOpen::after { content: ""; position: absolute; inset: 0; }
 }
 
 /* ── 13. disabled overrides that must outrank later component rules ─────── */

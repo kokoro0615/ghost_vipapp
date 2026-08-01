@@ -372,6 +372,12 @@ export function OperationCenter({
             className={styles.commandForm}
             onSubmit={submit}
           >
+            {/* The action bar is pinned to the dialog, not to the scrollport:
+                inside the scroller it stayed sticky over the form and controls
+                passed underneath it, which axe reports as a partially obscured
+                target and an operator experiences as a checkbox they cannot
+                reach. The body scrolls; the footer does not move. */}
+            <div className={styles.commandScroll}>
 	          <div className={styles.commandContext}>
 	            <strong>{kind === "walk_in" ? "店頭受付・即時着席" : "販売・運用停止"}</strong>
 	            <span className="tabular-nums">{board.businessDay.businessDate} / 22:00–翌05:00</span>
@@ -690,6 +696,8 @@ export function OperationCenter({
               </div>
             </div>
           ) : null}
+
+          </div>
 
           <footer className={styles.commandFooter}>
             <button type="button" className={styles.secondaryButton} onClick={closePanel} disabled={pending}>

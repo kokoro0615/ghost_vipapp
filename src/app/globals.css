@@ -25,9 +25,12 @@
   --surface: oklch(1 0 0); /* working pane */
   --surface-raised: oklch(1 0 0); /* popovers, dialogs */
   --surface-quiet: oklch(0.984 0.0025 85); /* zebra / inset rows */
-  --surface-sunken: oklch(0.952 0.004 85); /* pane headers, rails */
-  --surface-hover: oklch(0.966 0.004 85);
-  --surface-active: oklch(0.944 0.005 85);
+  /* A header band has to read as a band. SmartHR separates its table head at
+   * #edebe8 against a white pane; GHOST sat at 0.952, close enough to white
+   * that column headers dissolved into the rows beneath them. */
+  --surface-sunken: oklch(0.943 0.005 85); /* pane headers, rails */
+  --surface-hover: oklch(0.962 0.004 85);
+  --surface-active: oklch(0.936 0.006 85);
 
   /* Legacy alias kept so route-level shells resolve to the same ground. */
   --canvas: var(--paper);
@@ -41,9 +44,22 @@
   --text-secondary: var(--ink-2);
   --text-tertiary: var(--ink-3);
 
-  /* ---- Rules (hairlines carry structure, so only two weights exist) ---- */
-  --rule: oklch(0.92 0.003 82);
-  --rule-strong: oklch(0.822 0.004 82);
+  /* ---- Rules (hairlines carry structure, so only two weights exist) ----
+   *
+   * These carry every plane edge, every column rule and every table divider on
+   * a surface that has no shadows to fall back on — so when they are too light
+   * the whole board reads as an unfinished wireframe rather than as an
+   * instrument, which is exactly the complaint this pass answers.
+   *
+   * Reference point: SmartHR's design system, the closest well-measured
+   * Japanese business-UI system, sets its BORDER at #d6d3d0 (≈ oklch 0.868) on
+   * a #f8f7f6 ground. GHOST previously sat at 0.92 — light enough that a table
+   * header did not read as a header. It moves most of the way there and stops
+   * short, because this board carries more rules per screen than SmartHR's
+   * forms do and the full step would read as a grid rather than as structure.
+   */
+  --rule: oklch(0.893 0.004 82);
+  --rule-strong: oklch(0.79 0.005 82);
   /* Control boundaries must clear WCAG 2.2 1.4.11 (3:1) on every surface. */
   --rule-control: oklch(0.635 0.005 82);
   --border: var(--rule);
@@ -86,9 +102,22 @@
   --t-mini: 0.75rem; /* 12px — secondary row text */
   --t-body: 0.8125rem; /* 13px — UI default */
   --t-data: 0.9375rem; /* 15px — primary values */
+  --t-field: 1rem; /* 16px — every text-entry control. See note below. */
   --t-lead: 1.125rem; /* 18px — pane titles */
   --t-figure: 1.375rem; /* 22px — counters, hero time */
   --t-display: clamp(1.625rem, 3.4vw, 2rem); /* login / empty states */
+
+  /* `--t-field` is a device constraint, not a taste choice, and it is the one
+   * step in this scale that must never be lowered.
+   *
+   * Safari on iOS/iPadOS zooms the layout viewport when focus enters a text
+   * control whose computed font-size is below 16px. This app runs on a venue
+   * iPad with `body { overflow: hidden }`, so that zoom strands the operator in
+   * a panned board with no scroll affordance to get back — mid-service, one tap
+   * into a search field. Every input, select and textarea therefore renders at
+   * `--t-field` or larger. Measured before the fix: search 13px, toolbar select
+   * 13px, wizard fields 13px, wizard date 15px, ribbon 12px (11px on phones) —
+   * every text-entry control on the surface except the login field. */
 
   --lh-tight: 1.15;
   --lh-ui: 1.35;
@@ -114,12 +143,29 @@
   --s-9: 32px;
   --s-10: 40px;
 
-  /* ---- Geometry: structural planes are square; controls barely softened ---- */
-  --r-chip: 2px;
-  --r-control: 3px;
-  --r-pane: 4px;
+  /* ---- Geometry ----
+   *
+   * 2–3px is not "restrained", it is brittle: at the venue's 2x density those
+   * corners resolve to four hard pixels and every control reads as a wireframe
+   * box rather than as a made object. SmartHR uses 4 / 6 / 8 for exactly this
+   * class of dense business UI, and that is the register adopted here.
+   *
+   * The ban that still holds is the one that matters: nothing reaches 12px, so
+   * the surface never becomes a pile of soft SaaS cards.
+   */
+  --r-chip: 3px;
+  --r-control: 6px;
+  --r-pane: 8px;
 
-  /* ---- Elevation: value + hairline. No decorative shadow clouds. ---- */
+  /* ---- Elevation ----
+   *
+   * Value and a hairline still carry the plane stack; this is not a licence for
+   * shadow clouds. What was missing is the shortest step of all — the contact
+   * shadow that says a pane sits *on* the desk rather than being printed into
+   * it. SmartHR's LAYER1 (`0 1px 2px`) is that step, and `--lift-pane` is its
+   * GHOST equivalent: one layer, warm, and almost subliminal.
+   */
+  --lift-pane: 0 1px 2px 0 oklch(0.3 0.01 70 / 0.07);
   --lift-raised: 0 1px 2px -1px oklch(0.3 0.01 70 / 0.1), 0 8px 20px -16px oklch(0.3 0.01 70 / 0.22);
   --lift-dialog: 0 1px 0 oklch(0.3 0.01 70 / 0.05), 0 28px 64px -30px oklch(0.28 0.012 70 / 0.32);
   --scrim: oklch(0.26 0.012 70 / 0.44);
@@ -163,8 +209,18 @@ body {
   margin: 0;
 }
 
+html {
+  /* iPadOS inflates text in some rotation/reflow paths unless this is pinned.
+   * 100% keeps the authored scale without disabling the user's own zoom. */
+  -webkit-text-size-adjust: 100%;
+}
+
 body {
   overflow: hidden;
+  /* The workspace owns every scroll region (§5.2). Without this, a flick that
+   * reaches the end of a ledger rubber-bands the whole page on iPadOS and the
+   * fixed chrome visibly detaches. */
+  overscroll-behavior: none;
   background: var(--paper);
   -webkit-font-smoothing: antialiased;
   font-kerning: normal;
@@ -177,6 +233,38 @@ input,
 select,
 textarea {
   font: inherit;
+}
+
+/* ---- Touch is the primary input on this surface ----
+ *
+ * The venue device is an iPad, so every control is pressed by a finger. Two
+ * browser defaults have to be replaced rather than inherited:
+ *
+ *  - iOS paints a grey flash box on tap. On 2–3px radius controls it reads as a
+ *    rendering fault, and it fires even where the press is rejected. The app
+ *    draws its own `:active` feedback instead.
+ *  - Double-tap-to-zoom makes the first tap of a fast double-press wait ~300ms
+ *    before it commits. `manipulation` removes that wait and keeps pinch-zoom,
+ *    which stays available for accessibility.
+ */
+button,
+input,
+select,
+textarea,
+[role="button"],
+[role="tab"],
+a[href] {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/* The default for text entry — see `--t-field`. Component rules override this
+ * by specificity, so the real guard is the contract test, which fails on any
+ * `font-size` in a text-control rule that does not resolve to `--t-field`. */
+input:not([type="checkbox"]):not([type="radio"]),
+select,
+textarea {
+  font-size: var(--t-field);
 }
 
 /* Figures never reflow a column: one rule, applied everywhere numbers live.
@@ -199,6 +287,35 @@ textarea {
   clip-path: inset(50%);
   white-space: nowrap;
   border: 0;
+}
+
+/* ---- Tablet: one register up ----
+ *
+ * The scale above is tuned for a cursor at a desk. The venue reads this board on
+ * a 10.2" iPad held at arm's length, in a dark room, while doing something else
+ * — and on that panel a CSS pixel is a point, so `--t-body: 13px` is Apple's
+ * *Footnote*, three steps under the 17pt iPadOS uses for body text. That gap is
+ * most of why the surface reads as a shrunken desktop app rather than an iPad
+ * one.
+ *
+ * Each step moves up roughly one Apple register. It costs no density: `--h-row`
+ * is already 52px for the touch floor, and the row's tallest stack (17px value
+ * over 13px caption at `--lh-ui`) still lands under it, so the ledger shows the
+ * same number of rows it did before.
+ *
+ * Scoped by width rather than by `pointer: coarse` on purpose. Width is
+ * deterministic in the audit, and this app ships to one device class; a laptop
+ * happening to sit in the range gets larger type, which is not a defect.
+ */
+@media (min-width: 768px) and (max-width: 1279px) {
+  :root {
+    --t-micro: 0.75rem; /* 12px */
+    --t-mini: 0.8125rem; /* 13px */
+    --t-body: 0.9375rem; /* 15px */
+    --t-data: 1.0625rem; /* 17px — Apple's iPadOS body */
+    --t-lead: 1.25rem; /* 20px */
+    --t-figure: 1.625rem; /* 26px */
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

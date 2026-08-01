@@ -65,9 +65,11 @@ Measured before → after (dense 14-reservation board):
 
 ## 3. Rules of the direction
 
-1. **Planes separate by value plus one hairline.** No shadow clouds, no blur,
-   no glass. Elevation exists only for things that float (dialogs, the floor
-   plan sheet, table nodes).
+1. **Planes separate by value plus one hairline**, plus a single contact shadow
+   (`--lift-pane`) where something genuinely floats over scrolled content — the
+   masthead, the toolbar, a sticky table head, the timeline's tick row. No
+   shadow clouds, no blur, no glass, and never a second layer. Elevation is a
+   statement about z-order, not a decoration (`DESIGN.md` §4.7).
 2. **Exactly one accent.** Champagne means "you are here" — the selected row,
    the selected table, the current filter, the now-line. Nothing else.
 3. **Status is a swatch glyph plus a word**, never a pill that reads as a
@@ -85,6 +87,16 @@ Measured before → after (dense 14-reservation board):
    one thing the app deliberately does not draw.
 9. **The interface does not narrate itself.** No subtitle under a label, no
    eyebrow that repeats the title, no `01` without an `02` (`DESIGN.md` §5.7c).
+
+10. **This is an iPad, and it is held.** The board is designed at 1080×810 and
+    810×1080 with a finger, not at 1440×900 with a mouse (`DESIGN.md` L11).
+    Rotation reflows one panel; it never swaps the shell. Type is sized for a
+    10.2" panel at arm's length in a dark room, where a CSS pixel is a point.
+
+11. **Nothing depends on a pointer that is not there.** Hover is a cursor
+    affordance and lives behind a capability guard; anything hover revealed has a
+    touch equivalent; every control acknowledges its own press, because the
+    browser's tap flash was removed on purpose (`DESIGN.md` §6.1).
 
 ### The 2026-07-31 refinement — what made it read as generated
 
@@ -128,16 +140,19 @@ or submits an Owner PIN.
 --paper           oklch(0.968 0.0035 85)   application ground (#f5f4f2)
 --surface         oklch(1 0 0)             working pane
 --surface-quiet   oklch(0.984 0.0025 85)   zebra rows, inset blocks
---surface-sunken  oklch(0.952 0.004 85)    pane headers, rails
+--surface-sunken  oklch(0.943 0.005 85)    pane headers, rails
 --surface-hover / --surface-active         interaction states
 ```
 
 The ground is a warm translation of the measured Apple `#f5f5f7` canvas, not a
 copy: `#f5f4f2` keeps GHOST's champagne temperature. White working panes remain
 distinct through the solid value step and authored hairlines; hierarchy does
-not need a dark beige desk or a shadow stack. `--rule` is correspondingly
-restrained at `oklch(0.92 0.003 82)`. Every step stays warm white; none is a
-generic blue-grey SaaS surface.
+not need a dark beige desk or a shadow stack. `--rule` sits at
+`oklch(0.893 0.004 82)` — restrained, but dark enough to hold an edge on a
+surface that has no shadow to fall back on. It was `0.92` until the 2026-08-01
+texture pass found that a table head had stopped reading as a head
+(`DESIGN.md` §4.7). Every step stays warm white; none is a generic blue-grey
+SaaS surface.
 
 ### Ink (all verified against WCAG 2.2 AA)
 
@@ -188,6 +203,15 @@ all (15–19.5px drift across a ten-digit string), so a ledger column would jitt
 BIZ UDPGothic also ships only 400/700. Full matrix and method:
 `docs/ui/VIP_MANAGER_LIGHT_RESERVATION_RESEARCH.md` §4.
 
+**The scale is not the same size on the device.** Between 768px and 1439px the
+six reading steps move up roughly one Apple register (13→15 body, 15→17 data).
+On a 10.2" iPad a CSS pixel is a point, so the desk scale's `--t-body: 13px` is
+Apple's *Footnote* — three registers under the 17pt iPadOS uses for body text,
+and most of why the surface read as a shrunken desktop app. It costs no density:
+`--h-row` was already 52px for the touch floor and the taller stack still fits,
+so the ledger shows the same number of rows. Text controls are pinned separately
+at 16px and never move (`DESIGN.md` §4.5–4.6).
+
 The 2026-07-31 Owner-requested bake-off retained M PLUS 2 rather than copying an
 Apple system stack: true Apple/Hiragino rendering was unavailable on this Linux
 host, while M PLUS 2 kept licensed, consistent Japanese and effective tabular
@@ -211,8 +235,10 @@ Six-step scale: `--t-micro 11 · --t-mini 12 · --t-body 13 · --t-data 15 ·
 
 ### Geometry, spacing, motion
 
-Spacing on a 4px rhythm (`--s-1`…`--s-10`). Radius stays structural:
-`--r-chip 2 · --r-control 3 · --r-pane 4`. Motion is `--dur-fast 110ms /
+Spacing on a 4px rhythm (`--s-1`…`--s-10`). Radius stays structural but is no
+longer brittle: `--r-chip 3 · --r-control 6 · --r-pane 8`, the register SmartHR
+uses for dense business UI. Nothing reaches 12px, so the surface never becomes a
+pile of soft cards (`DESIGN.md` §4.7). Motion is `--dur-fast 110ms /
 --dur-ui 160ms / --dur-panel 220ms` on `--ease-ui` and `--ease-enter`;
 `prefers-reduced-motion` collapses every duration.
 
@@ -268,12 +294,28 @@ version・監査履歴を残す。返金ケースと顧客通知はこの導線�
 各段階は1タップ、56px高、説明付きとする。汎用check-inを同時に重複表示せず、
 予約がない空席では次客操作を推測表示しない。
 
-### ≤1023px
+### 768–1023px — iPad portrait
+
+Single column at full width. The inspector and the queue **overlay from the
+trailing edge** at `min(420px, 54vw)` — the behaviour of a supplementary column
+on iPadOS when a split view collapses — so the operator keeps the board in view
+while reading a reservation. Dialogs stay dialogs. **The operator toolbar is
+kept**: view switcher, create, menu and the masthead counters all remain.
+
+This tier exists because the venue iPad is 810pt wide in portrait and used to
+land in the phone shell. Rotating the device then swapped the whole interaction
+model — bottom nav appearing, toolbar emptying — instead of moving one panel.
+
+### ≤767px — phone
 
 Single column. The inspector becomes a full sheet, the counters become a 52px
 filter strip, and a five-item bottom nav carries 受付 / 一覧 / フロア / 時間軸 /
-メニュー. The `1023px` threshold is shared by the workspace (`matchMedia`) and
-the QA harness — change both together.
+メニュー.
+
+The `1023px` threshold is shared by the workspace (`matchMedia`) and the QA
+harness — change both together. In the workspace it means only *"the inspector is
+not persistent"*, which is true for iPad portrait as well; the phone shell is a
+separate, lower tier.
 
 ### 新規予約 dialog — two zones, never three
 

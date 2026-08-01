@@ -12,6 +12,11 @@ test("light UI QA freezes the exact Chromium and WebKit release matrix", () => {
   assert.deepEqual(
     QA_VIEWPORTS.map(({ browser, width, height }) => `${browser}-${width}x${height}`),
     [
+      /* The venue device leads the matrix: an iPad (8th generation) is
+       * 1080×810pt landscape and 810×1080pt portrait. Everything after it is
+       * regression cover for the shells that still exist. */
+      "chromium-1080x810",
+      "chromium-810x1080",
       "chromium-1440x900",
       "chromium-1366x768",
       "chromium-1194x834",
@@ -20,8 +25,36 @@ test("light UI QA freezes the exact Chromium and WebKit release matrix", () => {
       "chromium-390x844",
       "chromium-375x812",
       "chromium-320x800",
+      /* Safari is the browser the venue actually uses, so the device viewport
+       * is pinned for WebKit too and reported as not-run where the host cannot
+       * launch it. */
+      "webkit-1080x810",
       "webkit-1194x834",
     ],
+  );
+  /* Touch emulation is part of the contract, not a detail of the run: without
+   * it the harness drives a mouse browser at a tablet size and cannot observe
+   * hover that latches on tap. */
+  for (const key of ["chromium-1080x810", "chromium-810x1080", "webkit-1080x810"]) {
+    const entry = QA_VIEWPORTS.find(
+      ({ browser, width, height }) => `${browser}-${width}x${height}` === key,
+    );
+    assert.equal(entry.touch, true, `${key} must be audited as a touch device`);
+    assert.equal(entry.scale, 2, `${key} must render at the panel's 2x density`);
+  }
+  /* An iPad ships with motion on. Auditing the venue device only under
+   * `reduce` leaves the timeline's four infinite phase signals, and the floor
+   * plan's two, permanently unobserved. */
+  for (const key of ["chromium-1080x810", "chromium-810x1080"]) {
+    const entry = QA_VIEWPORTS.find(
+      ({ browser, width, height }) => `${browser}-${width}x${height}` === key,
+    );
+    assert.equal(entry.motion, true, `${key} must be audited with motion running`);
+  }
+  /* …and the reduced-motion path must still be covered somewhere. */
+  assert.ok(
+    QA_VIEWPORTS.some((entry) => !entry.motion),
+    "at least one viewport must audit prefers-reduced-motion",
   );
   for (const state of [
     "login",

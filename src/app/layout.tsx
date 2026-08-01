@@ -49,6 +49,25 @@ export function generateMetadata(): Metadata {
       follow: false,
       nocache: true,
     },
+    /*
+     * The venue runs this board on an iPad, and in Safari the tab and address
+     * bars take roughly 84pt off a viewport that is only 810pt tall in
+     * landscape to begin with — about 12% of the operator's work area, spent on
+     * browser chrome that a single-purpose console never uses.
+     *
+     * Added to the Home Screen the app launches standalone and gets that space
+     * back, with no browser UI to mis-tap during service. `default` keeps the
+     * status bar opaque so the light masthead starts below it rather than
+     * sliding under the clock.
+     *
+     * Note for whoever installs it: a Home Screen app has its own cookie store,
+     * so the Basic challenge is answered once inside the installed app.
+     */
+    appleWebApp: {
+      capable: true,
+      title: "VIP Manager",
+      statusBarStyle: "default",
+    },
   };
 }
 
