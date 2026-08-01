@@ -359,8 +359,8 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
     const events = new EventSource(
       `/api/admin/vip-floor/events?date=${encodeURIComponent(businessDate)}&since=${revisionAtConnect}`,
     );
-    let hasOpened = false;
     let streamUnavailable = false;
+    let revisionRefreshPending = false;
     let reconnectTimer: number | null = null;
 
     const markStreamUnavailable = () => {
@@ -387,15 +387,41 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
     };
 
     events.addEventListener("open", () => {
-      const isReconnect = hasOpened || reconnectTimer !== null || streamUnavailable;
-      hasOpened = true;
       if (reconnectTimer !== null) {
         window.clearTimeout(reconnectTimer);
         reconnectTimer = null;
       }
-      if (isReconnect) {
+    });
+
+    events.addEventListener("ready", (event) => {
+      try {
+        const payload = JSON.parse((event as MessageEvent<string>).data) as {
+          businessDate?: unknown;
+          revision?: unknown;
+        };
+        if (
+          payload.businessDate !== businessDate
+          || payload.revision !== revisionAtConnect
+          || !streamUnavailable
+        ) {
+          return;
+        }
         streamUnavailable = false;
-        void loadBoard(businessDate);
+        const globalState = state.board.reservations.length === 0
+          ? "empty"
+          : state.board.operations.adminMutationEnabled
+            ? "healthy"
+            : "read_only";
+        dispatch({
+          type: "globalState",
+          state: globalState,
+          description: globalState === "read_only"
+            ? "GHOST側の更新スイッチが停止中です。予約は閲覧できます。"
+            : "GHOST予約台帳と同期済みです。",
+          message: `REV ${revisionAtConnect} / 更新通知へ再接続済み`,
+        });
+      } catch {
+        markStreamUnavailable();
       }
     });
 
@@ -431,7 +457,11 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
             message: `REV ${revisionAtConnect} → ${payload.revision} / 欠番回復中`,
           });
         }
-        void loadBoard(businessDate);
+        if (revisionRefreshPending) return;
+        revisionRefreshPending = true;
+        void loadBoard(businessDate).finally(() => {
+          revisionRefreshPending = false;
+        });
       } catch {
         markStreamUnavailable();
       }
@@ -450,6 +480,8 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
     loadBoard,
     state.board.boardRevision,
     state.board.businessDay.businessDate,
+    state.board.operations.adminMutationEnabled,
+    state.board.reservations.length,
   ]);
 
   useEffect(() => {

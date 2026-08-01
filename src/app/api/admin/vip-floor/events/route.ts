@@ -39,6 +39,7 @@ export async function GET(request: Request) {
 
   const encoder = new TextEncoder();
   let lastRevision = since;
+  let readySent = false;
   let closed = false;
   let pollTimer: ReturnType<typeof setTimeout> | null = null;
   let lifetimeTimer: ReturnType<typeof setTimeout> | null = null;
@@ -63,12 +64,12 @@ export async function GET(request: Request) {
 
         try {
           const response = await ghostAdminFetch(
-            `/api/admin/v2/vip-floor?businessDate=${encodeURIComponent(businessDate)}`,
+            `/api/admin/v2/vip-floor/revision?businessDate=${encodeURIComponent(businessDate)}`,
             {},
             token,
           );
           const payload = await copyJson(response) as Record<string, unknown>;
-          const revision = payload.boardRevision;
+          const revision = payload.revision;
 
           if (!response.ok) {
             controller.enqueue(encoder.encode(
@@ -78,13 +79,34 @@ export async function GET(request: Request) {
             return;
           }
 
-          if (typeof revision === "number" && Number.isSafeInteger(revision) && revision > lastRevision) {
+          if (
+            payload.businessDate !== businessDate
+            || typeof revision !== "number"
+            || !Number.isSafeInteger(revision)
+            || revision < 0
+          ) {
+            controller.enqueue(encoder.encode(
+              `event: unavailable\ndata: ${JSON.stringify({ status: 502 })}\n\n`,
+            ));
+            close();
+            return;
+          }
+
+          if (revision > lastRevision) {
             lastRevision = revision;
             controller.enqueue(encoder.encode(
               `event: revision\ndata: ${JSON.stringify({
                 businessDate,
                 revision,
                 observedAt: new Date().toISOString(),
+              })}\n\n`,
+            ));
+          } else if (!readySent) {
+            readySent = true;
+            controller.enqueue(encoder.encode(
+              `event: ready\ndata: ${JSON.stringify({
+                businessDate,
+                revision,
               })}\n\n`,
             ));
           }
