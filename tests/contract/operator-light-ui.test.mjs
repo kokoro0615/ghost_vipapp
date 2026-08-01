@@ -148,23 +148,21 @@ test("the wizard never spends alert colour on a state the operator cannot act on
   assert.doesNotMatch(reservationWizard, /data-ok=/u);
 });
 
-test("owner Basic access never renders a PIN field and demo PIN stays isolated", () => {
+test("Basic access renders no secondary credential field in either lane", () => {
   assert.match(workspace, /className=\{styles\.loginFrame\}/u);
   assert.match(workspace, /GHOST Osaka 1階VIPフロア座席図/u);
   assert.match(workspace, /if \(!demo\.config\)/u);
   assert.match(workspace, /ユーザー名とパスワードを確認しています/u);
-  assert.match(workspace, /PIN入力は不要です/u);
+  assert.match(workspace, /ブラウザのBasic認証から直接/u);
   assert.match(workspace, /window\.location\.reload\(\)/u);
-  assert.match(workspace, /デモ専用PIN/u);
-  assert.match(workspace, /type="password"/u);
-  assert.match(workspace, /aria-invalid=\{loginFailed\}/u);
-  assert.match(workspace, /loginInputRef\.current\?\.focus\(\)/u);
-  assert.match(workspace, /"フロアを開く"/u);
+  assert.match(workspace, /VIP予約デモへ再接続/u);
+  assert.match(workspace, /onClick=\{\(\) => void reconnect\(\)\}/u);
+  assert.doesNotMatch(workspace, /デモ専用PIN|owner-pin|type="password"|submitPin|loginInputRef/u);
   const ownerBoundary = workspace.slice(
     workspace.indexOf("if (!demo.config)"),
     workspace.indexOf("return (", workspace.indexOf("if (!demo.config)") + 1),
   );
-  assert.doesNotMatch(ownerBoundary, /<input|専用PIN|type="password"/u);
+  assert.doesNotMatch(ownerBoundary, /<input|type="password"/u);
   assert.match(workspaceStyles, /\.loginFrame \{[\s\S]*?grid-template-columns:/u);
   assert.match(workspaceStyles, /vipmapv3\.9239fd2174\.webp/u);
   assert.match(
@@ -283,13 +281,12 @@ test("build invariants that look like mistakes stay in place", () => {
   // Each of these has been "cleaned up" by a well-meaning change before.
   // docs/DESIGN.md 2.3 records why every one of them is deliberate.
   const build = packageJson.scripts?.build ?? "";
-  assert.match(build, /provision-basic-owner\.mjs/u, "Owner access is provisioned pre-build");
+  assert.doesNotMatch(build, /provision-basic-owner|pin/iu, "build has no secondary credential provisioning");
   assert.match(build, /next build --webpack/u, "the production build is pinned to webpack");
   assert.match(build, /fix-middleware-trace\.mjs/u, "the middleware trace fix runs post-build");
   assert.ok(
-    build.indexOf("provision-basic-owner") < build.indexOf("next build")
-    && build.indexOf("next build") < build.indexOf("fix-middleware-trace"),
-    "build steps must stay in provision -> build -> trace-fix order",
+    build.indexOf("next build") < build.indexOf("fix-middleware-trace"),
+    "build steps must stay in build -> trace-fix order",
   );
 
   // Preloading the webfont would cost the first paint the Hiragino-first

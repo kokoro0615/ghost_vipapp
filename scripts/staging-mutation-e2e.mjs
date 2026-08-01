@@ -177,7 +177,6 @@ async function loadConfiguration() {
     allowTestScript,
     basicUser: readRequired(env, "VIPAPP_BASIC_USER"),
     basicPassword: readRequired(env, "VIPAPP_BASIC_PASSWORD"),
-    pin: readRequired(env, "VIPAPP_OWNER_PIN"),
     protectionBypass: readRequired(env, "GHOST_VIPAPP_PROTECTION_BYPASS"),
   };
 }
@@ -199,7 +198,6 @@ async function main() {
     basicPassword: config.basicPassword,
     defaultHeaders: { "x-vercel-protection-bypass": config.protectionBypass },
     rules: [
-      { method: "POST", path: "/api/admin/session/pin" },
       { method: "GET", path: "/api/admin/session" },
       { method: "DELETE", path: "/api/admin/session" },
       { method: "GET", path: "/api/admin/vip-floor" },
@@ -212,12 +210,9 @@ async function main() {
 
   try {
     emit("staging_mutation_e2e_started", { contract: "vip-floor.v2", lifecycle: "external" });
-    const login = await client.requestJson("/api/admin/session/pin", {
-      method: "POST",
-      json: { pin: config.pin },
-    });
-    assert(login.response.ok && login.payload?.ok === true, `pin_login_failed:${login.response.status}`);
-    assert(client.jar.size > 0, "pin_login_cookie_missing");
+    const login = await client.requestJson("/api/admin/session");
+    assert(login.response.ok && login.payload?.ok === true, `basic_session_failed:${login.response.status}`);
+    assert(client.jar.size > 0, "basic_session_cookie_missing");
     loggedIn = true;
 
     const beforeBoard = await client.requestJson(`/api/admin/vip-floor?date=${encodeURIComponent(config.businessDate)}`);

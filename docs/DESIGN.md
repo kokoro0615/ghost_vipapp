@@ -129,10 +129,10 @@ These look like mistakes and are not:
 
 - **`next build --webpack`.** The build is pinned to webpack. Do not switch to
   Turbopack for the production build.
-- **`scripts/provision-basic-owner.mjs` runs pre-build** and
-  **`scripts/fix-middleware-trace.mjs` runs post-build.** Both are part of
-  `npm run build`. Removing either breaks Owner access or the middleware trace
-  on Vercel.
+- **`scripts/fix-middleware-trace.mjs` runs post-build.** It is part of
+  `npm run build`; removing it breaks the middleware trace on Vercel. Owner
+  access exchanges a verified Basic lane through the dedicated server-to-server
+  session endpoint and never provisions or derives a secondary credential.
 - **`preload: false` on the font.** Deliberate: the Hiragino-first fallback list
   is the fast path on the venue's iPads; preloading the webfont would cost the
   first paint it is supposed to protect.
@@ -621,7 +621,7 @@ npm run ci   # lint · typecheck · unit+contract+PII · build · maintenance ·
 
 | Gate | Pins |
 |---|---|
-| `tests/contract/operator-light-ui.test.mjs` | The design itself: OKLCH light tokens, no revived dark aliases, no hex, M PLUS 2 400/500/600/700 + explicit weight roles + tabular figures, six-step scale, two-zone wizard with all eight steps, Owner lane with no PIN field, two-column shell, hidden idle live region, full-colour floor plan with ≥52×44 nodes, chart rows filling height, no coloured side tabs, no `backdrop-filter`, no radius ≥12px |
+| `tests/contract/operator-light-ui.test.mjs` | The design itself: OKLCH light tokens, no revived dark aliases, no hex, M PLUS 2 400/500/600/700 + explicit weight roles + tabular figures, six-step scale, two-zone wizard with all eight steps, Basic-only access with no secondary credential field, two-column shell, hidden idle live region, full-colour floor plan with ≥52×44 nodes, chart rows filling height, no coloured side tabs, no `backdrop-filter`, no radius ≥12px |
 | `npm run test:a11y` | Required-state and viewport counts come from `scripts/light-ui-qa-manifest.mjs`; the harness currently captures the 45 required states plus one date-unavailable fixture state per viewport. Gate: axe 0 · horizontal overflow 0 · controls <44px 0 · **text controls <16px 0** · legacy purple 0 · console errors 0 · 5xx 0. Viewports carrying `touch: true` are driven with `hasTouch`/`isMobile` at `deviceScaleFactor: 2`, so `hover`/`pointer` media resolve the way they do on the device. Read counts from artifacts, never this prose. |
 | `tests/contract/source-of-truth-guard.test.mjs` | The legacy website admin surface is never treated as this app's UI |
 | `tests/unit/inspector-accessibility.test.mjs`, `timeline-state`, `ghost-operating-hours`, `workspace-route-sync` | Focus order, timeline state model, the 22:00–翌05:00 window, URL/state sync |
@@ -639,7 +639,7 @@ Four rules that used to rely on review discipline are now machine-enforced in
 |---|---|
 | **Website violet containment** | Raw `oklch()` at hue `300–340` appears outside §6; `prefers-color-scheme` appears at all; `color-scheme: light` is dropped. Also ratchets raw colour outside §6 at ≤1 |
 | **Dependency ban** | Tailwind, PostCSS, Sass, CSS-in-JS, Motion/GSAP/Lenis, Three/R3F, Radix/MUI/Chakra/antd, a second icon set or a charting library enters `dependencies`/`devDependencies`, a `tailwind.config.*`/`postcss.config.*` appears, or `lucide-react` is removed |
-| **Build invariants** | The build loses `provision-basic-owner` → `next build --webpack` → `fix-middleware-trace` (or their order), the font loses `preload: false`, the middleware matcher stops excluding `_next/static` / `_next/image` / `media/` / `icon.svg`, or `body { overflow: hidden }` disappears |
+| **Build invariants** | The build loses `next build --webpack` → `fix-middleware-trace` (or their order), the font loses `preload: false`, the middleware matcher stops excluding `_next/static` / `_next/image` / `media/` / `icon.svg`, or `body { overflow: hidden }` disappears |
 | **1023px sync** | The workspace and the stylesheet disagree on the threshold, a second `matchMedia` width is introduced, or the audit stops bracketing it with 1024 and 768 |
 
 ### 8.1b Guards added 2026-08-01

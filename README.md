@@ -36,7 +36,7 @@ Productionのcommitとこのcheckoutを照合します。
 - 検索、check-in、到着時間更新、卓割当、延長、memo、service_status更新、
   Walk-in取消の7 command入口
 - 顧客情報は表示上の必要最小限（マスク）を維持し、個人情報の新規エクスポートは対象外
-- 外部連携は Basic/PIN 認証付きの本番API連携で、TableCheck/API連携はこのサンドボックス外
+- 外部連携はBasic認証付きの本番API連携で、TableCheck/API連携はこのサンドボックス外
 
 2026-07-26監査時点では閲覧UIとcommand入口の段階です。正本v1.0の全業務機能と
 共有source上のmutation lineageは未完成のため、顧客提供・本番mutation全面開放は行いません。

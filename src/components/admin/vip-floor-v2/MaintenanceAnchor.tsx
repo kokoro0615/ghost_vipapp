@@ -21,7 +21,7 @@ export default function MaintenanceAnchor() {
         </div>
         <p className={styles.maintenanceSecurity}>
           <ShieldCheck size={16} aria-hidden="true" />
-          この画面からPIN、予約台帳、更新操作にはアクセスできません。
+          この画面から認証操作、予約台帳、更新操作にはアクセスできません。
         </p>
       </section>
     </main>

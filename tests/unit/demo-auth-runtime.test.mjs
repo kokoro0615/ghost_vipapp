@@ -142,10 +142,7 @@ test("runtime Basic access session survives missing subrequest Authorization wit
   );
 });
 
-test("runtime demo PIN and HMAC session verify only inside the exact bounded workspace", async () => {
-  const pin = "24681357";
-  const salt = "runtime-demo-salt";
-  const verifier = crypto.scryptSync(pin, salt, 32).toString("hex");
+test("runtime demo HMAC session verifies only inside the exact bounded workspace", async () => {
   const processValue = {
     env: {
       VIPAPP_DEMO_ENABLED: "true",
@@ -154,8 +151,6 @@ test("runtime demo PIN and HMAC session verify only inside the exact bounded wor
       VIPAPP_DEMO_WORKSPACE_ID: "runtime-demo-workspace",
       VIPAPP_DEMO_DATA_VERSION: "runtime-v1",
       VIPAPP_DEMO_SESSION_HMAC_SECRET: "runtime-hmac-secret-with-at-least-32-bytes",
-      VIPAPP_DEMO_PIN_SALT: salt,
-      VIPAPP_DEMO_PIN_SCRYPT_VERIFIER: verifier,
     },
   };
   const api = await loadTypeScriptModule(
@@ -169,8 +164,6 @@ test("runtime demo PIN and HMAC session verify only inside the exact bounded wor
   );
   const activeNow = Date.parse("2026-08-01T12:00:00+09:00");
 
-  assert.equal(await api.verifyDemoPin(pin), true);
-  assert.equal(await api.verifyDemoPin("13572468"), false);
   const session = api.createDemoSession(activeNow);
   assert.ok(session?.token);
   const verified = api.verifyDemoSession(session.token, activeNow + 60_000);

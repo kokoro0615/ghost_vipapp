@@ -177,7 +177,7 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
           type: "globalState",
           state: "error",
           description: "管理セッションが終了しました。",
-          message: "PINで再ログインしてください",
+          message: "ユーザー名とパスワードで再接続してください",
         });
         return false;
       }
@@ -231,8 +231,8 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
           dispatch({
             type: "globalState",
             state: "loading",
-            description: "スタッフPINで認証してください。",
-            message: "PINでログインしてください",
+            description: "Basic認証を確認できませんでした。",
+            message: "ユーザー名とパスワードで再接続してください",
           });
           return;
         }
@@ -497,13 +497,11 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
     });
   }, [authMode, businessDate, loadBoard]);
 
-  const login = useCallback(async (pin: string) => {
+  const reconnect = useCallback(async () => {
     dispatch({ type: "pending", pending: true });
     try {
-      const response = await fetch("/api/admin/session/pin", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ pin }),
+      const response = await fetch("/api/admin/session", {
+        cache: "no-store",
       });
       const payload = await response.json().catch(() => ({})) as Session & Record<string, unknown>;
       if (!response.ok || !payload.ok) {
@@ -515,10 +513,8 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
           outcome: {
             ok: false,
             code: readVipOperationFailure(response.status, payload).code,
-            message: response.status === 429
-              ? "試行回数の上限です。時間をおいてください。"
-              : "PINを確認してください。",
-            recovery: "店舗から発行された個人PINを入力してください。",
+            message: "Basic認証を確認できませんでした。",
+            recovery: "ブラウザでユーザー名とパスワードを確認して再接続してください。",
           },
         });
         return false;
@@ -535,7 +531,7 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
         setDemoLeaseState("inactive");
       }
       setAuth({ status: "authenticated", session: payload });
-      dispatch({ type: "commandOutcome", outcome: { ok: true, message: "ログインしました" } });
+      dispatch({ type: "commandOutcome", outcome: { ok: true, message: "再接続しました" } });
       return loadBoard(businessDate, "initial");
     } catch {
       dispatch({
@@ -561,7 +557,7 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
       dispatch({
         type: "globalState",
         state: "loading",
-        description: "スタッフPINで認証してください。",
+        description: "Basic認証で再接続してください。",
         message: "ログアウトしました",
       });
     }
@@ -1348,7 +1344,7 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
     },
     businessDate,
     offline,
-    login,
+    reconnect,
     logout,
     loadBoard: () => loadBoard(businessDate),
     setBusinessDate,

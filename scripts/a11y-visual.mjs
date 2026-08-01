@@ -480,7 +480,7 @@ async function auditViewport(context, viewport) {
   await demoLoginPage.goto(`${origin}/?view=list&date=2026-07-27`, {
     waitUntil: "domcontentloaded",
   });
-  await demoLoginPage.getByLabel("デモ専用PIN").waitFor();
+  await demoLoginPage.getByRole("heading", { name: "VIP予約デモへ再接続" }).waitFor();
   await capture(demoLoginPage, "demo-login");
   await demoLoginPage.close();
 
@@ -644,13 +644,6 @@ async function installSyntheticRoutes(page, scenario = {}) {
   };
   const demoServerNow = scenario.fixedNow ?? new Date().toISOString();
   const demoLeaseExpiresAt = new Date(Date.parse(demoServerNow) + 60_000).toISOString();
-  await page.route("**/api/admin/session/pin", (route) => route.fulfill({
-    status: scenario.authenticated === false ? 401 : 200,
-    contentType: "application/json",
-    body: JSON.stringify(scenario.authenticated === false
-      ? { ok: false, error: "invalid_pin" }
-      : { ok: true, role: "owner", displayName: "Owner" }),
-  }));
   await page.route("**/api/admin/session", (route) => {
     if (scenario.demoMode === "expired") {
       return route.fulfill({

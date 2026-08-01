@@ -6,9 +6,11 @@ import {
 } from "@/lib/demo/accessContract";
 import {
   clearDemoSessionCookie,
+  createDemoSession,
   getDemoAccessState,
   getDemoPublicConfiguration,
   readDemoSessionCookie,
+  setDemoSessionCookie,
   verifyDemoSession,
 } from "@/lib/demo/session.server";
 import {
@@ -114,10 +116,20 @@ function getDemoSession(request: Request) {
   const publicConfig = getDemoPublicConfiguration(state.config);
   const token = readDemoSessionCookie(request);
   if (!token) {
+    const session = createDemoSession();
+    if (!session) return demoFailure(401, "demo_unavailable");
     const response = NextResponse.json(
-      { ok: false, authenticated: false, ...publicConfig },
+      {
+        ...publicConfig,
+        ok: true,
+        authenticated: true,
+        role: "owner-compatible-demo",
+        displayName: "Demo Operator",
+        sessionExpiresAt: new Date(session.claim.exp * 1000).toISOString(),
+      },
       { headers: { "cache-control": "no-store" } },
     );
+    setDemoSessionCookie(response, session.token);
     clearOwnerSessionCookie(response);
     return response;
   }

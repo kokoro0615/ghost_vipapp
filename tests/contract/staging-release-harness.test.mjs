@@ -35,7 +35,6 @@ async function makeFiles(t, {
   await writeFile(envPath, [
     "VIPAPP_BASIC_USER=user",
     "VIPAPP_BASIC_PASSWORD=password",
-    "VIPAPP_OWNER_PIN=123456",
     "GHOST_VIPAPP_PROTECTION_BYPASS=bypass-secret",
     "GHOST_VIPAPP_BACKEND_PROTECTION_BYPASS=backend-bypass-secret",
     "GHOST_VIPAPP_ALLOW_STAGING_MUTATION=E2E削除可",
@@ -45,7 +44,7 @@ async function makeFiles(t, {
   ].join("\n"));
   await writeFile(
     lifecycleEnvPath,
-    "SUPABASE_SERVICE_ROLE_KEY=not-emitted\nGHOST_VIP_RELEASE_CANDIDATE_PIN=123456\n",
+    "SUPABASE_SERVICE_ROLE_KEY=not-emitted\n",
   );
   await writeFile(manifestPath, JSON.stringify({
     trialRunId: runId,
@@ -91,7 +90,7 @@ test("release regression harness requires a fresh release-candidate lineage", as
   assert.match(result.stdout, /release_candidate_run_id_invalid/u);
 });
 
-test("release regression harness pins exact hosts, PIN source and lifecycle script hashes", async (t) => {
+test("release regression harness pins exact hosts and lifecycle script hashes", async (t) => {
   const files = await makeFiles(t, {
     origin: "http://localhost",
     host: "localhost",
@@ -132,7 +131,7 @@ test("release regression source covers required business and cleanup boundaries"
     "/api/admin/v2/customers/",
     "--focused-customer-profile",
     "GHOST_VIPAPP_BACKEND_PROTECTION_BYPASS",
-    "release_candidate_pin_sources_mismatch",
+    "basic_session_failed",
     "lifecycle_script_fingerprint_mismatch",
     "safeCommandFailureCode",
     "assertUiOperationSucceeded",

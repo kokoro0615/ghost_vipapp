@@ -1,4 +1,4 @@
-import { createHmac, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import "server-only";
 
 import { NextResponse } from "next/server";
@@ -7,7 +7,6 @@ import { normalizeVipAdminRole, type VipAdminRole } from "@/lib/adminPermissions
 import { readTrustedAccessLane } from "@/lib/demo/accessContract";
 
 const SESSION_COOKIE = "ghost_vipapp_admin_session";
-const BASIC_OWNER_PIN_CONTEXT = "ghost-vipapp-basic-owner-pin-v1";
 const BACKEND_ORIGIN = (process.env.GHOST_ADMIN_API_ORIGIN ?? "https://ghost-ruby-one.vercel.app").replace(/\/$/u, "");
 const PRODUCTION_WEBSITE_ORIGINS = new Set(["https://ghost-ruby-one.vercel.app"]);
 
@@ -64,26 +63,13 @@ export function copyJson(response: Response) {
   return response.json().catch(() => ({}));
 }
 
-export function loginAdminPin(body: string) {
-  return ghostAdminFetch("/api/admin/session/pin", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body,
-  });
-}
-
-export function deriveBasicOwnerPin(password = process.env.VIPAPP_BASIC_PASSWORD) {
-  if (!password) return null;
-  const digest = createHmac("sha256", BASIC_OWNER_PIN_CONTEXT)
-    .update(password, "utf8")
-    .digest();
-  return String(digest.readUInt32BE(0) % 100_000_000).padStart(8, "0");
-}
-
 export function loginBasicOwnerSession() {
-  const pin = deriveBasicOwnerPin();
-  if (!pin) return null;
-  return loginAdminPin(JSON.stringify({ pin }));
+  const secret = process.env.GHOST_BASIC_OWNER_SESSION_SECRET;
+  if (!secret || secret.length < 32) return null;
+  return ghostAdminFetch("/api/admin/session/basic-owner", {
+    method: "POST",
+    headers: { "x-ghost-vipapp-owner-session-secret": secret },
+  });
 }
 
 export async function readAdminSession(token: string) {

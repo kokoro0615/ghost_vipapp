@@ -65,7 +65,7 @@ async function main() {
     const withBasic = await client.request("/");
     assert(withBasic.ok, `basic_entry_failed:${withBasic.status}`);
 
-    await login(client, config.pin);
+    await login(client);
     loggedIn = true;
     await delay(2_100);
     await runRequiredLifecycle(
@@ -76,7 +76,7 @@ async function main() {
     );
     const expiredSession = await client.requestJson("/api/admin/session");
     assert(expiredSession.response.status === 401, "expired_session_still_authenticated");
-    const backendSessionToken = await login(client, config.pin);
+    const backendSessionToken = await login(client);
     const backendClient = createBackendClient(config, backendSessionToken);
 
     const options = await readOptions(client, config.businessDate);
@@ -545,7 +545,7 @@ async function runFocusedCustomerProfile(config) {
       config,
     );
 
-    const backendSessionToken = await login(client, config.pin);
+    const backendSessionToken = await login(client);
     loggedIn = true;
     const backendClient = createBackendClient(config, backendSessionToken);
     const options = await readOptions(client, config.businessDate);
@@ -665,7 +665,6 @@ function createClient(config) {
     defaultHeaders: { "x-vercel-protection-bypass": config.protectionBypass },
     rules: [
       { method: "GET", path: "/" },
-      { method: "POST", path: "/api/admin/session/pin" },
       { method: "GET", path: "/api/admin/session" },
       { method: "DELETE", path: "/api/admin/session" },
       { method: "GET", path: "/api/admin/vip-floor" },
@@ -701,15 +700,12 @@ function createBackendClient(config, sessionToken) {
   });
 }
 
-async function login(client, pin) {
-  const result = await client.requestJson("/api/admin/session/pin", {
-    method: "POST",
-    json: { pin },
-  });
-  assert(result.response.ok && result.payload?.ok === true, `pin_login_failed:${result.response.status}`);
-  assert(client.jar.size > 0, "pin_login_cookie_missing");
+async function login(client) {
+  const result = await client.requestJson("/api/admin/session");
+  assert(result.response.ok && result.payload?.ok === true, `basic_session_failed:${result.response.status}`);
+  assert(client.jar.size > 0, "basic_session_cookie_missing");
   const token = client.jar.value(ADMIN_SESSION_COOKIE);
-  assert(typeof token === "string" && token.length > 0, "pin_login_cookie_token_missing");
+  assert(typeof token === "string" && token.length > 0, "basic_session_cookie_token_missing");
   const session = await client.requestJson("/api/admin/session");
   assert(session.response.ok && session.payload?.ok === true, "session_read_after_login_failed");
   return token;
@@ -1022,10 +1018,8 @@ async function runUiRegression(config, reservationId, uiReservationPlan) {
       if (response.status() >= 500) failures.push(`http_${response.status()}`);
     });
 
-    const pinLogin = await context.request.post(`${config.origin.origin}/api/admin/session/pin`, {
-      data: { pin: config.pin },
-    });
-    assert(pinLogin.ok(), `ui_owner_session_bootstrap_failed:${pinLogin.status()}`);
+    const basicSession = await context.request.get(`${config.origin.origin}/api/admin/session`);
+    assert(basicSession.ok(), `ui_owner_session_bootstrap_failed:${basicSession.status()}`);
     await page.goto(`${config.origin.origin}/?view=list&date=${config.businessDate}`, {
       waitUntil: "networkidle",
     });
@@ -1385,16 +1379,7 @@ async function loadConfiguration() {
     );
   }
   const lifecycleEnvFile = required(manifest, "websiteLifecycleEnvFile");
-  const lifecycleEnv = parseEnvFile(
-    await readMode600File(lifecycleEnvFile, "website_lifecycle_env_file"),
-  );
-  assert(
-    constantTimeEqual(
-      required(lifecycleEnv, "GHOST_VIP_RELEASE_CANDIDATE_PIN"),
-      required(env, "VIPAPP_OWNER_PIN"),
-    ),
-    "release_candidate_pin_sources_mismatch",
-  );
+  await readMode600File(lifecycleEnvFile, "website_lifecycle_env_file");
 
   return {
     origin,
@@ -1411,7 +1396,6 @@ async function loadConfiguration() {
     verifyScript: manifest.verifyScript,
     basicUser: required(env, "VIPAPP_BASIC_USER"),
     basicPassword: required(env, "VIPAPP_BASIC_PASSWORD"),
-    pin: required(env, "VIPAPP_OWNER_PIN"),
     protectionBypass: required(env, "GHOST_VIPAPP_PROTECTION_BYPASS"),
     backendProtectionBypass: required(env, "GHOST_VIPAPP_BACKEND_PROTECTION_BYPASS"),
     focusedCustomerProfile: process.argv.includes("--focused-customer-profile"),

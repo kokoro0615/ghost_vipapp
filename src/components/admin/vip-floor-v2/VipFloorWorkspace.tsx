@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { usePathname, useSearchParams } from "next/navigation";
-import { type FormEvent, type KeyboardEvent, type ReactNode, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { type KeyboardEvent, type ReactNode, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   Activity,
@@ -159,13 +159,11 @@ export default function VipFloorWorkspace() {
     demo,
     businessDate,
     offline,
-    login,
+    reconnect,
     logout,
     loadBoard,
     setBusinessDate,
   } = useVipFloorWorkspace(initialBusinessDate);
-  const [pin, setPin] = useState("");
-  const [loginFailed, setLoginFailed] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [operationOpen, setOperationOpen] = useState(false);
   const [editingReservationId, setEditingReservationId] = useState<string | null>(null);
@@ -181,7 +179,6 @@ export default function VipFloorWorkspace() {
   const [resetOpen, setResetOpen] = useState(false);
   const [queueOpen, setQueueOpen] = useState(false);
   const [turnoverContext, setTurnoverContext] = useState<TurnoverContext | null>(null);
-  const loginInputRef = useRef<HTMLInputElement>(null);
   const menuRef = useRef<HTMLElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const mobileSheetRef = useRef<HTMLDivElement>(null);
@@ -438,17 +435,6 @@ export default function VipFloorWorkspace() {
     }
   }
 
-  async function submitPin(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const success = await login(pin);
-    setLoginFailed(!success);
-    if (success) {
-      setPin("");
-    } else {
-      loginInputRef.current?.focus();
-    }
-  }
-
   if (auth.status !== "authenticated") {
     if (demo.leaseState === "expired" && demo.config) {
       return (
@@ -527,7 +513,7 @@ export default function VipFloorWorkspace() {
                   </button>
                 ) : null}
                 <p className={styles.loginHint}>
-                  PIN入力は不要です。この画面から直接、管理台帳へ移動します。
+                  ブラウザのBasic認証から直接、管理台帳へ移動します。
                 </p>
               </section>
             </div>
@@ -569,63 +555,28 @@ export default function VipFloorWorkspace() {
               </figure>
             </section>
 
-            <form className={styles.loginPanel} onSubmit={submitPin}>
+            <section className={styles.loginPanel} aria-labelledby="demo-access-title">
               <div className={styles.loginAccess}>
-                <span>{demo.config ? "DEMO ACCESS" : "OWNER ACCESS"}</span>
+                <span>DEMO ACCESS</span>
               </div>
               <div className={styles.loginIntro}>
-                <h1>VIP予約デモに入る</h1>
-                <p>デモ専用PINを入力してください。</p>
+                <h1 id="demo-access-title">VIP予約デモへ再接続</h1>
+                <p>ブラウザのBasic認証を確認して再接続してください。</p>
               </div>
               <DemoCue />
-              <div className={styles.loginField}>
-                <label htmlFor="owner-pin">
-                  <span>
-                    デモ専用PIN
-                    <small>4–8桁</small>
-                  </span>
-                  <input
-                    ref={loginInputRef}
-                    id="owner-pin"
-                    name="pin"
-                    type="password"
-                    value={pin}
-                    onChange={(event) => {
-                      setPin(event.target.value.replace(/\D/gu, "").slice(0, 8));
-                      if (loginFailed) setLoginFailed(false);
-                    }}
-                    inputMode="numeric"
-                    enterKeyHint="go"
-                    autoComplete="off"
-                    autoCapitalize="off"
-                    spellCheck={false}
-                    minLength={4}
-                    maxLength={8}
-                    aria-invalid={loginFailed}
-                    aria-describedby="pin-feedback pin-security"
-                  />
-                </label>
-                <p
-                  id="pin-feedback"
-                  className={styles.loginMessage}
-                  role={loginFailed ? "alert" : "status"}
-                  data-tone={loginFailed ? "danger" : undefined}
-                >
-                  {state.message}
-                </p>
-              </div>
               <button
-                type="submit"
-                aria-label="ログインしてフロアを開く"
-                disabled={state.pending || pin.length < 4}
+                type="button"
+                aria-label="Basic認証を確認してフロアへ再接続"
+                disabled={state.pending}
+                onClick={() => void reconnect()}
               >
                 <ShieldCheck size={18} aria-hidden />
-                {state.pending || auth.status === "checking" ? "確認中…" : "フロアを開く"}
+                {state.pending || auth.status === "checking" ? "確認中…" : "再接続"}
               </button>
-              <p id="pin-security" className={styles.loginHint}>
+              <p className={styles.loginHint}>
                 合成データのみを使用し、Production予約は変更しません。
               </p>
-            </form>
+            </section>
           </div>
         </main>
       </DemoModeProvider>

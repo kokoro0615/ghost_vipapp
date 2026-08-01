@@ -10,11 +10,8 @@ const PATHS = Object.freeze({
   session: "src/lib/demo/session.server.ts",
   proxy: "src/proxy.ts",
   sessionRoute: "src/app/api/admin/session/route.ts",
-  pinRoute: "src/app/api/admin/session/pin/route.ts",
   leaseRoute: "src/app/api/admin/demo/lease/route.ts",
   ownerProxy: "src/lib/server/ghostAdminProxy.ts",
-  ownerBootstrap: "scripts/provision-basic-owner.mjs",
-  packageJson: "package.json",
 });
 
 async function readRequired(relativePath) {
@@ -127,13 +124,12 @@ test("proxy converts verified Basic auth into a signed HttpOnly access cookie fo
 });
 
 test("owner and demo cookies are isolated and the opposite lane cookie is cleared", async () => {
-  const [access, proxy, sessionRoute, pinRoute] = await Promise.all([
+  const [access, proxy, sessionRoute] = await Promise.all([
     readRequired(PATHS.access),
     readRequired(PATHS.proxy),
     readRequired(PATHS.sessionRoute),
-    readRequired(PATHS.pinRoute),
   ]);
-  const boundary = `${access}\n${proxy}\n${sessionRoute}\n${pinRoute}`;
+  const boundary = `${access}\n${proxy}\n${sessionRoute}`;
 
   assertContainsAll(boundary, [
     /OWNER_SESSION_COOKIE/u,
@@ -156,11 +152,10 @@ test("owner and demo cookies are isolated and the opposite lane cookie is cleare
   assert.match(boundary, /mode\s*[:=]\s*["']demo["']/u);
 });
 
-test("demo PIN sessions use scrypt verification and signed, bounded claims without Production proxying", async () => {
+test("demo Basic sessions use signed, bounded claims without Production proxying", async () => {
   const session = await readRequired(PATHS.session);
 
   assertContainsAll(session, [
-    /\bscrypt(?:Sync)?\b/u,
     /timingSafeEqual/u,
     /createHmac/u,
     /mode\s*:\s*["']demo["']/u,
@@ -170,41 +165,39 @@ test("demo PIN sessions use scrypt verification and signed, bounded claims witho
     /\bexp\b/u,
     /\bjti\b/u,
     /randomUUID|randomBytes/u,
-    /VIPAPP_DEMO_PIN_SALT/u,
-    /VIPAPP_DEMO_PIN_SCRYPT_VERIFIER/u,
     /VIPAPP_DEMO_SESSION_HMAC_SECRET/u,
   ], PATHS.session);
+  assert.doesNotMatch(session, /PIN|scrypt|VIPAPP_DEMO_PIN/u);
   assert.doesNotMatch(session, /ghostAdminFetch/u);
   assert.doesNotMatch(session, /GHOST_ADMIN_API_ORIGIN|ghost-ruby-one|Authorization\s*:/iu);
   assert.doesNotMatch(session, /NEXT_PUBLIC_/u);
   assert.doesNotMatch(
     session,
     /process\.env\.(?:VIPAPP_DEMO_PIN|VIPAPP_DEMO_BASIC_PASSWORD)\b/u,
-    "raw demo PIN/Basic password must not be read by demo session code",
+    "raw demo Basic password must not be read by demo session code",
   );
 });
 
-test("session and PIN routes branch on the trusted lane while preserving the owner Production path", async () => {
-  const [sessionRoute, pinRoute, ownerProxy] = await Promise.all([
+test("session route branches on the trusted Basic lane without a secondary credential route", async () => {
+  const [sessionRoute, ownerProxy] = await Promise.all([
     readRequired(PATHS.sessionRoute),
-    readRequired(PATHS.pinRoute),
     readRequired(PATHS.ownerProxy),
   ]);
-  const routes = `${sessionRoute}\n${pinRoute}`;
+  const routes = `${sessionRoute}\n${ownerProxy}`;
 
   assertContainsAll(routes, [
     /TRUSTED_ACCESS_LANE_HEADER/u,
     /["']owner["']/u,
     /["']demo["']/u,
     /ghostAdminFetch/u,
-    /verify[A-Za-z]*Demo[A-Za-z]*Pin|verifyDemoPin/u,
     /sign[A-Za-z]*Demo[A-Za-z]*(?:Session|Claim)|createDemoSession/u,
   ], "session routes");
   assert.match(sessionRoute, /export\s+async\s+function\s+GET/u);
   assert.match(sessionRoute, /export\s+async\s+function\s+DELETE/u);
-  assert.match(pinRoute, /export\s+async\s+function\s+POST/u);
   assert.match(ownerProxy, /ghost_vipapp_admin_session/u, "owner cookie name must remain stable");
   assert.match(ownerProxy, /ghostAdminFetch\("\/api\/admin\/session"/u);
+  assert.match(ownerProxy, /ghostAdminFetch\("\/api\/admin\/session\/basic-owner"/u);
+  assert.doesNotMatch(routes, /\/api\/admin\/session\/pin|verifyDemoPin/u);
   assert.doesNotMatch(
     routes,
     /mode\s*:\s*request|role\s*:\s*request|headers\.get\([^)]*mode/iu,
@@ -222,39 +215,27 @@ test("session and PIN routes branch on the trusted lane while preserving the own
   );
 });
 
-test("verified Owner Basic access is exchanged server-side without exposing an Owner PIN UI", async () => {
-  const [sessionRoute, ownerProxy, ownerBootstrap, packageJson] = await Promise.all([
+test("verified Owner Basic access is exchanged through the dedicated server-only endpoint", async () => {
+  const [sessionRoute, ownerProxy] = await Promise.all([
     readRequired(PATHS.sessionRoute),
     readRequired(PATHS.ownerProxy),
-    readRequired(PATHS.ownerBootstrap),
-    readRequired(PATHS.packageJson),
   ]);
-  const bridge = `${sessionRoute}\n${ownerProxy}\n${ownerBootstrap}`;
+  const bridge = `${sessionRoute}\n${ownerProxy}`;
 
   assertContainsAll(bridge, [
-    /ghost-vipapp-basic-owner-pin-v1/u,
-    /createHmac\(\s*["']sha256["']/u,
-    /VIPAPP_BASIC_PASSWORD/u,
+    /GHOST_BASIC_OWNER_SESSION_SECRET/u,
+    /x-ghost-vipapp-owner-session-secret/u,
+    /\/api\/admin\/session\/basic-owner/u,
     /loginBasicOwnerSession/u,
     /setAdminToken/u,
-    /set_admin_pin_v7/u,
-    /VIPAPP_SUPABASE_SERVICE_ROLE_KEY/u,
-    /VIPAPP_SUPABASE_URL/u,
   ], "Owner Basic session bridge");
   assert.match(
     sessionRoute,
     /if\s*\(!token\)[\s\S]*loginBasicOwnerSession\(\)[\s\S]*setAdminToken/u,
     "a missing Owner admin cookie must be exchanged only inside the trusted Owner route",
   );
-  assert.match(ownerBootstrap, /process\.env\.VERCEL_ENV\s*!==\s*["']production["']/u);
-  assert.match(
-    ownerBootstrap,
-    /if\s*\(!supabaseUrl\s*\|\|\s*!serviceRoleKey\)[\s\S]*process\.exit\(0\)/u,
-    "runtime must remain sealed after the one-time Production bootstrap",
-  );
-  assert.match(packageJson, /node \.\/scripts\/provision-basic-owner\.mjs/u);
-  assert.doesNotMatch(bridge, /NEXT_PUBLIC_(?:VIPAPP_BASIC_PASSWORD|SUPABASE_SERVICE_ROLE_KEY)/u);
-  assert.doesNotMatch(ownerBootstrap, /console\.log\([^)]*(?:password|serviceRoleKey|pin)/iu);
+  assert.doesNotMatch(bridge, /PIN|deriveBasicOwnerPin|set_admin_pin_v7|VIPAPP_SUPABASE_SERVICE_ROLE_KEY/u);
+  assert.doesNotMatch(bridge, /NEXT_PUBLIC_/u);
 });
 
 test("demo lease is same-origin, fail-closed, server-timed, and never longer than 60 seconds", async () => {

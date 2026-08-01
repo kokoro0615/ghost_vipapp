@@ -1377,8 +1377,8 @@
 .floorTaskRail, .floorTaskTabs, .floorTaskList, .floorMobileFocus { display: none; }
 
 @keyframes floorInstrumentEnter {
-  from { opacity: 0; scale: 0.86; }
-  to { opacity: 1; scale: 1; }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 @keyframes seatLock {
   0% { scale: 1; }
@@ -1996,12 +1996,10 @@
   place-items: center;
   padding: var(--s-6);
   background: var(--scrim);
-  animation: scrimIn var(--dur-panel) var(--ease-enter);
 }
-@keyframes scrimIn { from { opacity: 0; } to { opacity: 1; } }
-@keyframes dialogIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
-@keyframes sheetIn { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: none; } }
-@keyframes sheetUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+@keyframes dialogIn { from { transform: translateY(8px); } to { transform: none; } }
+@keyframes sheetIn { from { transform: translateX(24px); } to { transform: none; } }
+@keyframes sheetUp { from { transform: translateY(16px); } to { transform: none; } }
 
 .commandDialog, .customerDialog, .observabilityDialog, .demoResetDialog {
   display: flex;
@@ -2133,7 +2131,7 @@
 .helperText { margin: 0; color: var(--ink-3); font-size: var(--t-micro); line-height: var(--lh-ui); }
 
 .assignmentOptions { display: grid; gap: 1px; overflow: hidden; border: 1px solid var(--rule); border-radius: var(--r-control); background: var(--rule); }
-.assignmentOptions > span { padding: var(--s-3) var(--s-5); background: var(--surface-sunken); color: var(--ink-3); font-size: var(--t-micro); }
+.assignmentOptions > span { padding: var(--s-3) var(--s-5); background: var(--surface-sunken); color: var(--ink-2); font-size: var(--t-micro); }
 .assignmentOptions label {
   display: grid !important;
   min-height: var(--h-control);

@@ -31,7 +31,6 @@ async function makeExternalLifecycle(t, { origin, vipHost, cleanupBody = "" } = 
   await writeFile(envPath, [
     "VIPAPP_BASIC_USER=user",
     "VIPAPP_BASIC_PASSWORD=password",
-    "VIPAPP_OWNER_PIN=123456",
     "GHOST_VIPAPP_PROTECTION_BYPASS=bypass-secret",
     "GHOST_VIPAPP_ALLOW_STAGING_MUTATION=E2E削除可",
     "",
@@ -67,6 +66,7 @@ test("staging harness uses canonical proxy commands, verifies version/revision/a
   let version = 4;
   let revision = 9;
   let notes = [];
+  let sessionRetired = false;
   const requests = [];
   const bypassHeaders = [];
   const server = createServer(async (request, response) => {
@@ -75,9 +75,9 @@ test("staging harness uses canonical proxy commands, verifies version/revision/a
     requests.push({ method: request.method, pathname: url.pathname });
     bypassHeaders.push(request.headers["x-vercel-protection-bypass"]);
     response.setHeader("content-type", "application/json");
-    if (url.pathname === "/api/admin/session/pin" && request.method === "POST") {
+    if (url.pathname === "/api/admin/session" && request.method === "GET" && !sessionRetired) {
       response.setHeader("set-cookie", `ghost_vipapp_admin_session=${sessionCookie}; HttpOnly; Path=/api`);
-      response.end(JSON.stringify({ ok: true }));
+      response.end(JSON.stringify({ ok: true, role: "owner" }));
       return;
     }
     if (url.pathname === "/api/admin/vip-floor" && request.method === "GET" && hasSession) {
@@ -105,6 +105,7 @@ test("staging harness uses canonical proxy commands, verifies version/revision/a
       return;
     }
     if (url.pathname === "/api/admin/session" && request.method === "DELETE") {
+      sessionRetired = true;
       response.setHeader("set-cookie", "ghost_vipapp_admin_session=; Max-Age=0; HttpOnly; Path=/api");
       response.end(JSON.stringify({ ok: true }));
       return;
@@ -128,10 +129,10 @@ test("staging harness uses canonical proxy commands, verifies version/revision/a
   assert.match(result.stdout, /"revisionAdvanced":true/u);
   assert.match(result.stdout, /"auditVerified":true/u);
   assert.match(result.stdout, /"cleanupVerified":true/u);
-  assert.doesNotMatch(`${result.stdout}${result.stderr}`, /staging-session-secret|123456|password|bypass-secret/u);
+  assert.doesNotMatch(`${result.stdout}${result.stderr}`, /staging-session-secret|password|bypass-secret/u);
   assert.deepEqual(bypassHeaders, Array(6).fill("bypass-secret"));
   assert.deepEqual(requests, [
-    { method: "POST", pathname: "/api/admin/session/pin" },
+    { method: "GET", pathname: "/api/admin/session" },
     { method: "GET", pathname: "/api/admin/vip-floor" },
     { method: "POST", pathname: "/api/admin/vip-floor/commands" },
     { method: "GET", pathname: "/api/admin/vip-floor" },
@@ -177,13 +178,14 @@ test("staging harness refuses manifest fingerprint mismatches and unsafe lifecyc
 test("staging harness runs cleanup and redacts secrets when canonical mutation fails", async (t) => {
   const sessionCookie = "failure-cleanup-session";
   let version = 4;
+  let sessionRetired = false;
   const server = createServer(async (request, response) => {
     const url = new URL(request.url, "http://localhost");
     const hasSession = request.headers.cookie?.includes(`ghost_vipapp_admin_session=${sessionCookie}`);
     response.setHeader("content-type", "application/json");
-    if (url.pathname === "/api/admin/session/pin" && request.method === "POST") {
+    if (url.pathname === "/api/admin/session" && request.method === "GET" && !sessionRetired) {
       response.setHeader("set-cookie", `ghost_vipapp_admin_session=${sessionCookie}; HttpOnly; Path=/api`);
-      response.end(JSON.stringify({ ok: true }));
+      response.end(JSON.stringify({ ok: true, role: "owner" }));
       return;
     }
     if (url.pathname === "/api/admin/vip-floor" && request.method === "GET" && hasSession) {
@@ -196,6 +198,7 @@ test("staging harness runs cleanup and redacts secrets when canonical mutation f
       return;
     }
     if (url.pathname === "/api/admin/session" && request.method === "DELETE") {
+      sessionRetired = true;
       response.setHeader("set-cookie", "ghost_vipapp_admin_session=; Max-Age=0; HttpOnly; Path=/api");
       response.end(JSON.stringify({ ok: true }));
       return;
@@ -215,13 +218,13 @@ test("staging harness runs cleanup and redacts secrets when canonical mutation f
   const result = await runNodeScript("scripts/staging-mutation-e2e.mjs", testEnv(files));
   assert.equal(result.code, 1);
   assert.match(result.stdout, /canonical_mutation_failed:409/u);
-  assert.doesNotMatch(`${result.stdout}${result.stderr}`, /failure-cleanup-session|123456|password|bypass-secret/u);
+  assert.doesNotMatch(`${result.stdout}${result.stderr}`, /failure-cleanup-session|password|bypass-secret/u);
   const receipt = await readFile(files.receiptPath, "utf8");
   assert.match(receipt, /cleanup .*cleanup/u);
   assert.match(receipt, /verify .*after-cleanup/u);
 });
 
-test("staging harness cleans the seeded trial run after PIN login failure", async (t) => {
+test("staging harness cleans the seeded trial run after Basic session failure", async (t) => {
   const server = createServer((request, response) => {
     assert.equal(request.headers["x-vercel-protection-bypass"], "bypass-secret");
     response.setHeader("content-type", "application/json");
@@ -234,7 +237,7 @@ test("staging harness cleans the seeded trial run after PIN login failure", asyn
   const files = await makeExternalLifecycle(t, { origin: `http://localhost:${port}`, vipHost: "localhost" });
   const result = await runNodeScript("scripts/staging-mutation-e2e.mjs", testEnv(files));
   assert.equal(result.code, 1);
-  assert.match(result.stdout, /pin_login_failed:401/u);
+  assert.match(result.stdout, /basic_session_failed:401/u);
   const receipt = await readFile(files.receiptPath, "utf8");
   assert.match(receipt, /cleanup .*cleanup/u);
   assert.match(receipt, /verify .*after-cleanup/u);

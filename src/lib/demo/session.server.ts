@@ -1,7 +1,6 @@
 import {
   createHmac,
   randomUUID,
-  scrypt as scryptCallback,
   timingSafeEqual,
 } from "node:crypto";
 import "server-only";
@@ -17,7 +16,6 @@ export const DEMO_LEASE_INTERVAL_MS = 60_000;
 
 const DEMO_STARTS_AT_MS = Date.parse(DEMO_STARTS_AT);
 const DEMO_EXPIRES_AT_MS = Date.parse(DEMO_EXPIRES_AT);
-const DEMO_PIN_PATTERN = /^\d{8,64}$/u;
 
 export type DemoSessionClaim = {
   mode: "demo";
@@ -97,41 +95,6 @@ export function getDemoPublicConfiguration(config: DemoConfiguration): DemoPubli
     dataVersion: config.dataVersion,
     leaseIntervalMs: DEMO_LEASE_INTERVAL_MS,
   };
-}
-
-function decodeVerifier(value: string) {
-  if (/^(?:[0-9a-f]{2})+$/iu.test(value)) return Buffer.from(value, "hex");
-  if (!/^[A-Za-z0-9+/]+={0,2}$/u.test(value) || value.length % 4 !== 0) return null;
-  const decoded = Buffer.from(value, "base64");
-  return decoded.length > 0 ? decoded : null;
-}
-
-function deriveScrypt(candidate: string, salt: string, length: number) {
-  return new Promise<Buffer>((resolve, reject) => {
-    scryptCallback(candidate, salt, length, (error, derived) => {
-      if (error) reject(error);
-      else resolve(derived);
-    });
-  });
-}
-
-export async function verifyDemoPin(pin: unknown) {
-  const candidate = typeof pin === "string" ? pin : "";
-  if (!DEMO_PIN_PATTERN.test(candidate)) return false;
-
-  const salt = process.env.VIPAPP_DEMO_PIN_SALT;
-  const encodedVerifier = process.env.VIPAPP_DEMO_PIN_SCRYPT_VERIFIER;
-  if (!salt || !encodedVerifier) return false;
-
-  const verifier = decodeVerifier(encodedVerifier);
-  if (!verifier || verifier.length < 16 || verifier.length > 128) return false;
-
-  try {
-    const derived = await deriveScrypt(candidate, salt, verifier.length);
-    return timingSafeEqual(derived, verifier);
-  } catch {
-    return false;
-  }
 }
 
 function base64UrlEncode(value: string | Buffer) {
