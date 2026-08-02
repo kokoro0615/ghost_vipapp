@@ -12,27 +12,82 @@ export const TIMELINE_PHASE_ORDER = [
 
 export type TimelinePhaseKey = (typeof TIMELINE_PHASE_ORDER)[number];
 
+/*
+ * Signal tiers, not just colours. A floor operator reads this chart from across
+ * the room and out of the corner of an eye, where hue is the first thing to go
+ * and rhythm is the last. IEC 60601-1-8 — the clinical alarm standard — encodes
+ * priority the same way: the faster and harder the burst repeats, the sooner
+ * someone has to move. We borrow the ladder, not the frequencies. The fastest
+ * band here blinks at ~1.1Hz, comfortably under the three-flashes-per-second
+ * threshold of WCAG 2.3.1, and every tier keeps an authored still state (§7).
+ *
+ *   low    → the guest is due               → one slow swell
+ *   medium → the table is due back          → a double pulse
+ *   high   → the clock has already run out  → a hard square blink
+ */
+export const TIMELINE_SIGNAL_ORDER = ["none", "low", "medium", "high"] as const;
+
+export type TimelineSignal = (typeof TIMELINE_SIGNAL_ORDER)[number];
+
+/*
+ * One table, so the legend and the bands can never drift into describing
+ * different rhythms. The legend swatch blinks at its own tier, which makes the
+ * key teach the code instead of merely naming it. The meaning never lives in
+ * the movement alone: every band also spells its phase out in words.
+ */
 export const TIMELINE_PHASE_META: Record<TimelinePhaseKey, {
   shortLabel: string;
   glyph: string;
+  signal: TimelineSignal;
 }> = {
-  scheduled: { shortLabel: "予定", glyph: "○" },
-  arrival_soon: { shortLabel: "来店前", glyph: "◉" },
-  active: { shortLabel: "接客中", glyph: "▶" },
-  closing_soon: { shortLabel: "残り15分", glyph: "◫" },
-  overdue: { shortLabel: "超過", glyph: "!" },
-  resolved: { shortLabel: "完了", glyph: "✓" },
+  scheduled: { shortLabel: "予定", glyph: "○", signal: "none" },
+  arrival_soon: { shortLabel: "来店前", glyph: "◉", signal: "low" },
+  active: { shortLabel: "接客中", glyph: "▶", signal: "none" },
+  closing_soon: { shortLabel: "残り15分", glyph: "◫", signal: "medium" },
+  overdue: { shortLabel: "超過", glyph: "!", signal: "high" },
+  resolved: { shortLabel: "完了", glyph: "✓", signal: "none" },
 };
 
 export type TimelinePhase = {
   key: TimelinePhaseKey;
   label: string;
   description: string;
+  signal: TimelineSignal;
+  /*
+   * A band that keeps blinking after the floor has already dealt with it
+   * teaches operators to ignore blinking. `acknowledged` is what turns the
+   * alarm off while leaving the state on screen: the frame keeps its phase
+   * colour and the label keeps counting, only the motion stops.
+   */
+  acknowledged: boolean;
 };
 
 const MINUTE_MS = 60_000;
-const TERMINAL_STATUSES = new Set(["paid", "completed", "no_show"]);
+/*
+ * Terminal for the *table*, not for the bill. The backend releases a seat
+ * assignment on `completed` and `no_show` only — a paid party is still sitting
+ * there, and `paid` can still advance to `resetting`. Muting a paid band to
+ * "完了" would hide an occupied table from the one view whose whole job is
+ * turnover. `paid` is settlement, and settlement is acknowledgement (below).
+ */
+const TERMINAL_STATUSES = new Set(["completed", "no_show"]);
 const NOT_SEATED_STATUSES = new Set(["expected", "late", "no_contact"]);
+/* Someone from the party is in the room, so "due to arrive" has been answered. */
+const ARRIVED_STATUSES = new Set([
+  "arrived",
+  "partial_arrival",
+  "seated",
+  "bottle_pending",
+  "bottle_served",
+  "bill_requested",
+  "paid",
+  "resetting",
+  "completed",
+]);
+/* The floor has recorded why the table is sitting past its start time. */
+const DELAY_RECORDED_STATUSES = new Set(["late", "no_contact"]);
+/* Settlement is underway, so "this table is due back" has been answered. */
+const SETTLING_STATUSES = new Set(["bill_requested", "paid", "resetting", "completed"]);
 
 function minutesUntil(timestampMs: number, nowMs: number) {
   return Math.max(1, Math.ceil((timestampMs - nowMs) / MINUTE_MS));
@@ -40,6 +95,23 @@ function minutesUntil(timestampMs: number, nowMs: number) {
 
 function minutesSince(timestampMs: number, nowMs: number) {
   return Math.max(1, Math.floor((nowMs - timestampMs) / MINUTE_MS));
+}
+
+function phase(
+  key: TimelinePhaseKey,
+  label: string,
+  description: string,
+  acknowledged = false,
+): TimelinePhase {
+  return {
+    key,
+    label,
+    description: acknowledged
+      ? `${description}。対応済みのため点滅は停止しています`
+      : description,
+    signal: TIMELINE_PHASE_META[key].signal,
+    acknowledged,
+  };
 }
 
 export function getTimelinePhase({
@@ -55,72 +127,61 @@ export function getTimelinePhase({
 }): TimelinePhase {
   const startMs = new Date(startAt).getTime();
   const endMs = new Date(endAt).getTime();
+  const status = serviceStatus ?? "";
 
   if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs <= startMs) {
-    return {
-      key: "scheduled",
-      label: "時刻確認",
-      description: "予約時刻を確認してください",
-    };
+    return phase("scheduled", "時刻確認", "予約時刻を確認してください");
   }
 
-  if (serviceStatus && TERMINAL_STATUSES.has(serviceStatus)) {
-    return {
-      key: "resolved",
-      label: "完了",
-      description: "この予約の接客記録は完了しています",
-    };
+  if (status && TERMINAL_STATUSES.has(status)) {
+    return phase("resolved", "完了", "この予約の接客記録は完了しています");
   }
 
   if (nowMs < startMs) {
     const remaining = minutesUntil(startMs, nowMs);
     if (remaining <= ARRIVAL_SOON_MINUTES) {
-      return {
-        key: "arrival_soon",
-        label: `来店まで${remaining}分`,
-        description: `予約開始まで残り${remaining}分です`,
-      };
+      return phase(
+        "arrival_soon",
+        `来店まで${remaining}分`,
+        `予約開始まで残り${remaining}分です`,
+        ARRIVED_STATUSES.has(status),
+      );
     }
-    return {
-      key: "scheduled",
-      label: "来店予定",
-      description: `予約開始まで${remaining}分です`,
-    };
+    return phase("scheduled", "来店予定", `予約開始まで${remaining}分です`);
   }
 
   if (nowMs >= endMs) {
     const overtime = minutesSince(endMs, nowMs);
-    return {
-      key: "overdue",
-      label: `超過${overtime}分`,
-      description: `予約終了時刻を${overtime}分超過しています`,
-    };
+    return phase(
+      "overdue",
+      `超過${overtime}分`,
+      `予約終了時刻を${overtime}分超過しています`,
+      SETTLING_STATUSES.has(status),
+    );
   }
 
   const closingAtMs = endMs - CLOSING_SOON_MINUTES * MINUTE_MS;
   if (nowMs >= closingAtMs) {
     const remaining = minutesUntil(endMs, nowMs);
-    return {
-      key: "closing_soon",
-      label: `残り${remaining}分`,
-      description: `予約終了まで残り${remaining}分です`,
-    };
+    return phase(
+      "closing_soon",
+      `残り${remaining}分`,
+      `予約終了まで残り${remaining}分です`,
+      SETTLING_STATUSES.has(status),
+    );
   }
 
-  if (!serviceStatus || NOT_SEATED_STATUSES.has(serviceStatus)) {
+  if (!status || NOT_SEATED_STATUSES.has(status)) {
     const delay = minutesSince(startMs, nowMs);
-    return {
-      key: "overdue",
-      label: `開始超過${delay}分`,
-      description: `予約開始時刻を${delay}分過ぎています`,
-    };
+    return phase(
+      "overdue",
+      `開始超過${delay}分`,
+      `予約開始時刻を${delay}分過ぎています`,
+      DELAY_RECORDED_STATUSES.has(status),
+    );
   }
 
-  return {
-    key: "active",
-    label: "接客中",
-    description: `予約終了まで${minutesUntil(endMs, nowMs)}分です`,
-  };
+  return phase("active", "接客中", `予約終了まで${minutesUntil(endMs, nowMs)}分です`);
 }
 
 export function getClosingWindowPercent(startAt: string, endAt: string) {

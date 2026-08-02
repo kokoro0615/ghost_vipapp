@@ -514,13 +514,55 @@ async function auditViewport(context, viewport) {
 
 async function assertTimelinePhases(page) {
   await page.locator("button[data-phase]").first().waitFor();
-  const renderedPhases = await page.locator("button[data-phase]").evaluateAll((buttons) =>
-    buttons.map((button) => button.getAttribute("data-phase")).sort());
+  const bands = await page.locator("button[data-phase]").evaluateAll((buttons) =>
+    buttons.map((button) => ({
+      code: button.textContent?.match(/PHASE-\d+/u)?.[0] ?? null,
+      phase: button.getAttribute("data-phase"),
+      signal: button.getAttribute("data-signal"),
+      acknowledged: button.hasAttribute("data-acknowledged"),
+    })));
+
   assert.deepEqual(
-    renderedPhases,
-    ["active", "arrival_soon", "closing_soon", "overdue", "resolved", "scheduled"],
-    "chart must render all six reservation band phases exactly once",
+    bands.map((band) => band.phase).sort(),
+    [
+      "active", "arrival_soon", "arrival_soon",
+      "closing_soon", "overdue", "overdue", "resolved", "scheduled",
+    ],
+    "chart must render all six reservation band phases, twice for the two that "
+    + "also have to prove the handled state",
   );
+
+  /* The alarm ladder, as it actually renders: three tiers raise a signal and
+   * three do not. */
+  assert.deepEqual(
+    Object.fromEntries(bands.map((band) => [band.code, band.signal])),
+    {
+      "PHASE-01": "none",
+      "PHASE-02": "low",
+      "PHASE-03": "none",
+      "PHASE-04": "medium",
+      "PHASE-05": "high",
+      "PHASE-06": "none",
+      "PHASE-07": "low",
+      "PHASE-08": "high",
+    },
+    "each band must expose the signal tier its phase belongs to",
+  );
+
+  /* Handled bands keep their tier and lose their motion, and they have to sit
+   * beside an unhandled band in the same tier or the screenshot proves nothing. */
+  assert.deepEqual(
+    bands.filter((band) => band.acknowledged).map((band) => band.code).sort(),
+    ["PHASE-07", "PHASE-08"],
+    "only the two answered bands may be acknowledged",
+  );
+  for (const tier of ["low", "high"]) {
+    const inTier = bands.filter((band) => band.signal === tier);
+    assert.ok(
+      inTier.some((band) => band.acknowledged) && inTier.some((band) => !band.acknowledged),
+      `the ${tier} tier must render both a blinking and a handled band`,
+    );
+  }
 }
 
 async function newQaPage(context, scenario = {}) {
@@ -1246,6 +1288,24 @@ const timelinePhaseSpecs = [
     scheduledStartAt: "2026-07-26T14:00:00.000Z",
     scheduledEndAt: "2026-07-26T16:00:00.000Z",
   },
+  /* The two acknowledged bands. Both are inside a blinking window, and both
+   * have already been answered on the floor, so their alarm has to be still
+   * while the band beside them in the same phase is still blinking. Without
+   * these the "handled" path renders in no screenshot at all. */
+  {
+    publicCode: "PHASE-07",
+    serviceStatus: "arrived",
+    lifecycleStatus: "confirmed",
+    scheduledStartAt: "2026-07-26T15:10:00.000Z",
+    scheduledEndAt: "2026-07-26T17:10:00.000Z",
+  },
+  {
+    publicCode: "PHASE-08",
+    serviceStatus: "bill_requested",
+    lifecycleStatus: "checked_in",
+    scheduledStartAt: "2026-07-26T13:20:00.000Z",
+    scheduledEndAt: "2026-07-26T14:40:00.000Z",
+  },
 ];
 const timelinePhaseReservations = timelinePhaseSpecs.map((spec, index) => ({
   ...board.reservations[0],
@@ -1284,7 +1344,13 @@ const timelinePhaseBoard = {
     activeReservationCount: timelinePhaseReservations.length - 1,
     assignmentCount: timelinePhaseReservations.length,
     guestCount: timelinePhaseReservations.reduce((total, item) => total + item.guestCount.total, 0),
-    serviceStatusCounts: { expected: 2, seated: 3, completed: 1 },
+    serviceStatusCounts: {
+      expected: 2,
+      seated: 3,
+      completed: 1,
+      arrived: 1,
+      bill_requested: 1,
+    },
   },
 };
 

@@ -1444,9 +1444,16 @@
 .timelineLegend [data-phase="closing_soon"] i { border-bottom-color: var(--warn); color: var(--warn); }
 .timelineLegend [data-phase="overdue"] i { border-bottom-color: var(--alert); color: var(--alert); }
 .timelineLegend [data-phase="resolved"] i { border-bottom-color: var(--ink-3); color: var(--live); }
+/* The key states the alarm ladder without moving: the thicker the underline,
+ * the harder the band it names blinks. */
+.timelineLegend [data-signal="low"] i { border-bottom-width: 2px; }
+.timelineLegend [data-signal="medium"] i { border-bottom-width: 3px; }
+.timelineLegend [data-signal="high"] i { border-bottom-width: 4px; }
 
 .timelineScroller { min-height: 0; flex: 1; overflow: auto; overscroll-behavior: contain; background: var(--surface); }
 .timelineGrid {
+  --elapsed: 0%;
+  --elapsed-wash: color-mix(in oklch, var(--ink) 4%, transparent);
   display: flex;
   min-width: 1020px;
   min-height: 100%;
@@ -1485,7 +1492,10 @@
   box-shadow: var(--lift-pane);
   flex: 0 0 32px;
 }
-.timelineTicks span {
+/* Each cell is a half-hour *interval* labelled by its start, so a label sits on
+ * the time it names. Laying the labels out as equal columns instead put every
+ * one of them half a column late. */
+.timelineTicks span:not(.nowMarker) {
   display: flex;
   align-items: center;
   padding-left: var(--s-2);
@@ -1494,6 +1504,30 @@
   font-family: var(--font-figure);
   font-size: var(--t-micro);
   font-variant-numeric: tabular-nums;
+}
+.timelineTicks span[data-hour] {
+  border-left-color: var(--rule-strong);
+  color: var(--ink-2);
+}
+/* The clock reads in the ruler, where nothing clips it — the old chip lived
+ * inside the track's `overflow: hidden` and never rendered at all. */
+.nowMarker {
+  position: absolute;
+  z-index: 2;
+  top: 50%;
+  left: var(--bar-start);
+  padding: 1px var(--s-3);
+  border-radius: var(--r-chip);
+  /* Carved out of the ruler, so the labels it lands on read as covered rather
+   * than as broken text. The chip is the authority at that position anyway. */
+  box-shadow: 0 0 0 3px var(--surface-sunken);
+  background: var(--action);
+  color: var(--action-text);
+  font-family: var(--font-figure);
+  font-size: var(--t-micro);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  transform: translate(-50%, -50%);
 }
 .timelineRow {
   display: grid;
@@ -1518,12 +1552,29 @@
 .timelineTableLabel strong { color: var(--ink); font-family: var(--font-figure); font-size: var(--t-mini); font-weight: var(--weight-strong); }
 .timelineTableLabel span { color: var(--ink-3); font-size: var(--t-micro); }
 .timelineTableLabel small { color: var(--alert); font-size: var(--t-micro); }
+/* Three layers, topmost first: the hour rules, the half-hour rules, and a wash
+ * over the part of the night that has already happened. The grid is derived
+ * from the same interval count as the ruler, so a line always lands on a label
+ * — the previous fixed 6.25% drew one every 26.3 minutes, naming nothing. */
 .timelineTrack {
   position: relative;
   overflow: hidden;
-  background-image: repeating-linear-gradient(90deg, transparent 0 calc(6.25% - 1px), var(--rule) calc(6.25% - 1px) 6.25%);
+  background-image:
+    repeating-linear-gradient(90deg, var(--rule-strong) 0 1px, transparent 1px calc(200% / var(--tick-count))),
+    repeating-linear-gradient(90deg, var(--rule) 0 1px, transparent 1px calc(100% / var(--tick-count))),
+    linear-gradient(90deg, var(--elapsed-wash) 0 var(--elapsed), transparent var(--elapsed));
 }
+/* A band answers two questions that must not compete for the same ink:
+ *   what kind of table is this  → the top rule and the fill (service status)
+ *   how soon must someone move  → the frame, and whether the frame blinks
+ * Status keeps the horizontal rule it has always had; a coloured side tab is
+ * banned on this surface and the gate enforces it. Keeping the fill still is
+ * not a stylistic preference either: text sits on that fill, so animating it
+ * would make the label's contrast a function of the animation phase — the
+ * exact defect DESIGN.md §7.1 records. */
 .timelineBar {
+  --band-frame: var(--rule-strong);
+  --band-rule: var(--ink-3);
   position: absolute;
   z-index: 2;
   top: 50%;
@@ -1531,13 +1582,18 @@
   display: flex;
   width: var(--bar-width);
   min-width: 56px;
-  height: var(--h-control);
+  /* The row is required to share the chart's height (§6), so on a tall viewport
+   * the lane grows and a fixed 44px band starts to float: measured at 79% of
+   * the lane in landscape but only 49% in portrait, which reads as pills
+   * scattered on white rather than as occupancy. The band grows with its lane,
+   * never below the touch floor and never into a slab. */
+  height: clamp(var(--h-control), 64%, 88px);
   align-items: center;
   gap: var(--s-3);
   padding: 0 var(--s-4);
   overflow: hidden;
-  border: 1px solid var(--rule-strong);
-  border-top: 3px solid var(--ink-3);
+  border: 2px solid var(--band-frame);
+  border-top: 3px solid var(--band-rule);
   border-radius: var(--r-chip);
   background-color: var(--surface);
   color: var(--ink);
@@ -1550,6 +1606,8 @@
 }
 .timelineBarTime,
 .timelineBarPhase,
+.timelineBarStatus,
+.timelineBarGuests,
 .timelineBar small {
   position: relative;
   z-index: 2;
@@ -1561,6 +1619,12 @@
 }
 .timelineBarTime { flex: 0 0 auto; font-weight: var(--weight-ui); }
 .timelineBarPhase { min-width: 0; font-weight: var(--weight-strong); }
+/* Status and party size are separate elements, not one `status · code` string,
+ * so the band sheds them in the order the floor can afford to lose them. The
+ * cover count is the one fact the lane label cannot supply — that label carries
+ * the table's capacity, not this booking's covers. */
+.timelineBarStatus { flex: 0 0 auto; color: var(--ink-2); font-weight: var(--weight-ui); }
+.timelineBarGuests { flex: 0 0 auto; color: var(--ink-2); font-weight: var(--weight-ui); }
 .timelineBar small { min-width: 0; color: var(--ink-3); font-weight: var(--weight-ui); }
 .timelineClosingWindow,
 .timelineBarSignal {
@@ -1568,138 +1632,130 @@
   z-index: 1;
   pointer-events: none;
 }
+/* The release window only means something while the table is live. Drawn on a
+ * booking four hours out, or on one that has already finished, it is noise. */
 .timelineClosingWindow {
+  display: none;
   inset: 0 0 0 auto;
   width: var(--closing-window);
-  border-left: 1px solid var(--rule-strong);
-  background: var(--surface-sunken);
+  border-left: 1px dashed var(--warn-line);
+  background: color-mix(in oklch, var(--warn) 10%, transparent);
 }
-.timelineBarSignal { opacity: 0; }
-.timelineBar[data-tone="danger"] { border-top-color: var(--alert); }
-.timelineBar[data-tone="warning"] { border-top-color: var(--warn); }
-.timelineBar[data-tone="success"] { border-top-color: var(--live); }
-.timelineBar[data-tone="active"] { border-top-color: var(--accent); }
-.timelineBar[data-cue="stripe"] { background-image: repeating-linear-gradient(135deg, var(--alert-wash) 0 4px, transparent 4px 9px); }
-.timelineBar[data-phase="arrival_soon"] {
-  border-bottom-color: var(--accent-line);
-  background-color: var(--accent-wash);
+.timelineBar[data-phase="active"] .timelineClosingWindow,
+.timelineBar[data-phase="closing_soon"] .timelineClosingWindow,
+.timelineBar[data-phase="overdue"] .timelineClosingWindow { display: block; }
+
+/* ── band layer 1 · which table is this ──────────────────────────────────
+ * Thirteen service statuses, separated three ways at once so none of them
+ * depends on hue alone: a tone wash groups them, the top rule's weight and
+ * pattern survive greyscale and a failing projector, and the status word
+ * printed on every band names the exact one. The fill never animates (§7.1). */
+.timelineBar[data-tone="neutral"] { --band-rule: var(--ink-3); background-color: var(--surface); }
+.timelineBar[data-tone="active"] { --band-rule: var(--live); background-color: var(--live-wash); }
+.timelineBar[data-tone="warning"] { --band-rule: var(--warn); background-color: var(--warn-wash); }
+.timelineBar[data-tone="danger"] { --band-rule: var(--alert); background-color: var(--alert-wash); }
+.timelineBar[data-tone="success"] { --band-rule: var(--live); background-color: var(--surface-sunken); }
+.timelineBar[data-cue="line"] { border-top-width: 2px; }
+.timelineBar[data-cue="double"] { border-top-width: 4px; border-top-style: double; }
+.timelineBar[data-cue="dash"] { border-top-style: dashed; }
+.timelineBar[data-cue="stripe"] {
+  background-image: repeating-linear-gradient(
+    135deg,
+    color-mix(in oklch, var(--ink) 8%, transparent) 0 3px,
+    transparent 3px 8px
+  );
 }
-.timelineBar[data-phase="arrival_soon"] .timelineClosingWindow {
-  border-left-color: var(--accent-line);
-  background: color-mix(in oklch, var(--accent) 20%, var(--surface));
-}
-.timelineBar[data-phase="active"] {
-  border-color: var(--live-line);
-  border-top-color: var(--live);
-  background-color: var(--live);
-  background-image: none;
-  color: var(--ink-inverse);
-}
-.timelineBar[data-phase="active"] small { color: var(--ink-inverse); }
-.timelineBar[data-phase="active"] .timelineClosingWindow {
-  border-left-color: var(--ink-inverse);
-  background: var(--warn);
-}
-.timelineBar[data-phase="closing_soon"] {
-  border-color: var(--warn-line);
-  border-top-color: var(--warn);
-  background-color: var(--warn);
-  background-image: none;
-  color: var(--ink-inverse);
-}
-.timelineBar[data-phase="closing_soon"] small { color: var(--ink-inverse); }
-.timelineBar[data-phase="closing_soon"] .timelineClosingWindow {
-  border-left-color: var(--ink-inverse);
-  background: var(--action);
-}
-.timelineBar[data-phase="overdue"] {
-  border-color: var(--alert-line);
-  border-top-color: var(--alert);
-  background-color: var(--alert);
-  background-image: none;
-  color: var(--ink-inverse);
-}
-.timelineBar[data-phase="overdue"] small { color: var(--ink-inverse); }
-.timelineBar[data-phase="overdue"] .timelineClosingWindow {
-  border-left-color: var(--ink-inverse);
-  background: var(--action);
-}
-.timelineBar[data-phase="resolved"] {
-  border-color: var(--rule-strong);
-  border-top-color: var(--live);
-  background-color: var(--surface-sunken);
-  color: var(--ink-2);
-}
-.timelineBar[data-phase="resolved"] .timelineClosingWindow { background: var(--surface-active); }
+
+/* ── band layer 2 · how soon someone has to move ─────────────────────────
+ * Only the frame carries the clock, so the two readings never overwrite each
+ * other and the text keeps one fixed contrast pair all night. */
+.timelineBar[data-phase="arrival_soon"] { --band-frame: var(--accent); }
+.timelineBar[data-phase="active"] { --band-frame: var(--live); }
+.timelineBar[data-phase="closing_soon"] { --band-frame: var(--warn); }
+.timelineBar[data-phase="overdue"] { --band-frame: var(--alert); }
+/* Quiet, not borderless. At `--rule` the frame all but vanished on the sunken
+ * fill and the band read as unfinished rather than as deliberately done. */
+.timelineBar[data-phase="resolved"] { --band-frame: var(--rule-strong); color: var(--ink-2); }
+.timelineBar[data-phase="resolved"] small { color: var(--ink-3); }
+/* Selection is drawn around the band, never through it. Repainting the borders
+ * would make the two semantic layers lie for as long as a band is selected. */
 .timelineBar[data-selected] {
   z-index: 3;
-  border-color: var(--accent);
   outline: 2px solid var(--accent);
   outline-offset: 1px;
   box-shadow: inset 0 -3px var(--accent);
 }
 
-@keyframes timelineArrivalBeacon {
-  0%, 100% { opacity: 0.18; transform: scaleY(0.42); }
-  48% { opacity: 0.9; transform: scaleY(1); }
+/* The alarm is a second frame drawn just inside the first, so what blinks is
+ * the band's own edge — never its fill, never its label. `opacity` is the only
+ * animated property: compositor work the venue's A12 can hold until 05:00. */
+.timelineBarSignal {
+  inset: 0;
+  border: 2px solid var(--band-frame);
+  border-radius: calc(var(--r-chip) - 2px);
+  opacity: 0;
 }
-@keyframes timelineServiceSweep {
-  0% { opacity: 0; transform: translateX(-120%); }
-  14% { opacity: 0.62; }
-  58% { opacity: 0.62; }
-  74%, 100% { opacity: 0; transform: translateX(860%); }
+.timelineBar[data-signal="high"] .timelineBarSignal {
+  border-width: 3px;
+  box-shadow: inset 0 0 0 1px var(--band-frame);
 }
-@keyframes timelineClosingPulse {
-  0%, 56%, 100% { opacity: 0.08; transform: scaleX(0.94); }
-  14% { opacity: 0.34; transform: scaleX(1); }
-  28% { opacity: 0.12; transform: scaleX(0.97); }
-  40% { opacity: 0.28; transform: scaleX(1); }
+
+/* Three rhythms, loudest last, in the ladder clinical alarm systems use
+ * (IEC 60601-1-8): priority reads as waveform and amplitude, not just speed.
+ * Every tier stays at or under ~1.1 flashes per second — roughly a third of
+ * the WCAG 2.3.1 three-per-second threshold. */
+@keyframes timelineSignalLow {
+  0%, 100% { opacity: 0.12; }
+  50% { opacity: 0.85; }
 }
-@keyframes timelineOverdueSignal {
-  0%, 100% { opacity: 0.04; }
-  50% { opacity: 0.22; }
+@keyframes timelineSignalMedium {
+  0%, 60%, 100% { opacity: 0.1; }
+  12%, 40% { opacity: 0.95; }
+  26% { opacity: 0.1; }
+}
+@keyframes timelineSignalHigh {
+  0%, 46% { opacity: 1; }
+  50%, 96% { opacity: 0.05; }
+  100% { opacity: 1; }
 }
 @media (prefers-reduced-motion: no-preference) {
-  .timelineBar[data-phase="arrival_soon"] .timelineBarSignal {
-    inset: 3px auto 3px 2px;
-    width: 4px;
-    border-top: 4px solid var(--accent);
-    border-bottom: 4px solid var(--accent);
-    opacity: 0.2;
-    transform-origin: center;
-    animation: timelineArrivalBeacon 2.4s var(--ease-ui) infinite;
+  .timelineBar[data-signal="low"]:not([data-acknowledged]) .timelineBarSignal {
+    animation: timelineSignalLow 2.4s var(--ease-ui) infinite;
   }
-  .timelineBar[data-phase="active"] .timelineBarSignal {
-    inset: 2px auto 2px 0;
-    width: 12%;
-    border-right: 1px solid var(--ink-inverse);
-    animation: timelineServiceSweep 4.8s linear infinite;
+  .timelineBar[data-signal="medium"]:not([data-acknowledged]) .timelineBarSignal {
+    animation: timelineSignalMedium 1.8s var(--ease-ui) infinite;
   }
-  .timelineBar[data-phase="closing_soon"] .timelineBarSignal {
-    inset: 0 0 0 auto;
-    width: var(--closing-window);
-    background: var(--ink-inverse);
-    transform-origin: right center;
-    animation: timelineClosingPulse 2.8s var(--ease-ui) infinite;
-  }
-  .timelineBar[data-phase="overdue"] .timelineBarSignal {
-    inset: 0;
-    background: var(--ink-inverse);
-    animation: timelineOverdueSignal 1.8s var(--ease-ui) infinite;
+  .timelineBar[data-signal="high"]:not([data-acknowledged]) .timelineBarSignal {
+    animation: timelineSignalHigh 900ms steps(1, end) infinite;
   }
 }
+/* Handled: the alarm stops, the state stays. A band that keeps blinking after
+ * the floor has dealt with it is how operators learn to ignore blinking. */
+.timelineBar[data-acknowledged] .timelineBarSignal { animation: none; opacity: 0.3; }
 .timelineView[data-motion="paused"] .timelineBarSignal { animation-play-state: paused; }
 @media (prefers-reduced-motion: reduce) {
-  .timelineBarSignal { opacity: 0 !important; transform: none !important; }
-  .timelineBar[data-phase="arrival_soon"] .timelineBarSignal {
-    inset: 5px auto 5px 3px;
-    width: 2px;
-    background: var(--accent);
-    opacity: 1 !important;
-  }
+  /* Same three tiers, authored still: how strongly the ring is drawn says how
+   * urgent it is, so nothing lives in the movement alone. */
+  .timelineBarSignal { animation: none !important; }
+  .timelineBar[data-signal="low"] .timelineBarSignal { opacity: 0.5; }
+  .timelineBar[data-signal="medium"] .timelineBarSignal { opacity: 0.75; }
+  .timelineBar[data-signal="high"] .timelineBarSignal { opacity: 1; }
+  .timelineBar[data-acknowledged] .timelineBarSignal { opacity: 0.3; }
 }
-@container (max-width: 178px) {
+/* What a narrowing band gives up, in reverse order of what the floor needs:
+ * the identifier first — a tap opens the inspector for that — then the status
+ * word, then the cover count, then the start time. Covers outrank the status
+ * word because covers are never redundant, while the status is often already
+ * implied by the countdown. The countdown is the last thing standing, because
+ * it is why the band exists. */
+@container (max-width: 240px) {
   .timelineBar small { display: none; }
+}
+@container (max-width: 200px) {
+  .timelineBarStatus { display: none; }
+}
+@container (max-width: 160px) {
+  .timelineBarGuests { display: none; }
 }
 @container (max-width: 118px) {
   .timelineBarTime { display: none; }
@@ -1722,21 +1778,22 @@
   font-size: var(--t-micro);
   transform: translateY(-50%);
 }
-.nowLine { position: absolute; z-index: 3; top: 0; bottom: 0; left: var(--bar-start); width: 2px; background: var(--accent); }
-.nowLine::before { position: absolute; top: 0; left: -3px; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); content: ""; }
-.timelineRow:first-of-type .nowLine::after {
+/* One line, one cap. The cap repeated on all eight rows read as a beaded chain
+ * rather than as the single authoritative "you are here". */
+/* Graphite, not champagne. "Now" is structure, not status — and champagne is
+ * already the arrival frame and the selection ring, so a champagne now-line
+ * competed with the very bands standing closest to it. Line, cap and clock are
+ * now one object in one colour. */
+.nowLine { position: absolute; z-index: 3; top: 0; bottom: 0; left: var(--bar-start); width: 2px; background: var(--action); }
+.timelineRow:first-of-type .nowLine::before {
   position: absolute;
-  top: -26px;
-  left: 0;
-  padding: var(--s-1) var(--s-3);
-  border-radius: var(--r-chip);
+  top: 0;
+  left: -3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
   background: var(--action);
-  color: var(--action-text);
-  content: attr(data-label);
-  font-family: var(--font-figure);
-  font-size: var(--t-micro);
-  white-space: nowrap;
-  transform: translateX(-50%);
+  content: "";
 }
 
 .chartExceptions {
@@ -1765,6 +1822,13 @@
 .chartExceptions header strong { font-weight: var(--weight-ui); letter-spacing: 0.05em; }
 .chartExceptions header span { color: var(--ink); font-family: var(--font-figure); font-size: var(--t-mini); font-weight: var(--weight-strong); }
 .chartExceptions > div > div { min-height: 0; flex: 1; overflow-y: auto; }
+/* Rule 7 — the idle state costs no pixels. With nothing outstanding the rail
+ * was three panels saying 対象なし three times: 140px in landscape and, once it
+ * stacks, ~200px in portrait, on the one view whose rows are contractually
+ * required to share whatever height is left. The counts stay; the empty bodies
+ * do not. */
+.chartExceptions[data-idle] { max-height: none; }
+.chartExceptions[data-idle] > div > div { display: none; }
 .chartExceptions button {
   display: flex;
   width: 100%;
@@ -3135,6 +3199,11 @@
 .zoomControl button:active, .chartExceptions button:active,
 .commandHeader button:active, .shellMenuGrid > button:active,
 .queueItem:active { background: var(--surface-active); transition-duration: 0s; }
+/* The band cannot take the shared `--surface-active` press: its fill is the
+ * service status. It presses the way a floor node does instead — `scale` is
+ * compositor work and touches neither semantic layer. Without this, selecting a
+ * reservation was the one control on the venue iPad that answered with nothing. */
+.timelineBar:active { scale: 0.985; }
 .commandGrid button:active:not(:disabled) { background: var(--surface-active); transition-duration: 0s; }
 .commandGrid button:first-child:active:not(:disabled) { background: var(--action-press); color: var(--action-text); transition-duration: 0s; }
 .commandGrid button[data-danger]:active:not(:disabled) { background: var(--alert-wash); color: var(--alert); transition-duration: 0s; }

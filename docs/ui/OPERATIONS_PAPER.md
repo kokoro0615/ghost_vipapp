@@ -71,7 +71,11 @@ Measured before → after (dense 14-reservation board):
    shadow clouds, no blur, no glass, and never a second layer. Elevation is a
    statement about z-order, not a decoration (`DESIGN.md` §4.7).
 2. **Exactly one accent.** Champagne means "you are here" — the selected row,
-   the selected table, the current filter, the now-line. Nothing else.
+   the selected table, the current filter. Nothing else. **"Now" is not one of
+   them**: the timeline's now-line, its cap and its clock are graphite, because
+   now is structure rather than status, and because champagne is also the
+   arrival frame — a champagne now-line competed with the very bands standing
+   closest to it (2026-08-02).
 3. **Status is a swatch glyph plus a word**, never a pill that reads as a
    button. Colour is never the only carrier.
 4. **Emphasis is horizontal.** Selection is a bottom rule; alert is a tinted
@@ -97,6 +101,38 @@ Measured before → after (dense 14-reservation board):
     affordance and lives behind a capability guard; anything hover revealed has a
     touch equivalent; every control acknowledges its own press, because the
     browser's tap flash was removed on purpose (`DESIGN.md` §6.1).
+
+12. **An alarm that cannot be answered is noise.** The timeline is the one place
+    that may blink. It blinks on the band's frame and never on the surface a
+    label sits on; three tiers say how soon, not just that something is wrong;
+    and the blink stops the moment the floor answers it, leaving the state and
+    the countdown exactly where they were (`DESIGN.md` §7.0b).
+
+### The 2026-08-02 timeline pass — what the band was not saying
+
+The six phases and their signals had shipped, but the venue read the chart from
+across the room and could not act on it. Four causes, each fixed by moving
+information rather than adding effects:
+
+| Symptom | Cause | Now |
+|---|---|---|
+| Nothing appeared to blink | The motion was an inner 4px sliver at 0.18→0.9 opacity, and the overdue signal peaked at 0.22 | A ring on the band's own frame: 2px, 3px at the top tier, hard on/off |
+| Every urgency looked alike | One rhythm per phase, all soft pulses of similar amplitude | A three-tier ladder — slow swell, double pulse, square blink — so the rhythm names the priority |
+| Thirteen statuses read as five | The phase owned the fill; status got a 3px top border and one stripe | Status owns the fill wash and the top rule; the phase owns the other three sides and the blink |
+| Handled tables kept shouting | The band was a pure function of the clock | Answering the band — arriving, recording the delay, starting settlement — stops the motion and keeps the state |
+| The axis under the bands was not true | The ruler laid N labels out as N equal columns, and the track drew a fixed 6.25% gradient | Half-hour intervals labelled by their start, and a grid derived from the same count — a line now lands on a label instead of every 26.3 minutes |
+| "Now" read as a beaded chain | The cap was drawn on all eight rows, and its clock sat at `top: -26px` inside the track's `overflow: hidden` | One line, one cap, and the clock reads in the ruler where nothing clips it |
+| Bands floated in white on the venue iPad | A fixed 44px band in a lane the row contract makes grow — 79% of the lane in landscape but 49% in portrait | The band grows with its lane, `clamp(44px, 64%, 88px)`, never below the touch floor and never a slab |
+| A tapped band answered with nothing | `.timelineBar` was absent from the §12c press states, and the browser's tap flash is removed on purpose | It presses the way a floor node does, with `scale` — the shared background press is unavailable because that surface is the status |
+| The idle exception rail cost 140–200px | Three panels each saying 対象なし, under the one view whose rows must share the leftover height | The counts stay on one line; the empty bodies collapse (rule 7) |
+| The band never said how many people | Status and code shared one string; covers were nowhere | Status, covers and code are separate elements, shed in that reverse order as the band narrows |
+| Every band advertised its last fifteen minutes | The release window was drawn on all six phases | Drawn only while the table is live; on a booking four hours out it was noise |
+
+The band also counted down to the wrong time. A seat extension moves
+`expectedReleaseAt` and leaves the booked `scheduledEndAt` alone, and the chart
+was reading the booked one — so an extended table raised its last-fifteen alarm
+while it was still legitimately occupied. The band, its geometry and its
+conflict detection now all read the release time the floor is working to.
 
 ### The 2026-07-31 refinement — what made it read as generated
 

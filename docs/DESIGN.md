@@ -593,6 +593,108 @@ CSS only. Transitions and `@keyframes` in the stylesheet; no animation runtime
   listens to `visibilitychange` and sets `data-motion="paused"`, which halts the
   timeline's phase signals via `animation-play-state`. The venue iPad runs all
   night; an infinite animation on a backgrounded tab is battery spent on nothing.
+  The 10-second phase clock stops with it and resynchronises on return.
+
+### 7.0b The timeline band, as of 2026-08-02
+
+The band is the one place on this surface where an alarm is legitimate, so it is
+also the place where the rules have to be written down rather than inferred.
+
+**Two layers, two questions, no overlap.**
+
+| Layer | Answers | Carried by |
+|---|---|---|
+| Service status (13) | *what kind of table is this* | the fill wash, the top rule's colour/weight/pattern, and the status word on the band |
+| Time phase (6) | *how soon must someone move* | the other three border sides, and whether they blink |
+
+The fill is the layer that never moves. Text sits on it, so animating it would
+make the label's contrast a function of the animation phase — the defect §7.1
+records. Status keeps the **horizontal rule** it has always had; a coloured side
+tab is banned here and `operator-light-ui.test.mjs` enforces it, so the top
+border is the only edge status may claim.
+
+Five tone washes and four rule patterns cannot separate thirteen statuses on
+their own, and are not asked to: `arrived`/`seated` and `no_contact`/`no_show`
+share a pair. **The status word on the band is the discriminator**, exactly as
+L6 requires — colour is a grouping, never the identification.
+
+**A narrowing band sheds content in a fixed order.** The band is a container,
+and it gives things up in reverse order of what the floor can afford to lose:
+the booking code at 240px (a tap opens the inspector for it), the status word at
+200px, the cover count at 160px, the start time at 118px. Covers outrank the
+status word because covers are never redundant, while the status often is: the
+band drops the word entirely when the countdown already contains it, so 来店予定
+never prints beside 予定 and 完了 never beside 完了 (§5.7c). The countdown is the
+last thing standing, because it is why the band exists — do not "fix" a cramped
+band by dropping the phase label instead. Below 200px the visible status signal
+falls back to the tone wash and the top rule, a grouping rather than an
+identification; the exact status is still in the accessible name, the inspector
+and the ledger.
+
+**The band grows with its lane.** §6 requires the eight rows to share the
+chart's height, so on a tall viewport the lane grows underneath a fixed band: a
+44px band measured 79% of the lane in landscape but only 49% in portrait, which
+reads as pills scattered on white rather than as occupancy. `clamp(44px, 64%,
+88px)` keeps the touch floor, fills the lane, and never becomes a slab.
+
+**The alarm ladder.** Three phases raise a signal and three do not. Priority is
+carried by waveform and amplitude, in the ladder clinical alarm systems use
+(IEC 60601-1-8), because rhythm is the last thing to survive peripheral vision:
+
+| Tier | Phase | Rhythm | Ring |
+|---|---|---|---|
+| `low` | 来店15分前 | one slow swell, 2.4s | 2px, champagne |
+| `medium` | 残り15分 | double pulse, 1.8s | 2px, warn |
+| `high` | 超過 | hard square blink, 900ms | 3px + inner hairline, alert |
+
+Every tier stays at or under ~1.1 flashes per second — roughly a third of the
+WCAG 2.3.1 three-per-second threshold. What blinks is a ring drawn just inside
+the band's own frame, and `opacity` is the only property it animates.
+
+The band presses with `scale`, not with a background: §6.1 removed the browser's
+tap flash on purpose, and selecting a reservation was the one control on the
+venue iPad that answered a finger with nothing at all. The shared
+`--surface-active` press is unavailable here because that surface is the
+service status.
+
+Selection is drawn *around* the band — outline and an inset underline — and
+never repaints the borders, or the two layers would lie for as long as a band
+is selected.
+
+**`resolved` is terminal for the table, not for the bill.** The backend releases
+a seat assignment on `completed` and `no_show` only; a paid party is still
+sitting there and can still advance to `resetting`. Muting a paid band to 完了
+would hide an occupied table from the one view whose job is turnover, so `paid`
+keeps its countdown and is treated as settlement — which is acknowledgement.
+
+**A handled band goes quiet.** `TimelinePhase.acknowledged` is true once the
+floor has answered the thing the band is shouting about: someone from the party
+is in the room for the arrival window, settlement has started for the closing
+and overtime windows, the delay has been recorded for a table sitting past its
+start. The alarm stops; the phase, the tier and the countdown all stay. A band
+that keeps blinking after it has been dealt with is how operators learn to
+ignore blinking.
+
+**The axis has to be true before the bands on it can be.** The ruler is built
+from half-hour *intervals* labelled by their start, not from labelled points laid
+out as equal columns — the latter put every label half a column out, up to
+fourteen minutes at either end of this window, from the time it named. The track's rules are
+derived from that same interval count (`--tick-count`), so a line always lands on
+a label; the fixed 6.25% gradient it replaced drew one every 26.3 minutes and
+corresponded to nothing. Hour rules outrank half-hour rules, the elapsed part of
+the night carries a 4% wash because it cannot be acted on, and "now" is one line
+with one cap whose clock reads in the ruler — inside the track it was clipped by
+`overflow: hidden` and had never rendered at all.
+
+**The release window is drawn only while the table is live** (`active`,
+`closing_soon`, `overdue`). On a booking four hours out, or one already finished,
+the last-fifteen marker is noise.
+
+**The band counts down to the release time the floor is working to, not the one
+that was booked.** A seat extension moves `expectedReleaseAt` and deliberately
+leaves `scheduledEndAt` alone, so `ChartView` reads the raw board row. It also
+reads the raw service status there, because the view model coerces null to
+`expected` and the fill has thirteen states, not a silent fourteenth.
 
 ### 7.1 Motion is audited, as of 2026-08-01
 
@@ -649,6 +751,17 @@ Four rules that used to rely on review discipline are now machine-enforced in
 | **iOS zoom threshold** (`a11y-visual.mjs`) | Any visible `input`/`select`/`textarea` that is not a checkbox, radio or hidden computes a font-size below 16px, at any audited viewport (§4.5) |
 | **Device matrix** (`tests/unit/light-ui-qa-manifest.test.mjs`) | `1080×810` or `810×1080` leaves the viewport list, or either loses `touch: true` / `scale: 2` / `motion: true` — i.e. the audit stops driving the venue device as a touch device, or stops running its animations |
 | **Reduced-motion coverage** (same test) | Every viewport gains `motion: true`, leaving the authored static fallbacks unobserved |
+
+### 8.1c Guards added 2026-08-02
+
+Each verified to fail when violated before being kept.
+
+| Guard | Fails when |
+|---|---|
+| **Band frame, not band fill** (`tests/contract/chart-live-state.test.mjs`) | A `timelineSignal*` keyframe animates anything other than `opacity`, a tier loses its rhythm, the acknowledged rule stops halting the animation, `data-motion="paused"` stops pausing it, or reduced motion loses a tier's authored still state |
+| **Effective release time** (same test) | The band, its geometry or its conflict detection falls back to the booked `scheduledEndAt`, or the fill reads the view model's coerced service status instead of the raw board row |
+| **Phase clock** (same test) | The 10-second local tick is loosened, so a 15-minute threshold could fire late |
+| **Handled bands render** (`scripts/a11y-visual.mjs`) | The `chart-phases` fixture stops rendering an acknowledged band beside a blinking one in the same tier, or a band's `data-signal` disagrees with its phase |
 
 ### 8.2 Still unguarded (review discipline required)
 

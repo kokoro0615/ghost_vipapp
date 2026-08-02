@@ -50,8 +50,21 @@ export default function ChartView({ board, reservations, selectedReservationId, 
   const [renderedAt, setRenderedAt] = useState(() => Date.now());
   const [motionPaused, setMotionPaused] = useState(false);
   useEffect(() => {
-    const timer = window.setInterval(() => setRenderedAt(Date.now()), 30_000);
-    const syncMotion = () => setMotionPaused(document.hidden);
+    /* The 15-minute thresholds are the whole point of the band, so the clock
+     * has to be finer than the window it guards. At 10s a band can be at most
+     * ten seconds late turning its alarm on — the tick is local arithmetic and
+     * issues no request, so the only cost is re-rendering eight rows. */
+    let timer = 0;
+    const syncMotion = () => {
+      const hidden = document.hidden;
+      setMotionPaused(hidden);
+      window.clearInterval(timer);
+      /* A backgrounded iPad runs all night. Stop the clock with the animations
+       * and resynchronise the moment the board comes back on screen. */
+      if (hidden) return;
+      setRenderedAt(Date.now());
+      timer = window.setInterval(() => setRenderedAt(Date.now()), 10_000);
+    };
     syncMotion();
     document.addEventListener("visibilitychange", syncMotion);
     return () => {
@@ -63,7 +76,16 @@ export default function ChartView({ board, reservations, selectedReservationId, 
   const operatingStart = new Date(operatingWindow.startAt);
   const operatingEnd = new Date(operatingWindow.endAt);
   const totalMinutes = Math.max(60, (operatingEnd.getTime() - operatingStart.getTime()) / 60_000);
-  const tickCount = Math.floor(totalMinutes / 30) + 1;
+  /*
+   * The ruler is built from half-hour *intervals*, not from labelled points.
+   * Laying N labels out as N equal columns offsets every one of them by half a
+   * column — measured on this window, up to 14 minutes at either end, zero
+   * mid-chart — on a chart whose whole job is minutes. Intervals of exactly
+   * 1/tickCount also give the track a grid that lands on the labels instead of
+   * near them; the 6.25% gradient this replaced drew a line every 26.3 minutes,
+   * which corresponded to nothing.
+   */
+  const tickCount = Math.max(1, Math.round(totalMinutes / 30));
   const timeFormatter = new Intl.DateTimeFormat("ja-JP", {
     hour: "2-digit",
     minute: "2-digit",
@@ -84,24 +106,44 @@ export default function ChartView({ board, reservations, selectedReservationId, 
     : null;
   const unassigned = reservations.filter((item) => item.tableIds.length === 0);
   const delayed = reservations.filter((item) => item.serviceStatus === "late");
+  /*
+   * The board carries two ends, and only one of them is the floor's. A seat
+   * extension moves `expectedReleaseAt` and deliberately leaves the booked
+   * `scheduledEndAt` where it is, so a band drawn from the view model's `endAt`
+   * counts down to a release time that no longer exists — and would raise its
+   * last-fifteen-minutes alarm while the table is still legitimately occupied.
+   * The raw board row is also the only place the service status is still
+   * honestly nullable; the view model coerces null to `expected`.
+   */
+  const bandByReservation = useMemo(() => {
+    const rawById = new Map(board.reservations.map((item) => [item.id, item]));
+    return new Map(reservations.map((reservation) => {
+      const raw = rawById.get(reservation.id);
+      const endAt = raw?.expectedReleaseAt ?? reservation.endAt;
+      const serviceStatus = raw ? raw.serviceStatus : reservation.serviceStatus;
+      return [reservation.id, {
+        endAt,
+        serviceStatus,
+        phase: getTimelinePhase({
+          nowMs: renderedAt,
+          startAt: reservation.startAt,
+          endAt,
+          serviceStatus,
+        }),
+      }] as const;
+    }));
+  }, [board.reservations, renderedAt, reservations]);
+  const bandEnd = (reservation: UiReservation) =>
+    bandByReservation.get(reservation.id)?.endAt ?? reservation.endAt;
   const conflicts = reservations.filter((item, index) => reservations.some((other, otherIndex) =>
     otherIndex !== index
     && item.tableIds.some((tableId) => other.tableIds.includes(tableId))
-    && new Date(item.startAt).getTime() < new Date(other.endAt).getTime()
-    && new Date(other.startAt).getTime() < new Date(item.endAt).getTime(),
+    && new Date(item.startAt).getTime() < new Date(bandEnd(other)).getTime()
+    && new Date(other.startAt).getTime() < new Date(bandEnd(item)).getTime(),
   ));
-  const phaseByReservation = useMemo(() => new Map(reservations.map((reservation) => [
-    reservation.id,
-    getTimelinePhase({
-      nowMs: renderedAt,
-      startAt: reservation.startAt,
-      endAt: reservation.endAt,
-      serviceStatus: reservation.serviceStatus,
-    }),
-  ])), [renderedAt, reservations]);
   const phaseCounts = TIMELINE_PHASE_ORDER.reduce<Record<string, number>>((counts, phase) => {
     counts[phase] = reservations.filter((reservation) =>
-      phaseByReservation.get(reservation.id)?.key === phase).length;
+      bandByReservation.get(reservation.id)?.phase.key === phase).length;
     return counts;
   }, {});
 
@@ -126,7 +168,7 @@ export default function ChartView({ board, reservations, selectedReservationId, 
       <div className={styles.timelineLegend} aria-label="予約帯ステータス">
         <strong>運行帯</strong>
         {TIMELINE_PHASE_ORDER.map((phase) => (
-          <span key={phase} data-phase={phase}>
+          <span key={phase} data-phase={phase} data-signal={TIMELINE_PHASE_META[phase].signal}>
             <i aria-hidden>{TIMELINE_PHASE_META[phase].glyph}</i>
             {TIMELINE_PHASE_META[phase].shortLabel}
             <b className="tabular-nums">{phaseCounts[phase]}</b>
@@ -135,10 +177,24 @@ export default function ChartView({ board, reservations, selectedReservationId, 
       </div>
 
       <div className={styles.timelineScroller} tabIndex={0} aria-label="VIP席の時間軸。左右にスクロールできます。" data-zoom={zoom}>
-        <div className={styles.timelineGrid}>
+        <div
+          className={styles.timelineGrid}
+          style={{
+            "--tick-count": tickCount,
+            /* Everything left of this cannot be acted on any more. */
+            "--elapsed": showNowLine ? nowStyle?.["--bar-start" as keyof CSSProperties] ?? "0%" : "0%",
+          } as CSSProperties}
+        >
           <div className={styles.timelineCorner}><Clock3 size={14} aria-hidden /> 席 / 時刻</div>
           <div className={styles.timelineTicks} style={{ gridTemplateColumns: `repeat(${tickCount}, 1fr)` }}>
-            {ticks.map((tick) => <span key={tick}>{tick}</span>)}
+            {ticks.map((tick, index) => (
+              <span key={tick} data-hour={index % 2 === 0 || undefined}>{tick}</span>
+            ))}
+            {showNowLine && nowStyle ? (
+              <span className={styles.nowMarker} style={nowStyle}>
+                {timeFormatter.format(renderedAt)}
+              </span>
+            ) : null}
           </div>
           {board.tables.map((table) => {
             const items = reservations.filter((reservation) => reservation.tableIds.includes(table.id));
@@ -151,32 +207,45 @@ export default function ChartView({ board, reservations, selectedReservationId, 
                 </div>
                 <div className={styles.timelineTrack}>
                   {items.map((reservation) => {
-                    const meta = getStatusMeta(reservation.serviceStatus);
-                    const phase = phaseByReservation.get(reservation.id)
+                    const band = bandByReservation.get(reservation.id);
+                    const endAt = band?.endAt ?? reservation.endAt;
+                    const serviceStatus = band ? band.serviceStatus : reservation.serviceStatus;
+                    const meta = getStatusMeta(serviceStatus);
+                    const phase = band?.phase
                       ?? getTimelinePhase({
                         nowMs: renderedAt,
                         startAt: reservation.startAt,
-                        endAt: reservation.endAt,
-                        serviceStatus: reservation.serviceStatus,
+                        endAt,
+                        serviceStatus,
                       });
                     return (
                       <button
                         key={reservation.id}
                         type="button"
                         className={styles.timelineBar}
-                        style={positionStyle(reservation.startAt, reservation.endAt, operatingWindow.startAt, operatingWindow.endAt)}
+                        style={positionStyle(reservation.startAt, endAt, operatingWindow.startAt, operatingWindow.endAt)}
                         data-tone={meta.tone}
                         data-cue={meta.cue}
+                        data-service-status={serviceStatus ?? "not_set"}
                         data-phase={phase.key}
+                        data-signal={phase.signal}
+                        data-acknowledged={phase.acknowledged || undefined}
                         data-selected={reservation.id === selectedReservationId || undefined}
                         onClick={() => onSelect(reservation.id)}
-                        aria-label={`${reservation.publicCode}、${reservation.guestLabel}、${reservation.startLabel}から${reservation.endLabel}、${meta.label}。${phase.description}`}
+                        aria-label={`${reservation.publicCode}、${reservation.guestLabel}、${reservation.guestCount}名、${reservation.startLabel}から${timeFormatter.format(new Date(endAt))}、${meta.label}。${phase.description}`}
                       >
                         <i className={styles.timelineClosingWindow} aria-hidden />
                         <i className={styles.timelineBarSignal} aria-hidden />
                         <span className={styles.timelineBarTime}>{reservation.startLabel}</span>
                         <strong className={styles.timelineBarPhase}>{phase.label}</strong>
-                        <small>{meta.shortLabel} · {reservation.publicCode}</small>
+                        <span className={`${styles.timelineBarGuests} tabular-nums`}>{reservation.guestCount}名</span>
+                        {/* 来店予定/予定 and 完了/完了 are the same fact twice. The status
+                            word earns its slot only when it says something the
+                            countdown does not — ボトル待ち, 会計依頼, 一部到着. */}
+                        {phase.label.includes(meta.shortLabel) ? null : (
+                          <span className={styles.timelineBarStatus}>{meta.shortLabel}</span>
+                        )}
+                        <small>{reservation.publicCode}</small>
                       </button>
                     );
                   })}
@@ -204,7 +273,11 @@ export default function ChartView({ board, reservations, selectedReservationId, 
         </div>
       </div>
 
-      <section className={styles.chartExceptions} aria-label="時間軸の要対応">
+      <section
+        className={styles.chartExceptions}
+        aria-label="時間軸の要対応"
+        data-idle={unassigned.length + conflicts.length + delayed.length === 0 || undefined}
+      >
         {([
           ["未割当", unassigned, "席を割当"],
           ["処理競合", conflicts, "競合"],
