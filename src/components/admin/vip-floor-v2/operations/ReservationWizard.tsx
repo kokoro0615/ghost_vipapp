@@ -94,14 +94,15 @@ export function ReservationWizard({
   const trialMode = useTrialMode();
   const demoMode = useDemoMode();
   const syntheticMode = trialMode || demoMode.enabled;
+  const businessDate = board.businessDay.businessDate;
   const defaults = useMemo(
     () => reservation
       ? {
           start: localInput(reservation.startAt),
           end: localInput(reservation.endAt),
         }
-      : scheduleDefaults(board),
-    [board, reservation],
+      : scheduleDefaults(businessDate),
+    [businessDate, reservation],
   );
   const initialOfferingId = reservation?.bookingOfferingId
     ?? options.offerings.find((offering) =>
@@ -230,7 +231,17 @@ export function ReservationWizard({
     const changed = await onBusinessDateChange(nextBusinessDate);
     if (!changed) {
       setDateError("この日の予約情報を取得できませんでした。別の日を選ぶか、営業日設定を確認してください。");
+      return;
     }
+    /* The event-day lookup replaces board/options without remounting this
+     * wizard. Keep the in-progress draft on the new day's operating window;
+     * otherwise an old 22:00 becomes "翌22:00" and step 2 is impossible. */
+    const nextSchedule = scheduleDefaults(nextBusinessDate);
+    setDraft((current) => ({
+      ...current,
+      startAt: nextSchedule.start,
+      endAt: nextSchedule.end,
+    }));
   }
 
   return (
@@ -593,8 +604,8 @@ function stepValid(step: number, draft: Draft, editing: boolean, businessDate: s
   return true;
 }
 
-function scheduleDefaults(board: VipFloorBoardV2) {
-  const window = getGhostOperatingWindow(board.businessDay.businessDate);
+function scheduleDefaults(businessDate: string) {
+  const window = getGhostOperatingWindow(businessDate);
   const startAt = Date.parse(window.startAt);
   return {
     start: localInput(new Date(startAt).toISOString()),

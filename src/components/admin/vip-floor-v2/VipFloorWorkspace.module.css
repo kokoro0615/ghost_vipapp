@@ -1440,6 +1440,7 @@
 }
 .timelineLegend b { color: var(--ink-3); font-weight: var(--weight-ui); }
 .timelineLegend [data-phase="arrival_soon"] i { border-bottom-color: var(--accent); color: var(--accent-ink); }
+.timelineLegend [data-phase="arrival_overdue"] i { border-bottom-color: var(--alert); color: var(--alert); }
 .timelineLegend [data-phase="active"] i { border-bottom-color: var(--live); color: var(--live); }
 .timelineLegend [data-phase="closing_soon"] i { border-bottom-color: var(--warn); color: var(--warn); }
 .timelineLegend [data-phase="overdue"] i { border-bottom-color: var(--alert); color: var(--alert); }
@@ -1670,6 +1671,7 @@
  * Only the frame carries the clock, so the two readings never overwrite each
  * other and the text keeps one fixed contrast pair all night. */
 .timelineBar[data-phase="arrival_soon"] { --band-frame: var(--accent); }
+.timelineBar[data-phase="arrival_overdue"] { --band-frame: var(--alert); }
 .timelineBar[data-phase="active"] { --band-frame: var(--live); }
 .timelineBar[data-phase="closing_soon"] { --band-frame: var(--warn); }
 .timelineBar[data-phase="overdue"] { --band-frame: var(--alert); }
@@ -3044,7 +3046,7 @@
   .timelineLegend {
     display: grid;
     min-height: 52px;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 0;
     padding: 0 var(--s-4);
   }

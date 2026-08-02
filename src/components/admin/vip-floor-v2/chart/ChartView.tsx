@@ -1,6 +1,6 @@
 "use client";
 
-import { type CSSProperties, useEffect, useMemo, useState } from "react";
+import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 import { Clock3, Minus, Plus } from "lucide-react";
 
 import { getGhostOperatingWindow } from "@/lib/ghostOperatingHours";
@@ -49,6 +49,8 @@ function positionStyle(startAt: string, endAt: string, operatingStartAt: string,
 export default function ChartView({ board, reservations, selectedReservationId, zoom, onZoom, onSelect }: ChartProps) {
   const [renderedAt, setRenderedAt] = useState(() => Date.now());
   const [motionPaused, setMotionPaused] = useState(false);
+  const [phaseAnnouncement, setPhaseAnnouncement] = useState("");
+  const previousPhaseByReservation = useRef<Map<string, string> | null>(null);
   useEffect(() => {
     /* The 15-minute thresholds are the whole point of the band, so the clock
      * has to be finer than the window it guards. At 10s a band can be at most
@@ -135,6 +137,28 @@ export default function ChartView({ board, reservations, selectedReservationId, 
   }, [board.reservations, renderedAt, reservations]);
   const bandEnd = (reservation: UiReservation) =>
     bandByReservation.get(reservation.id)?.endAt ?? reservation.endAt;
+  useEffect(() => {
+    const current = new Map(
+      reservations.map((reservation) => [
+        reservation.id,
+        bandByReservation.get(reservation.id)?.phase.key ?? "scheduled",
+      ]),
+    );
+    const previous = previousPhaseByReservation.current;
+    if (previous) {
+      const changes = reservations.flatMap((reservation) => {
+        const band = bandByReservation.get(reservation.id);
+        if (!band || previous.get(reservation.id) === band.phase.key) return [];
+        return [`${reservation.publicCode}、${band.phase.label}`];
+      });
+      if (changes.length > 0) {
+        const visibleChanges = changes.slice(0, 2).join("。 ");
+        const remainder = changes.length > 2 ? `。ほか${changes.length - 2}件` : "";
+        setPhaseAnnouncement(`時間帯が変化しました。${visibleChanges}${remainder}`);
+      }
+    }
+    previousPhaseByReservation.current = current;
+  }, [bandByReservation, reservations]);
   const conflicts = reservations.filter((item, index) => reservations.some((other, otherIndex) =>
     otherIndex !== index
     && item.tableIds.some((tableId) => other.tableIds.includes(tableId))
@@ -153,6 +177,7 @@ export default function ChartView({ board, reservations, selectedReservationId, 
       aria-labelledby="chart-view-title"
       data-motion={motionPaused ? "paused" : "running"}
     >
+      <p className="sr-only" role="status" aria-atomic="true">{phaseAnnouncement}</p>
       <div className={styles.viewStrip}>
         <h2 id="chart-view-title">席の時間軸</h2>
         <span className="tabular-nums">{board.tables.length}席 / {reservations.length}件</span>

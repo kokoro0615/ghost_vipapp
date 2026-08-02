@@ -517,6 +517,7 @@ async function assertTimelinePhases(page) {
   const bands = await page.locator("button[data-phase]").evaluateAll((buttons) =>
     buttons.map((button) => ({
       code: button.textContent?.match(/PHASE-\d+/u)?.[0] ?? null,
+      label: button.textContent ?? "",
       phase: button.getAttribute("data-phase"),
       signal: button.getAttribute("data-signal"),
       acknowledged: button.hasAttribute("data-acknowledged"),
@@ -525,12 +526,17 @@ async function assertTimelinePhases(page) {
   assert.deepEqual(
     bands.map((band) => band.phase).sort(),
     [
-      "active", "arrival_soon", "arrival_soon",
-      "closing_soon", "overdue", "overdue", "resolved", "scheduled",
+      "active", "arrival_overdue", "arrival_soon", "arrival_soon",
+      "closing_soon", "overdue", "resolved", "scheduled",
     ],
-    "chart must render all six reservation band phases, twice for the two that "
-    + "also have to prove the handled state",
+    "chart must render all seven reservation band phases, with a second arrival "
+    + "window to prove the handled state",
   );
+
+  const labels = Object.fromEntries(bands.map((band) => [band.code, band.label]));
+  assert.match(labels["PHASE-04"], /延長確認/u);
+  assert.match(labels["PHASE-05"], /解放超過/u);
+  assert.match(labels["PHASE-08"], /未着/u);
 
   /* The alarm ladder, as it actually renders: three tiers raise a signal and
    * three do not. */
@@ -1301,8 +1307,8 @@ const timelinePhaseSpecs = [
   },
   {
     publicCode: "PHASE-08",
-    serviceStatus: "bill_requested",
-    lifecycleStatus: "checked_in",
+    serviceStatus: "late",
+    lifecycleStatus: "confirmed",
     scheduledStartAt: "2026-07-26T13:20:00.000Z",
     scheduledEndAt: "2026-07-26T14:40:00.000Z",
   },

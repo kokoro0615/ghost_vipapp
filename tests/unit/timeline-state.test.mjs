@@ -42,8 +42,8 @@ test("two-hour band changes exactly fifteen minutes before release", () => {
     phaseAt("2026-07-31T14:45:00.000Z", "seated"),
     {
       key: "closing_soon",
-      label: "残り15分",
-      description: "予約終了まで残り15分です",
+      label: "延長確認 15分",
+      description: "利用終了まで残り15分です。延長の要否を確認してください",
       signal: "medium",
       acknowledged: false,
     },
@@ -51,20 +51,57 @@ test("two-hour band changes exactly fifteen minutes before release", () => {
   assert.equal(getClosingWindowPercent(startAt, endAt), 12.5);
 });
 
-test("timeline distinguishes start delay, overtime and terminal records", () => {
-  assert.equal(phaseAt("2026-07-31T13:01:00.000Z").key, "overdue");
+test("timeline distinguishes a missing arrival, release overtime and terminal records", () => {
+  assert.equal(phaseAt("2026-07-31T13:01:00.000Z").key, "arrival_overdue");
   assert.equal(phaseAt("2026-07-31T15:01:00.000Z", "seated").key, "overdue");
   assert.equal(phaseAt("2026-07-31T14:00:00.000Z", "completed").key, "resolved");
+});
+
+test("a party that never arrives remains an arrival exception after the booked end", () => {
+  const stillMissing = phaseAt("2026-07-31T15:30:00.000Z", "expected");
+  assert.equal(stillMissing.key, "arrival_overdue");
+  assert.equal(stillMissing.label, "未着150分");
+  assert.match(stillMissing.description, /到着を確認/u);
+
+  const recordedDelay = phaseAt("2026-07-31T15:30:00.000Z", "no_contact");
+  assert.equal(recordedDelay.key, "arrival_overdue");
+  assert.equal(recordedDelay.acknowledged, true);
+  assert.equal(phaseAt("2026-07-31T15:30:00.000Z", "no_show").key, "resolved");
+});
+
+test("the exact boundaries do not claim a minute has elapsed", () => {
+  assert.deepEqual(
+    phaseAt("2026-07-31T13:00:00.000Z"),
+    {
+      key: "arrival_overdue",
+      label: "到着確認",
+      description: "予約開始時刻です。到着を確認してください",
+      signal: "high",
+      acknowledged: false,
+    },
+  );
+  assert.deepEqual(
+    phaseAt("2026-07-31T15:00:00.000Z", "seated"),
+    {
+      key: "overdue",
+      label: "終了時刻",
+      description: "利用終了時刻です。延長または退店を確認してください",
+      signal: "high",
+      acknowledged: false,
+    },
+  );
+  assert.equal(phaseAt("2026-07-31T13:00:00.001Z").label, "未着1分");
+  assert.equal(phaseAt("2026-07-31T15:00:00.001Z", "seated").label, "解放超過1分");
 });
 
 /*
  * The alarm ladder. Urgency is carried by which tier a band is in, so the tiers
  * have to stay pinned to the phases rather than drifting into the stylesheet.
  */
-test("only the three time-critical phases raise a signal, loudest last", () => {
+test("only time-critical phases raise one of the three signal tiers", () => {
   assert.deepEqual(
     TIMELINE_PHASE_ORDER.map((phase) => TIMELINE_PHASE_META[phase].signal),
-    ["none", "low", "none", "medium", "high", "none"],
+    ["none", "low", "high", "none", "medium", "high", "none"],
   );
   assert.equal(phaseAt("2026-07-31T12:50:00.000Z").signal, "low");
   assert.equal(phaseAt("2026-07-31T14:50:00.000Z", "seated").signal, "medium");
@@ -105,7 +142,7 @@ test("the arrival alarm stops once anyone from the party is in the room", () => 
 test("a paid table is settled, not finished, and keeps its countdown", () => {
   const paidPastEnd = phaseAt("2026-07-31T15:20:00.000Z", "paid");
   assert.equal(paidPastEnd.key, "overdue");
-  assert.equal(paidPastEnd.label, "超過20分");
+  assert.equal(paidPastEnd.label, "解放超過20分");
   assert.equal(paidPastEnd.signal, "high");
   assert.equal(paidPastEnd.acknowledged, true);
 
@@ -133,8 +170,8 @@ test("a table sitting past its start stops blinking once the delay is recorded",
   assert.equal(phaseAt("2026-07-31T13:30:00.000Z", "expected").acknowledged, false);
   for (const status of ["late", "no_contact"]) {
     const recorded = phaseAt("2026-07-31T13:30:00.000Z", status);
-    assert.equal(recorded.key, "overdue", status);
-    assert.equal(recorded.label, "開始超過30分", status);
+    assert.equal(recorded.key, "arrival_overdue", status);
+    assert.equal(recorded.label, "未着30分", status);
     assert.equal(recorded.acknowledged, true, status);
   }
 });
@@ -142,7 +179,7 @@ test("a table sitting past its start stops blinking once the delay is recorded",
 test("a missing service status never counts as handled", () => {
   for (const status of [null, undefined, ""]) {
     assert.equal(phaseAt("2026-07-31T12:50:00.000Z", status).acknowledged, false);
-    assert.equal(phaseAt("2026-07-31T13:30:00.000Z", status).key, "overdue");
+    assert.equal(phaseAt("2026-07-31T13:30:00.000Z", status).key, "arrival_overdue");
     assert.equal(phaseAt("2026-07-31T13:30:00.000Z", status).acknowledged, false);
   }
 });

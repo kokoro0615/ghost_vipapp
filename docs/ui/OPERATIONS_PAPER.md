@@ -110,7 +110,7 @@ Measured before → after (dense 14-reservation board):
 
 ### The 2026-08-02 timeline pass — what the band was not saying
 
-The six phases and their signals had shipped, but the venue read the chart from
+The original six phases and their signals had shipped, but the venue read the chart from
 across the room and could not act on it. Four causes, each fixed by moving
 information rather than adding effects:
 
@@ -126,13 +126,30 @@ information rather than adding effects:
 | A tapped band answered with nothing | `.timelineBar` was absent from the §12c press states, and the browser's tap flash is removed on purpose | It presses the way a floor node does, with `scale` — the shared background press is unavailable because that surface is the status |
 | The idle exception rail cost 140–200px | Three panels each saying 対象なし, under the one view whose rows must share the leftover height | The counts stay on one line; the empty bodies collapse (rule 7) |
 | The band never said how many people | Status and code shared one string; covers were nowhere | Status, covers and code are separate elements, shed in that reverse order as the band narrows |
-| Every band advertised its last fifteen minutes | The release window was drawn on all six phases | Drawn only while the table is live; on a booking four hours out it was noise |
+| Every band advertised its last fifteen minutes | The release window was drawn on all original phases | Drawn only while the table is live; on a booking four hours out it was noise |
 
 The band also counted down to the wrong time. A seat extension moves
 `expectedReleaseAt` and leaves the booked `scheduledEndAt` alone, and the chart
 was reading the booked one — so an extended table raised its last-fifteen alarm
 while it was still legitimately occupied. The band, its geometry and its
 conflict detection now all read the release time the floor is working to.
+
+### The 2026-08-02 timer hardening — what the phase meant operationally
+
+The clock updated, but its vocabulary still merged different jobs. `overdue`
+meant both a guest who had not arrived and a table that had not been released;
+after the booked end, a never-arrived reservation even switched to a release
+alert. The final-fifteen label said only `残りN分`, so it measured time without
+naming the extension decision the floor needed to make.
+
+The seven-phase contract now keeps `未着` separate from `解放超過`, retains
+`未着` until a no-show/terminal record is made, and calls the final window
+`延長確認 N分`. Exact boundaries say `到着確認` / `終了時刻` instead of rounding
+zero elapsed seconds up to one minute. Extending `expectedReleaseAt` returns the
+band to `接客中`; starting the two-hour clock uses check-in only, because the
+generic `seated` status path does not move the release boundary. Phase changes
+are announced once through a polite status region, while per-minute countdowns
+stay silent to avoid alarm chatter.
 
 ### The 2026-07-31 refinement — what made it read as generated
 

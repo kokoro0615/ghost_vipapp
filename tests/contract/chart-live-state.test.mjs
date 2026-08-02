@@ -18,9 +18,34 @@ test("chart advances its now line, exposes live phases and includes both sides o
   assert.match(source, /data-acknowledged=\{phase\.acknowledged \|\| undefined\}/u);
   assert.match(source, /timelineClosingWindow/u);
   assert.match(source, /TIMELINE_PHASE_ORDER/u);
+  assert.match(source, /setRenderedAt\(Date\.now\(\)\)/u);
   assert.match(source, /document\.addEventListener\("visibilitychange", syncMotion\)/u);
+  assert.match(source, /previous\.get\(reservation\.id\) === band\.phase\.key/u);
+  assert.match(source, /role="status" aria-atomic="true"/u);
   assert.match(source, /otherIndex !== index/u);
   assert.doesNotMatch(source, /otherIndex > index/u);
+});
+
+test("arrival misses and release pressure stay distinct and actionable", async () => {
+  const state = await readFile(
+    new URL("../../src/components/admin/vip-floor-v2/chart/timelineState.ts", import.meta.url),
+    "utf8",
+  );
+  const styles = await readFile(
+    new URL("../../src/components/admin/vip-floor-v2/VipFloorWorkspace.module.css", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(state, /arrival_overdue: \{ shortLabel: "未着"/u);
+  assert.match(state, /closing_soon: \{ shortLabel: "延長確認"/u);
+  assert.match(state, /overdue: \{ shortLabel: "解放超過"/u);
+  assert.match(state, /`延長確認 \$\{remaining\}分`/u);
+  assert.match(state, /延長の要否を確認してください/u);
+  assert.ok(
+    state.indexOf("if (!status || NOT_SEATED_STATUSES.has(status))") < state.indexOf("if (nowMs >= endMs)"),
+    "a never-arrived party must not turn into a table-release alert after its booked end",
+  );
+  assert.match(styles, /data-phase="arrival_overdue"[^\n]*--band-frame: var\(--alert\)/u);
 });
 
 test("the band is drawn from the release time the floor is actually working to", async () => {

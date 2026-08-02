@@ -259,7 +259,7 @@ export function CommandCenter({
                   <option value="no_contact">連絡未達</option>
                   <option value="arrived">到着済み</option>
                   <option value="partial_arrival">一部到着</option>
-                  <option value="seated">着席中</option>
+                  <option value="seated" disabled>着席中（チェックイン専用）</option>
                   <option value="bottle_pending">ボトル待ち</option>
                   <option value="bottle_served">提供済み</option>
                   <option value="bill_requested">会計依頼</option>
@@ -268,6 +268,9 @@ export function CommandCenter({
                   <option value="completed">完了</option>
                   <option value="no_show">無断不来店</option>
                 </select>
+                <small className={styles.syntheticInputHint}>
+                  着席開始は「チェックイン」で記録すると、利用終了を実時刻から2時間後に設定します。
+                </small>
               </label>
             ) : null}
 

@@ -605,7 +605,7 @@ also the place where the rules have to be written down rather than inferred.
 | Layer | Answers | Carried by |
 |---|---|---|
 | Service status (13) | *what kind of table is this* | the fill wash, the top rule's colour/weight/pattern, and the status word on the band |
-| Time phase (6) | *how soon must someone move* | the other three border sides, and whether they blink |
+| Time phase (7) | *how soon must someone move, and why* | the other three border sides, the action label, and whether they blink |
 
 The fill is the layer that never moves. Text sits on it, so animating it would
 make the label's contrast a function of the animation phase — the defect §7.1
@@ -637,19 +637,41 @@ chart's height, so on a tall viewport the lane grows underneath a fixed band: a
 reads as pills scattered on white rather than as occupancy. `clamp(44px, 64%,
 88px)` keeps the touch floor, fills the lane, and never becomes a slab.
 
-**The alarm ladder.** Three phases raise a signal and three do not. Priority is
+**The alarm ladder.** Four time-critical phases use three signal tiers. Priority is
 carried by waveform and amplitude, in the ladder clinical alarm systems use
 (IEC 60601-1-8), because rhythm is the last thing to survive peripheral vision:
 
 | Tier | Phase | Rhythm | Ring |
 |---|---|---|---|
 | `low` | 来店15分前 | one slow swell, 2.4s | 2px, champagne |
-| `medium` | 残り15分 | double pulse, 1.8s | 2px, warn |
-| `high` | 超過 | hard square blink, 900ms | 3px + inner hairline, alert |
+| `medium` | 延長確認（利用終了15分前） | double pulse, 1.8s | 2px, warn |
+| `high` | 未着 / 解放超過 | hard square blink, 900ms | 3px + inner hairline, alert |
 
 Every tier stays at or under ~1.1 flashes per second — roughly a third of the
 WCAG 2.3.1 three-per-second threshold. What blinks is a ring drawn just inside
 the band's own frame, and `opacity` is the only property it animates.
+
+**Arrival and release are different exceptions.** A booking that passes its
+start without an arrival is `arrival_overdue` (`未着N分`) and remains so even
+after its booked end; it cannot become a table-release alert when nobody came.
+`overdue` is reserved for a party that arrived but still occupies the table at
+the release boundary (`解放超過N分`). At the exact start/end instant the label
+says `到着確認` / `終了時刻` rather than claiming one minute has elapsed.
+
+**Closing is an action, not a measurement.** The medium phase says
+`延長確認 N分` and its accessible description asks the operator to confirm
+extension. The release time is `expectedReleaseAt`, so a successful extension
+returns the band to `接客中` until the new final fifteen minutes. Starting a
+two-hour stay must use the check-in command: the generic service-status adapter
+rejects `seated`, because only check-in records the actual time and advances the
+release boundary to at least actual time + 120 minutes.
+
+Phase transitions are exposed through one polite `role=status` region. It
+announces only a phase-key change, never the 10-second clock tick or minute-by-
+minute label, following WCAG 4.1.3 without turning the board into a chatty live
+region. References: [W3C status messages](https://www.w3.org/WAI/WCAG22/Understanding/status-messages),
+[W3C three flashes](https://www.w3.org/WAI/WCAG22/Understanding/three-flashes),
+[Apple alerts](https://developer.apple.com/design/human-interface-guidelines/alerts).
 
 The band presses with `scale`, not with a background: §6.1 removed the browser's
 tap flash on purpose, and selecting a reservation was the one control on the

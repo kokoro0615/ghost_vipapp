@@ -14,6 +14,10 @@ const workspaceHookPath = path.join(
   root,
   "src/components/admin/vip-floor-v2/state/useVipFloorWorkspace.ts",
 );
+const commandCenterPath = path.join(
+  root,
+  "src/components/admin/vip-floor-v2/commands/CommandCenter.tsx",
+);
 const siblingWebsiteRoot = path.resolve(root, "../ghost/website");
 const siblingContractPath = path.join(
   siblingWebsiteRoot,
@@ -93,6 +97,15 @@ test("command payload translation preserves the v2 concurrency and domain fields
   assert.match(source, /walk_in_cancel[\s\S]*refundDecision: "none"/u);
   assert.match(source, /walk_in_cancel[\s\S]*notifyCustomer: false/u);
   assert.match(source, /body\.payload\?\.sourceChannel !== "walk_in"/u);
+});
+
+test("seating cannot bypass check-in's two-hour release-time update", () => {
+  const route = readFileSync(commandRoutePath, "utf8");
+  const commandCenter = readFileSync(commandCenterPath, "utf8");
+
+  assert.match(route, /serviceStatus === "seated"[\s\S]*check_in_required/u);
+  assert.match(commandCenter, /<option value="seated" disabled>着席中（チェックイン専用）<\/option>/u);
+  assert.match(commandCenter, /利用終了を実時刻から2時間後に設定します/u);
 });
 
 test("board adapter prefers vip-floor.v2 and makes legacy fallback read-only", () => {

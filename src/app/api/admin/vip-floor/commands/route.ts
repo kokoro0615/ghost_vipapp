@@ -128,6 +128,14 @@ function toCommandPayload(kind: CommandKind, body: CommandBody, expectedVersion:
       if (!isVipServiceStatus(serviceStatus)) {
         return { ok: false, error: "invalid_service_status" as const };
       }
+      /* `seated` is not a cosmetic status change. The canonical check-in RPC
+       * records the actual seated time and moves expectedReleaseAt to at least
+       * that time + 120 minutes. Letting this adapter send `seated` through the
+       * generic status RPC leaves the old release time in place and makes the
+       * timeline ask for an extension too early. */
+      if (serviceStatus === "seated") {
+        return { ok: false, error: "check_in_required" as const };
+      }
       if (typeof body.payload?.occurredAt !== "string") {
         return { ok: false, error: "invalid_occurredAt" as const };
       }

@@ -4,6 +4,7 @@ export const CLOSING_SOON_MINUTES = 15;
 export const TIMELINE_PHASE_ORDER = [
   "scheduled",
   "arrival_soon",
+  "arrival_overdue",
   "active",
   "closing_soon",
   "overdue",
@@ -42,9 +43,10 @@ export const TIMELINE_PHASE_META: Record<TimelinePhaseKey, {
 }> = {
   scheduled: { shortLabel: "予定", glyph: "○", signal: "none" },
   arrival_soon: { shortLabel: "来店前", glyph: "◉", signal: "low" },
+  arrival_overdue: { shortLabel: "未着", glyph: "!", signal: "high" },
   active: { shortLabel: "接客中", glyph: "▶", signal: "none" },
-  closing_soon: { shortLabel: "残り15分", glyph: "◫", signal: "medium" },
-  overdue: { shortLabel: "超過", glyph: "!", signal: "high" },
+  closing_soon: { shortLabel: "延長確認", glyph: "◫", signal: "medium" },
+  overdue: { shortLabel: "解放超過", glyph: "!", signal: "high" },
   resolved: { shortLabel: "完了", glyph: "✓", signal: "none" },
 };
 
@@ -94,7 +96,7 @@ function minutesUntil(timestampMs: number, nowMs: number) {
 }
 
 function minutesSince(timestampMs: number, nowMs: number) {
-  return Math.max(1, Math.floor((nowMs - timestampMs) / MINUTE_MS));
+  return Math.max(0, Math.ceil((nowMs - timestampMs) / MINUTE_MS));
 }
 
 function phase(
@@ -150,12 +152,30 @@ export function getTimelinePhase({
     return phase("scheduled", "来店予定", `予約開始まで${remaining}分です`);
   }
 
+  /* Arrival truth outranks the booked end. An expected/late/no-contact party
+   * that never came does not become a table-release problem when the original
+   * two-hour window ends; it remains an arrival exception until the floor
+   * records no-show or another terminal outcome. */
+  if (!status || NOT_SEATED_STATUSES.has(status)) {
+    const delay = minutesSince(startMs, nowMs);
+    return phase(
+      "arrival_overdue",
+      delay === 0 ? "到着確認" : `未着${delay}分`,
+      delay === 0
+        ? "予約開始時刻です。到着を確認してください"
+        : `予約開始時刻を${delay}分過ぎています。到着を確認してください`,
+      DELAY_RECORDED_STATUSES.has(status),
+    );
+  }
+
   if (nowMs >= endMs) {
     const overtime = minutesSince(endMs, nowMs);
     return phase(
       "overdue",
-      `超過${overtime}分`,
-      `予約終了時刻を${overtime}分超過しています`,
+      overtime === 0 ? "終了時刻" : `解放超過${overtime}分`,
+      overtime === 0
+        ? "利用終了時刻です。延長または退店を確認してください"
+        : `利用終了時刻を${overtime}分超過しています。延長または退店を確認してください`,
       SETTLING_STATUSES.has(status),
     );
   }
@@ -165,19 +185,9 @@ export function getTimelinePhase({
     const remaining = minutesUntil(endMs, nowMs);
     return phase(
       "closing_soon",
-      `残り${remaining}分`,
-      `予約終了まで残り${remaining}分です`,
+      `延長確認 ${remaining}分`,
+      `利用終了まで残り${remaining}分です。延長の要否を確認してください`,
       SETTLING_STATUSES.has(status),
-    );
-  }
-
-  if (!status || NOT_SEATED_STATUSES.has(status)) {
-    const delay = minutesSince(startMs, nowMs);
-    return phase(
-      "overdue",
-      `開始超過${delay}分`,
-      `予約開始時刻を${delay}分過ぎています`,
-      DELAY_RECORDED_STATUSES.has(status),
     );
   }
 

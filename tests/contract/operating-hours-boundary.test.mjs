@@ -29,6 +29,8 @@ test("timeline, options, board and mutations share the 22:00-next-day-05:00 cont
 
   assert.match(chart, /getGhostOperatingWindow\(board\.businessDay\.businessDate\)/u);
   assert.doesNotMatch(wizard, /type="datetime-local"/u);
+  assert.match(wizard, /scheduleDefaults\(businessDate\)/u);
+  assert.match(wizard, /const nextSchedule = scheduleDefaults\(nextBusinessDate\)[\s\S]*startAt: nextSchedule\.start[\s\S]*endAt: nextSchedule\.end/u);
   assert.doesNotMatch(operationCenter, /type="datetime-local"/u);
   assert.match(timeFields, /getGhostTimeOptions\(businessDate\)/u);
   assert.match(timeFields, /22:00〜翌05:00/u);
