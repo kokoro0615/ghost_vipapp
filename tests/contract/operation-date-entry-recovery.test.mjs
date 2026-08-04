@@ -18,6 +18,10 @@ const optionsRoute = readFileSync(
   "src/app/api/admin/vip-floor/options/route.ts",
   "utf8",
 );
+const staffRoute = readFileSync(
+  "src/app/api/admin/vip-floor/staff/route.ts",
+  "utf8",
+);
 const chart = readFileSync(
   "src/components/admin/vip-floor-v2/chart/ChartView.tsx",
   "utf8",
@@ -72,6 +76,11 @@ test("the intake dialog can recover by selecting a phone reservation date", () =
   assert.match(
     optionsRoute,
     /response\.status === 404[\s\S]*?payload\.error === "event_day_not_found"[\s\S]*?status: 200/u,
+  );
+  assert.match(
+    staffRoute,
+    /response\.status === 404[\s\S]*?payload\.error === "event_day_not_found"[\s\S]*?status: 200/u,
+    "the parallel staff read must not turn the same missing-day outcome into a console error",
   );
   assert.match(workspaceHook, /const eventDayMissing = payload\.error === "event_day_not_found";/u);
 });

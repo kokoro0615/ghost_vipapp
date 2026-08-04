@@ -26,11 +26,32 @@ export async function GET(request: Request) {
   ) {
     return NextResponse.json({ ok: false, error: "invalid_business_date" }, { status: 400 });
   }
-  return forward(
+  const response = await ghostAdminFetch(
     `/api/admin/v2/staff?businessDate=${encodeURIComponent(date)}`,
     {},
     auth.token,
   );
+  const payload = await copyJson(response);
+
+  // Staff assignments are event-day scoped. While an operator is recovering
+  // from an unregistered day, absence is expected and the client intentionally
+  // keeps staffData null. Preserve the domain outcome without emitting a
+  // browser-level failed-resource error; all other upstream failures remain
+  // failures, and no synthetic event-day or assignment data is created.
+  if (
+    response.status === 404
+    && payload
+    && typeof payload === "object"
+    && "error" in payload
+    && payload.error === "event_day_not_found"
+  ) {
+    return NextResponse.json(payload, {
+      status: 200,
+      headers: { "Cache-Control": "no-store" },
+    });
+  }
+
+  return NextResponse.json(payload, { status: response.status });
 }
 
 export async function POST(request: Request) {
