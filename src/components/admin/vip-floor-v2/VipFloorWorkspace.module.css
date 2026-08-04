@@ -1565,6 +1565,20 @@
     repeating-linear-gradient(90deg, var(--rule) 0 1px, transparent 1px calc(100% / var(--tick-count))),
     linear-gradient(90deg, var(--elapsed-wash) 0 var(--elapsed), transparent var(--elapsed));
 }
+.timelineEmptyRow { min-height: calc(var(--h-control) * 3); }
+.timelineEmptyRow .timelineTrack { display: grid; place-items: center; }
+.timelineEmptyMessage {
+  position: relative;
+  z-index: 2;
+  margin: 0;
+  padding: var(--s-3) var(--s-5);
+  border-top: 1px solid var(--rule-strong);
+  border-bottom: 1px solid var(--rule-strong);
+  background: var(--surface);
+  color: var(--ink-2);
+  font-size: var(--t-mini);
+  line-height: var(--lh-ui);
+}
 /* A band answers two questions that must not compete for the same ink:
  *   what kind of table is this  → the top rule and the fill (service status)
  *   how soon must someone move  → the frame, and whether the frame blinks
@@ -2169,6 +2183,26 @@
 }
 .commandContext strong { color: var(--ink); font-family: var(--font-figure); font-size: var(--t-data); font-weight: var(--weight-strong); }
 .commandContext span { color: var(--ink-2); font-size: var(--t-mini); }
+.operationDateRecovery {
+  display: grid;
+  gap: var(--s-6);
+  margin: var(--s-8) 0;
+  padding: var(--s-6);
+  border-top: 2px solid var(--accent);
+  border-bottom: 1px solid var(--rule-strong);
+  background: var(--surface-quiet);
+}
+.operationDateRecovery > div {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-4);
+  color: var(--ink-2);
+}
+.operationDateRecovery > div > span { display: grid; min-width: 0; gap: var(--s-2); }
+.operationDateRecovery strong { color: var(--ink); font-size: var(--t-body); font-weight: var(--weight-strong); }
+.operationDateRecovery small,
+.operationDateRecovery p { margin: 0; color: var(--ink-2); font-size: var(--t-mini); line-height: var(--lh-ui); }
+.operationDateRecovery p { padding-top: var(--s-4); border-top: 1px solid var(--rule); }
 .commandForm fieldset, .wizardBody fieldset { display: grid; min-width: 0; gap: var(--s-5); margin: 0; padding: 0; border: 0; }
 .commandForm legend { margin-bottom: var(--s-4); color: var(--ink-3); font-size: var(--t-mini); }
 .commandForm label, .wizardBody label, .staffCreate label,

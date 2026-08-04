@@ -256,6 +256,13 @@ export default function VipFloorWorkspace() {
     || ["loading", "stale", "reconnecting", "error", "read_only"].includes(state.globalState)
     || !state.board.operations.adminMutationEnabled
     || !canMutate;
+  // Opening the intake desk is a read action. A day without an event_day falls
+  // back to a read-only empty board, but the operator still needs this entry
+  // point to choose a different date for a phone reservation. Actual writes
+  // remain guarded by runOperation after the target day's canonical board loads.
+  const operationEntryBlocked = offline
+    || ["loading", "stale", "reconnecting", "error"].includes(state.globalState)
+    || !isOwner;
 
   const updateRoute = useCallback((updates: Record<string, string | null>) => {
     const params = new URLSearchParams(window.location.search);
@@ -359,11 +366,17 @@ export default function VipFloorWorkspace() {
   }
 
   async function openOperation() {
-    if (readOnly || !isOwner) return;
+    if (operationEntryBlocked) return;
     dispatch({ type: "clearConflict" });
     setEditingReservationId(null);
     setOperationOpen(true);
-    setOperationOptions(await loadOperationOptions());
+    setOperationOptions(null);
+    setOperationDatePending(true);
+    try {
+      setOperationOptions(await loadOperationOptions());
+    } finally {
+      setOperationDatePending(false);
+    }
   }
 
   async function openReservationEdit() {
@@ -378,11 +391,10 @@ export default function VipFloorWorkspace() {
   async function changeOperationBusinessDate(nextBusinessDate: string) {
     if (
       !DATE_PATTERN.test(nextBusinessDate)
-      || nextBusinessDate === businessDate
       || editingReservationId
       || operationDatePending
     ) {
-      return nextBusinessDate === businessDate;
+      return false;
     }
 
     setOperationDatePending(true);
@@ -750,8 +762,8 @@ export default function VipFloorWorkspace() {
             type="button"
             className={`${styles.primaryButton} ${styles.desktopCreate}`}
             onClick={() => void openOperation()}
-            disabled={readOnly || !isOwner}
-            aria-label={`新規オペレーション（${isOwner ? "Walk-inまたは受付ブロック" : "Owner専用"}）`}
+            disabled={operationEntryBlocked}
+            aria-label={`新規オペレーション（${isOwner ? "Walk-in・事前予約・受付ブロック" : "Owner専用"}）`}
           >
             <CalendarPlus size={18} aria-hidden />新規受付
           </button>
@@ -986,8 +998,8 @@ export default function VipFloorWorkspace() {
       <nav className={styles.primaryNav} aria-label="主要ナビゲーション">
         <button
           type="button"
-          disabled={readOnly || !isOwner}
-          aria-label={`新規オペレーション（${isOwner ? "Walk-inまたは受付ブロック" : "Owner専用"}）`}
+          disabled={operationEntryBlocked}
+          aria-label={`新規オペレーション（${isOwner ? "Walk-in・事前予約・受付ブロック" : "Owner専用"}）`}
           onClick={() => void openOperation()}
         >
           {/* Pinned by tests/contract/operations-adapter.test.mjs: on phones this

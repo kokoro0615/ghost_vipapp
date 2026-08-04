@@ -295,6 +295,19 @@ export default function ChartView({ board, reservations, selectedReservationId, 
               </div>
             );
           })}
+          {board.tables.length === 0 ? (
+            <div className={`${styles.timelineRow} ${styles.timelineEmptyRow}`}>
+              <div className={styles.timelineTableLabel}>
+                <strong>営業日</strong>
+                <span>未登録</span>
+              </div>
+              <div className={styles.timelineTrack}>
+                <p className={styles.timelineEmptyMessage} role="status">
+                  この日は席データがありません。営業日を切り替えてください。
+                </p>
+              </div>
+            </div>
+          ) : null}
         </div>
       </div>
 

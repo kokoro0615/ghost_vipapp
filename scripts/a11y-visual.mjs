@@ -26,6 +26,7 @@ const artifactDirectory = path.resolve(
 const targetedViewport = process.env.GHOST_VIP_QA_VIEWPORT?.trim() || null;
 const targetedState = process.env.GHOST_VIP_QA_STATE?.trim() || null;
 const webkitExecutablePath = process.env.GHOST_VIP_WEBKIT_EXECUTABLE?.trim() || null;
+const QA_RECOVERY_TIMEOUT_MS = 30_000;
 
 let server;
 let serverOutput = "";
@@ -148,15 +149,22 @@ async function auditViewport(context, viewport) {
   };
 
   if (targetedState) {
-    assert.equal(targetedState, "chart-phases", `unknown targeted QA state: ${targetedState}`);
-    const phasePage = await newQaPage(context, {
-      boardPayload: timelinePhaseBoard,
-      fixedNow: timelinePhaseNow,
-    });
-    await goToWorkspace(phasePage, "chart");
-    await assertTimelinePhases(phasePage);
-    await capture(phasePage, "chart-phases");
-    await phasePage.close();
+    if (targetedState === "chart-phases") {
+      const phasePage = await newQaPage(context, {
+        boardPayload: timelinePhaseBoard,
+        fixedNow: timelinePhaseNow,
+      });
+      await goToWorkspace(phasePage, "chart");
+      await assertTimelinePhases(phasePage);
+      await capture(phasePage, "chart-phases");
+      await phasePage.close();
+    } else if (targetedState === "operation-date-recovery") {
+      await auditOperationDateRecovery(context, capture);
+    } else if (targetedState === "chart-empty-grid") {
+      await auditMissingEventChart(context, capture);
+    } else {
+      assert.fail(`unknown targeted QA state: ${targetedState}`);
+    }
     return results;
   }
 
@@ -376,6 +384,9 @@ async function auditViewport(context, viewport) {
   );
   await emptyViewsPage.close();
 
+  await auditOperationDateRecovery(context, capture);
+  await auditMissingEventChart(context, capture);
+
   const operationConflictPage = await newQaPage(context, { operationStatus: 409 });
   await goToWorkspace(operationConflictPage, "list");
   await operationConflictPage.getByRole("button", { name: /新規オペレーション/u }).click();
@@ -510,6 +521,53 @@ async function auditViewport(context, viewport) {
   await demoExpiredPage.close();
 
   return results;
+}
+
+async function auditOperationDateRecovery(context, capture) {
+  const page = await newQaPage(context, {
+    boardPayloads: [missingEventBoard, alternateBoard],
+    missingEventDate: board.businessDay.businessDate,
+  });
+  await goToWorkspace(page, "list");
+  const intakeButton = page.getByRole("button", { name: /新規オペレーション/u });
+  await intakeButton.waitFor({ timeout: QA_RECOVERY_TIMEOUT_MS });
+  assert.equal(
+    await intakeButton.isEnabled(),
+    true,
+    "an event-day-missing board must still expose the phone reservation intake",
+  );
+  await intakeButton.click({ timeout: QA_RECOVERY_TIMEOUT_MS });
+  const dialog = page.getByRole("dialog", { name: "新規予約" });
+  await dialog.getByRole("alert")
+    .getByText("選択した日は予約を受け付ける営業日として登録されていません。")
+    .waitFor({ timeout: QA_RECOVERY_TIMEOUT_MS });
+  await dialog.getByRole("tab", { name: "事前予約" }).click({ timeout: QA_RECOVERY_TIMEOUT_MS });
+  await dialog.getByLabel("予約・受付日").waitFor({ timeout: QA_RECOVERY_TIMEOUT_MS });
+  await capture(page, "operation-date-recovery");
+  await dialog.getByLabel("予約・受付日").fill(alternateBusinessDate, { timeout: QA_RECOVERY_TIMEOUT_MS });
+  await dialog.getByRole("button", { name: "この日を開く" }).click({ timeout: QA_RECOVERY_TIMEOUT_MS });
+  await dialog.getByLabel("予約作成 1/8").waitFor({ timeout: QA_RECOVERY_TIMEOUT_MS });
+  assert.equal(
+    await page.getByLabel("営業日").inputValue(),
+    alternateBusinessDate,
+    "phone reservation recovery must load the selected canonical business day",
+  );
+  await capture(page, "operation-date-recovered");
+  await page.close();
+}
+
+async function auditMissingEventChart(context, capture) {
+  const page = await newQaPage(context, { boardPayload: missingEventBoard });
+  await goToWorkspace(page, "chart");
+  const emptyTimelineTrack = page.locator('[class*="timelineEmptyRow"] [class*="timelineTrack"]');
+  await emptyTimelineTrack.waitFor({ timeout: QA_RECOVERY_TIMEOUT_MS });
+  assert.notEqual(
+    await emptyTimelineTrack.evaluate((element) => getComputedStyle(element).backgroundImage),
+    "none",
+    "the true time grid must remain drawn when no event-day table payload exists",
+  );
+  await capture(page, "chart-empty-grid");
+  await page.close();
 }
 
 async function assertTimelinePhases(page) {
@@ -756,6 +814,13 @@ async function installSyntheticRoutes(page, scenario = {}) {
   });
   await page.route("**/api/admin/vip-floor/options?**", (route) => {
     const requestedDate = new URL(route.request().url()).searchParams.get("date");
+    if (requestedDate === scenario.missingEventDate) {
+      return route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ ok: false, error: "event_day_not_found" }),
+      });
+    }
     if (requestedDate === unavailableBusinessDate) {
       return route.fulfill({
         status: 200,
@@ -1474,6 +1539,20 @@ const emptyBoard = {
     noteCount: 0,
     guestCount: 0,
     serviceStatusCounts: {},
+  },
+};
+
+const missingEventBoard = {
+  ...emptyBoard,
+  legacyFallbackCount: 0,
+  tables: [],
+  totals: {
+    ...emptyBoard.totals,
+    tableCount: 0,
+  },
+  operations: {
+    ...emptyBoard.operations,
+    adminMutationEnabled: false,
   },
 };
 

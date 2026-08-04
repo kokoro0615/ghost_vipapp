@@ -125,9 +125,12 @@ export function OperationCenter({
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!options) return;
     const form = event.currentTarget;
     const data = new FormData(form);
+    if (!options) {
+      await onBusinessDateChange(String(data.get("businessDate") ?? ""));
+      return;
+    }
     const tableIds = kind === "walk_in"
       ? activeWalkInTableIds
       : data.getAll("tableIds").map(String).filter(Boolean);
@@ -268,6 +271,22 @@ export function OperationCenter({
     }
   }
 
+  const operationTabId = kind === "walk_in"
+    ? "operation-tab-walk-in"
+    : kind === "reservation_create"
+      ? "operation-tab-reservation"
+      : "operation-tab-block";
+  const operationContextLabel = kind === "walk_in"
+    ? "店頭受付・即時着席"
+    : kind === "reservation_create"
+      ? "電話・事前予約"
+      : "販売・運用停止";
+  const conflictTitle = conflict && !conflict.ok
+    ? conflict.code === "event_day_not_found"
+      ? "営業日未登録"
+      : conflict.code
+    : null;
+
   return (
     <div
       className={styles.dialogBackdrop}
@@ -367,7 +386,7 @@ export function OperationCenter({
           <form
             id="operation-panel"
             role="tabpanel"
-            aria-labelledby={kind === "walk_in" ? "operation-tab-walk-in" : "operation-tab-block"}
+            aria-labelledby={operationTabId}
             key={`${kind}:${editingBlockId ?? "new"}`}
             className={styles.commandForm}
             onSubmit={submit}
@@ -379,13 +398,32 @@ export function OperationCenter({
                 reach. The body scrolls; the footer does not move. */}
             <div className={styles.commandScroll}>
 	          <div className={styles.commandContext}>
-	            <strong>{kind === "walk_in" ? "店頭受付・即時着席" : "販売・運用停止"}</strong>
+	            <strong>{operationContextLabel}</strong>
 	            <span className="tabular-nums">{board.businessDay.businessDate} / 22:00–翌05:00</span>
 	          </div>
 
           {!options ? (
-            <div className={styles.centerState} aria-busy="true">
-              <p>営業日とプランを確認しています…</p>
+            <div className={styles.operationDateRecovery} aria-busy={datePending}>
+              <div>
+                <CalendarPlus size={20} aria-hidden />
+                <span>
+                  <strong>{datePending ? "営業日とプランを確認中" : "受付日を選択"}</strong>
+                  <small>{datePending
+                    ? "予約可能なプランと席を読み込んでいます。"
+                    : "事前予約は、お電話で確認した来店日を選んで続けてください。"}</small>
+                </span>
+              </div>
+              <label>
+                予約・受付日
+                <input
+                  type="date"
+                  name="businessDate"
+                  defaultValue={board.businessDay.businessDate}
+                  required
+                  disabled={datePending}
+                />
+              </label>
+              <p>営業日未登録の日は保存せず、日付を選び直せます。</p>
             </div>
           ) : (
             <fieldset disabled={pending}>
@@ -690,7 +728,7 @@ export function OperationCenter({
             <div className={styles.conflictBox} role="alert">
               <AlertTriangle size={18} aria-hidden />
               <div>
-                <strong>{conflict.code}</strong>
+                <strong>{conflictTitle}</strong>
                 <p>{conflict.message}</p>
                 <small>{conflict.recovery}</small>
               </div>
@@ -703,8 +741,12 @@ export function OperationCenter({
             <button type="button" className={styles.secondaryButton} onClick={closePanel} disabled={pending}>
               取消
             </button>
-            <button type="submit" className={styles.primaryButton} disabled={pending || !options}>
-              <Check size={16} />{pending
+            <button type="submit" className={styles.primaryButton} disabled={pending || datePending}>
+              <Check size={16} />{!options
+                ? datePending
+                  ? "確認中…"
+                  : "この日を開く"
+                : pending
                 ? "保存中…"
                 : editingBlock
                   ? "変更を保存"

@@ -51,6 +51,7 @@ test("Owner operation adapters expose only canonical Walk-in and block routes", 
     "the target event day must be verified before the workspace date changes",
   );
   assert.match(hook, /vip-floor\/options\?date=\$\{encodeURIComponent\(targetBusinessDate\)\}/u);
-  assert.match(hook, /response\.status === 404[\s\S]*payload\.error === "event_day_not_found"/u);
+  assert.match(hook, /const eventDayMissing = payload\.error === "event_day_not_found"/u);
+  assert.match(options, /response\.status === 404[\s\S]*payload\.error === "event_day_not_found"[\s\S]*status: 200/u);
   assert.match(hook, /event_day_not_found/u);
 });

@@ -109,6 +109,8 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
   const workspaceMutationBlocked = offline
     || ["loading", "stale", "reconnecting", "error", "read_only"].includes(state.globalState)
     || !state.board.operations.adminMutationEnabled;
+  const operationOptionsBlocked = offline
+    || ["loading", "stale", "reconnecting", "error"].includes(state.globalState);
   const mutationBlocked = workspaceMutationBlocked
     || (isDemo && demoLeaseState !== "active");
 
@@ -725,7 +727,10 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
   }, [auth.session, businessDate, loadBoard, mutationBlocked, offline]);
 
   const loadOperationOptions = useCallback(async (targetBusinessDate = businessDate) => {
-    if (workspaceMutationBlocked || !operatorAuthorized) return null;
+    // Options are a read. Keep them reachable from a read-only or event-day-
+    // missing board so the intake desk can move to a valid future business day.
+    // runOperation still enforces the target board's mutation contract.
+    if (operationOptionsBlocked || !operatorAuthorized) return null;
 
     try {
       const demoTransport = demoTransportRef.current;
@@ -783,8 +788,7 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
       const payload = await response.json().catch(() => ({})) as Record<string, unknown>;
 
       if (!response.ok || payload.ok !== true) {
-        const eventDayMissing = response.status === 404
-          && payload.error === "event_day_not_found";
+        const eventDayMissing = payload.error === "event_day_not_found";
         dispatch({
           type: "commandOutcome",
           outcome: {
@@ -817,8 +821,8 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
   }, [
     businessDate,
     demoLeaseState,
+    operationOptionsBlocked,
     operatorAuthorized,
-    workspaceMutationBlocked,
   ]);
 
   const runOperation = useCallback(async (draft: OperationDraft) => {

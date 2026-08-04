@@ -50,6 +50,22 @@ export async function GET(request: Request) {
   );
   const payload = await copyJson(response);
 
+  // A missing event day is an expected outcome while the operator is choosing
+  // a future phone-reservation date. Preserve the exact domain code but avoid
+  // turning this recoverable branch into a browser-level failed-resource error.
+  if (
+    response.status === 404
+    && payload
+    && typeof payload === "object"
+    && "error" in payload
+    && payload.error === "event_day_not_found"
+  ) {
+    return NextResponse.json(payload, {
+      status: 200,
+      headers: { "Cache-Control": "no-store" },
+    });
+  }
+
   if (
     response.ok
     && payload
