@@ -530,9 +530,11 @@ async function auditOperationDateRecovery(context, capture) {
     // zero-latency fixture hid. Keep the second board read in flight long
     // enough for React effects to run before the new route is committed.
     delaySecondBoardMs: 750,
+    eventMode: "unavailable",
     missingEventDate: board.businessDay.businessDate,
   });
   await goToWorkspace(page, "list");
+  await page.locator('main[data-state="stale"]').waitFor({ timeout: QA_RECOVERY_TIMEOUT_MS });
   const intakeButton = page.getByRole("button", { name: /新規オペレーション/u });
   await intakeButton.waitFor({ timeout: QA_RECOVERY_TIMEOUT_MS });
   assert.equal(

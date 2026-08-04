@@ -110,7 +110,7 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
     || ["loading", "stale", "reconnecting", "error", "read_only"].includes(state.globalState)
     || !state.board.operations.adminMutationEnabled;
   const operationOptionsBlocked = offline
-    || ["loading", "stale", "reconnecting", "error"].includes(state.globalState);
+    || ["loading", "error"].includes(state.globalState);
   const mutationBlocked = workspaceMutationBlocked
     || (isDemo && demoLeaseState !== "active");
 
@@ -727,9 +727,10 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
   }, [auth.session, businessDate, loadBoard, mutationBlocked, offline]);
 
   const loadOperationOptions = useCallback(async (targetBusinessDate = businessDate) => {
-    // Options are a read. Keep them reachable from a read-only or event-day-
-    // missing board so the intake desk can move to a valid future business day.
-    // runOperation still enforces the target board's mutation contract.
+    // Options are a read. Keep them reachable from a read-only, stale, or
+    // reconnecting board so the intake desk can move away from an event-day-
+    // missing date. runOperation still enforces the target board's mutation
+    // and continuity contract.
     if (operationOptionsBlocked || !operatorAuthorized) return null;
 
     try {

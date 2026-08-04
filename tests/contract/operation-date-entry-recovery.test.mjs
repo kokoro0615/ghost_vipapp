@@ -29,6 +29,11 @@ const styles = readFileSync(
 
 test("an Owner can open intake from an event-day-missing read-only board", () => {
   assert.match(workspace, /const operationEntryBlocked = offline/u);
+  assert.match(
+    workspace,
+    /const operationEntryBlocked = offline\s*\|\| \["loading", "error"\]/u,
+    "a missing-day stale stream must not hide the read-only date recovery entry",
+  );
   assert.match(workspace, /if \(operationEntryBlocked\) return;/u);
   assert.equal(
     workspace.match(/disabled=\{operationEntryBlocked\}/gu)?.length,
@@ -38,6 +43,11 @@ test("an Owner can open intake from an event-day-missing read-only board", () =>
   assert.match(
     workspaceHook,
     /if \(operationOptionsBlocked \|\| !operatorAuthorized\) return null;/u,
+  );
+  assert.match(
+    workspaceHook,
+    /const operationOptionsBlocked = offline\s*\|\| \["loading", "error"\]/u,
+    "stale and reconnecting boards must still permit future-date option reads",
   );
   assert.match(
     workspace,

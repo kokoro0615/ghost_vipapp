@@ -257,11 +257,12 @@ export default function VipFloorWorkspace() {
     || !state.board.operations.adminMutationEnabled
     || !canMutate;
   // Opening the intake desk is a read action. A day without an event_day falls
-  // back to a read-only empty board, but the operator still needs this entry
-  // point to choose a different date for a phone reservation. Actual writes
-  // remain guarded by runOperation after the target day's canonical board loads.
+  // back to an empty board and its revision stream can become stale, but the
+  // operator still needs this entry point to choose a different date for a
+  // phone reservation. Actual writes remain guarded by runOperation after the
+  // target day's canonical board loads.
   const operationEntryBlocked = offline
-    || ["loading", "stale", "reconnecting", "error"].includes(state.globalState)
+    || ["loading", "error"].includes(state.globalState)
     || !isOwner;
 
   const updateRoute = useCallback((updates: Record<string, string | null>) => {
