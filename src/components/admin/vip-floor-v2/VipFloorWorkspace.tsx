@@ -286,8 +286,27 @@ export default function VipFloorWorkspace() {
     if (state.statusFilter !== nextStatus) dispatch({ type: "statusFilter", status: nextStatus });
 
     const date = searchParams.get("date");
-    if (date && DATE_PATTERN.test(date) && date !== businessDate) void setBusinessDate(date);
-  }, [businessDate, dispatch, searchParams, setBusinessDate, state.query, state.statusFilter, state.view]);
+    // A phone-reservation date switch verifies options and then loads the
+    // canonical board before replacing the URL. Do not let the still-old URL
+    // race that in-flight load and abort it by restoring the previous date.
+    if (
+      !operationDatePending
+      && date
+      && DATE_PATTERN.test(date)
+      && date !== businessDate
+    ) {
+      void setBusinessDate(date);
+    }
+  }, [
+    businessDate,
+    dispatch,
+    operationDatePending,
+    searchParams,
+    setBusinessDate,
+    state.query,
+    state.statusFilter,
+    state.view,
+  ]);
 
   function switchView(view: WorkspaceView) {
     dispatch({ type: "view", view });

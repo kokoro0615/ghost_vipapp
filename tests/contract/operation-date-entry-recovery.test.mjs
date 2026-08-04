@@ -39,6 +39,11 @@ test("an Owner can open intake from an event-day-missing read-only board", () =>
     workspaceHook,
     /if \(operationOptionsBlocked \|\| !operatorAuthorized\) return null;/u,
   );
+  assert.match(
+    workspace,
+    /!operationDatePending[\s\S]*?date !== businessDate[\s\S]*?setBusinessDate\(date\)/u,
+    "the old URL must not abort an in-flight phone-reservation date switch",
+  );
 });
 
 test("the intake dialog can recover by selecting a phone reservation date", () => {
