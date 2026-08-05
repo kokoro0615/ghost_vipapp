@@ -735,6 +735,59 @@ function of the animation phase — passing at the bright end and failing at 4.0
 at the dim end. **If a label's backdrop animates, give the label its own opaque
 ground.**
 
+### 7.2 The boot screen, as of 2026-08-05
+
+A cold load used to cross **four unrelated full-page layouts in about two
+seconds**, and the operator reported the result as collapsed. They were right:
+
+| Frame | What rendered | Why it read as broken |
+|---|---|---|
+| Route Suspense fallback | an empty `<main>` | the first paint was a blank page |
+| `app/loading.tsx` | three static grey bars, centred | a skeleton of nothing that exists in this app; no motion, no identity |
+| Owner session probe | the **entire OWNER ACCESS login frame** | 1180×706 two-column shell — display wordmark, floor-plan photograph, `align-content: center` right column holding four short lines and ~450px of white; `VIP Manager` / `を開いています` broke a Latin word from its Japanese particle; content-box padding ran it **64px past the venue iPad's 810 points** |
+| Workspace | the ledger | — |
+
+The defect was not the styling of any one frame. It was that a **sign-in page was
+being built and thrown away as a progress indicator**.
+
+**The rule: everything before the ledger renders one frame.**
+`VipBootScreen` is that frame, and the route Suspense fallback, `app/loading.tsx`
+and `auth.status === "checking"` all render it. It is server-safe, so the first
+byte carries it, and it is deliberately small — mark, queue, one line — so
+nothing has to collapse when the workspace replaces it. The OWNER ACCESS frame
+now answers only the two states that need a form or a retry: the terminal lock
+and a failed connection.
+
+**The loader is the product's own loop, not a borrowed spinner.** Four records
+sit on a ledger rule. The queue advances one slot at a time on `--ease-enter`,
+and the record that reaches the head is lifted off the rule, carried back over
+the queue in champagne, and filed at the tail. One cycle is 1760ms, so the
+champagne moment occurs at ≈0.57 Hz — under a fifth of the WCAG 2.3.1 threshold
+— and the accent window is narrower than the 25% that separates two slots, so
+exactly one record is ever the accent.
+
+Colour is never keyframed: an accent copy sits over each graphite dot and only
+its opacity moves, which keeps the whole loop on `transform` and `opacity`.
+
+Two things about this loader were only found by measuring it, and both are
+worth keeping in mind for anything else on this surface:
+
+- **Every record also carries its slot as a plain declaration.** Keyframes
+  override it while the loop runs; it is what shows when the loop does not.
+  Without it all four records sat on slot 0 and read as **one dot** — which is
+  exactly what the QA gate captures, because it screenshots with animations
+  disabled.
+- **Reduced motion here is an authored still, not a slower loop.**
+  `globals.css` clamps `animation-duration` to 1ms and `animation-iteration-count`
+  to 1 under `reduce`, house-wide and with `!important`. An earlier revision
+  tried to walk the accent at half speed; measured, it rendered as four grey
+  dots with no accent at all. The still state is the loop's phase 0 — records on
+  their slots, the head record champagne — and the status line carries the
+  progress. **On this surface, no reduced-motion fallback may rely on an
+  animation still running.**
+
+---
+
 ---
 
 ## 8. Enforcement gates
@@ -773,6 +826,20 @@ Four rules that used to rely on review discipline are now machine-enforced in
 | **iOS zoom threshold** (`a11y-visual.mjs`) | Any visible `input`/`select`/`textarea` that is not a checkbox, radio or hidden computes a font-size below 16px, at any audited viewport (§4.5) |
 | **Device matrix** (`tests/unit/light-ui-qa-manifest.test.mjs`) | `1080×810` or `810×1080` leaves the viewport list, or either loses `touch: true` / `scale: 2` / `motion: true` — i.e. the audit stops driving the venue device as a touch device, or stops running its animations |
 | **Reduced-motion coverage** (same test) | Every viewport gains `motion: true`, leaving the authored static fallbacks unobserved |
+
+### 8.1d Guards added 2026-08-05
+
+Each verified to fail when violated before being kept.
+
+| Guard | Fails when |
+|---|---|
+| **One pre-ledger frame** (`tests/contract/operator-light-ui.test.mjs`) | `app/loading.tsx` or `app/page.tsx` stops rendering `VipBootScreen`, the Suspense fallback goes back to an empty element, or `auth.status === "checking"` falls through to the OWNER ACCESS frame |
+| **Boot screen stays server-safe** (same test) | `VipBootScreen` takes `"use client"` or a hook, or stops declaring four records |
+| **Boot screen fits the device** (same test) | `.bootShell` loses `box-sizing: border-box`, which is what pushed the old login frame past 810 points |
+| **Boot loop stays on the compositor** (same test) | A `bootQueue*` keyframe animates anything other than `transform` or `opacity` |
+| **Records rest on their own slots** (same test) | A record loses its base `transform`, so the four dots collapse onto slot 0 whenever the animation is not running |
+| **Reduced motion is a still** (same test) | The `reduce` block stops marking the head record statically, or reintroduces a looping fallback that the global 1ms clamp would silently kill |
+| **Boot is audited** (`scripts/light-ui-qa-manifest.mjs`) | `boot` leaves the required QA states, so the screen would stop being rendered at every viewport |
 
 ### 8.1c Guards added 2026-08-02
 

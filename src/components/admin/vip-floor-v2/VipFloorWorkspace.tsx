@@ -34,6 +34,7 @@ import { ObservabilityPanel } from "./observability/ObservabilityPanel";
 import { ExceptionRail } from "./shell/ExceptionRail";
 import { useVipFloorWorkspace } from "./state/useVipFloorWorkspace";
 import { StaffPanel } from "./staff/StaffPanel";
+import VipBootScreen from "./VipBootScreen";
 import { WaitlistPanel } from "./waitlist/WaitlistPanel";
 import { DemoCue, DemoModeProvider } from "./demo/DemoMode";
 import { DemoExpiryBoundary } from "./demo/DemoExpiryBoundary";
@@ -479,8 +480,16 @@ export default function VipFloorWorkspace() {
         </DemoModeProvider>
       );
     }
+    /* The session probe is boot, not a sign-in screen. Rendering the full
+     * OWNER ACCESS frame for it built a two-column login page — display
+     * wordmark, floor-plan figure, a right column more than half empty — and
+     * then threw it away a second later. The probe now shares one frame with
+     * the route Suspense fallback and `app/loading.tsx`, so a cold load holds
+     * a single surface until the ledger replaces it. */
+    if (auth.status === "checking") {
+      return <VipBootScreen label="Ownerの認証情報を確認しています。" />;
+    }
     if (!demo.config) {
-      const checkingOwnerAccess = auth.status === "checking";
       return (
         <DemoModeProvider value={{
           enabled: false,
@@ -520,30 +529,17 @@ export default function VipFloorWorkspace() {
                   <span>OWNER ACCESS</span>
                 </div>
                 <div className={styles.loginIntro}>
-                  <h1 id="owner-access-title">
-                    {checkingOwnerAccess ? "VIP Managerを開いています" : "接続を完了できませんでした"}
-                  </h1>
-                  <p>
-                    {checkingOwnerAccess
-                      ? "ユーザー名とパスワードを確認しています。"
-                      : "通信状態を確認し、もう一度接続してください。"}
-                  </p>
+                  <h1 id="owner-access-title">接続を完了できませんでした</h1>
+                  <p>通信状態を確認し、もう一度接続してください。</p>
                 </div>
-                <div
-                  className={styles.ownerAccessStatus}
-                  role="status"
-                  aria-live="polite"
-                  data-pending={checkingOwnerAccess || undefined}
-                >
+                <div className={styles.ownerAccessStatus} role="status" aria-live="polite">
                   <span aria-hidden />
-                  {checkingOwnerAccess ? "認証中" : "再接続が必要です"}
+                  再接続が必要です
                 </div>
-                {!checkingOwnerAccess ? (
-                  <button type="button" onClick={() => window.location.reload()}>
-                    <RefreshCw size={18} aria-hidden />
-                    再接続
-                  </button>
-                ) : null}
+                <button type="button" onClick={() => window.location.reload()}>
+                  <RefreshCw size={18} aria-hidden />
+                  再接続
+                </button>
                 <p className={styles.loginHint}>
                   ブラウザのBasic認証から直接、管理台帳へ移動します。
                 </p>
@@ -603,7 +599,7 @@ export default function VipFloorWorkspace() {
                 onClick={() => void reconnect()}
               >
                 <ShieldCheck size={18} aria-hidden />
-                {state.pending || auth.status === "checking" ? "確認中…" : "再接続"}
+                {state.pending ? "確認中…" : "再接続"}
               </button>
               <p className={styles.loginHint}>
                 合成データのみを使用し、Production予約は変更しません。

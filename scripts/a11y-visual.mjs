@@ -52,6 +52,19 @@ async function main() {
 
   try {
     await waitForServer();
+    /*
+     * `waitForServer` only proves that something answers on the port. If a
+     * server from an earlier run still holds it, our own `next start` exits on
+     * EADDRINUSE and the whole audit runs against that stale build — which is
+     * exactly what happened on 2026-08-05: a server left over from a killed
+     * run served a build whose CSS had since been deleted, and before that it
+     * silently produced a green 561-screenshot report for code that was never
+     * loaded. Auditing the wrong build is worse than not auditing at all, so
+     * this fails closed.
+     */
+    assert.equal(server.exitCode, null,
+      `the audit server exited instead of binding port ${port}; another server is `
+      + `probably still holding it. Server output:\n${serverOutput}`);
     browsers.set("chromium", await chromium.launch({
       executablePath: chromePath,
       headless: true,
@@ -74,11 +87,23 @@ async function main() {
             ...(webkitExecutablePath ? { executablePath: webkitExecutablePath } : {}),
           }));
         } catch (error) {
+          /* Playwright reports a host without the WebKit runtime two different
+           * ways: its own dependency probe, and — when the probe passes but a
+           * library is gone — the browser process dying on a dynamic link
+           * error, which surfaces only as "browser has been closed". Both are
+           * the same condition and both must land in `notRunViewports`, which
+           * is never counted as a pass. Before this, the second form crashed
+           * the whole run after all ten Chromium viewports had been audited,
+           * throwing away their results. */
           const message = error instanceof Error ? error.message : String(error);
-          if (!message.includes("Host system is missing dependencies to run browsers")) throw error;
+          const missingRuntime = message.includes("Host system is missing dependencies to run browsers");
+          const missingLibrary = /error while loading shared libraries: (\S+)/u.exec(message);
+          if (!missingRuntime && !missingLibrary) throw error;
           notRunViewports.push({
             viewport: `${viewport.browser}-${viewport.width}x${viewport.height}`,
-            reason: "host-system-missing-dependencies",
+            reason: missingRuntime
+              ? "host-system-missing-dependencies"
+              : `host-system-missing-shared-library:${missingLibrary[1].replace(/:$/u, "")}`,
           });
           continue;
         }
@@ -167,6 +192,12 @@ async function auditViewport(context, viewport) {
     }
     return results;
   }
+
+  const bootPage = await newQaPage(context, { sessionDelayMs: 8_000 });
+  await bootPage.goto(origin, { waitUntil: "domcontentloaded" });
+  await bootPage.locator('main[aria-busy="true"]').waitFor();
+  await capture(bootPage, "boot");
+  await bootPage.close();
 
   const loginPage = await newQaPage(context, { authenticated: false });
   await loginPage.goto(origin, { waitUntil: "domcontentloaded" });
@@ -756,7 +787,13 @@ async function installSyntheticRoutes(page, scenario = {}) {
   };
   const demoServerNow = scenario.fixedNow ?? new Date().toISOString();
   const demoLeaseExpiresAt = new Date(Date.parse(demoServerNow) + 60_000).toISOString();
-  await page.route("**/api/admin/session", (route) => {
+  await page.route("**/api/admin/session", async (route) => {
+    /* Holding the session probe open is the only way to observe the boot
+     * screen: it is the frame the workspace shows while this request is in
+     * flight, and on a warm connection it is gone in well under a second. */
+    if (scenario.sessionDelayMs) {
+      await new Promise((resolve) => setTimeout(resolve, scenario.sessionDelayMs));
+    }
     if (scenario.demoMode === "expired") {
       return route.fulfill({
         status: 410,

@@ -510,17 +510,6 @@
   border-radius: 50%;
   background: transparent;
 }
-.ownerAccessStatus[data-pending="true"] > span {
-  background: var(--accent);
-  animation: owner-access-pulse 1.2s var(--ease-ui) infinite alternate;
-}
-@keyframes owner-access-pulse {
-  from { opacity: 0.32; }
-  to { opacity: 1; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .ownerAccessStatus[data-pending="true"] > span { animation: none; }
-}
 
 .maintenanceShell, .demoExpiredShell {
   display: grid;
@@ -2733,7 +2722,7 @@
 }
 @keyframes paperPulse { from { opacity: 0.5; } to { opacity: 1; } }
 
-.routeState, .routeError {
+.routeError {
   display: flex;
   min-height: 100dvh;
   flex-direction: column;
@@ -2743,12 +2732,178 @@
   background: var(--paper);
   font-family: var(--font-ui);
 }
-.routeState div { width: min(680px, 80vw); height: 16px; border-radius: var(--r-chip); background: var(--surface-sunken); }
-.routeState div:nth-child(2) { width: min(520px, 68vw); }
-.routeState div:nth-child(3) { height: 260px; }
 .routeError h1 { margin: 0; font-size: var(--t-lead); font-weight: var(--weight-strong); }
 .routeError p { margin: 0; color: var(--ink-2); font-size: var(--t-body); }
 .routeError button { display: flex; min-height: var(--h-control); align-items: center; gap: var(--s-3); padding: 0 var(--s-5); border: 1px solid var(--action); border-radius: var(--r-control); background: var(--action); color: var(--action-text); font-weight: var(--weight-ui); }
+
+/* ── 10b. boot ──────────────────────────────────────────────────────────
+ * The shell every pre-ledger frame renders: route Suspense, app/loading, and
+ * the owner session check. It carries the same champagne top edge as the login
+ * and workspace shells, so a cold load reads as one surface being filled in
+ * rather than as three pages replacing each other.
+ * See docs/DESIGN.md section 7.2. */
+
+.bootShell {
+  position: relative;
+  display: grid;
+  /* Content-box would add the padding on top of 100dvh and scroll the boot
+     screen on the venue iPad, which is exactly what the login frame did. */
+  box-sizing: border-box;
+  min-height: 100dvh;
+  place-items: center;
+  padding:
+    max(var(--s-8), env(safe-area-inset-top))
+    var(--s-6)
+    max(var(--s-8), env(safe-area-inset-bottom));
+  background: var(--paper);
+  color: var(--ink);
+  color-scheme: light;
+  font-family: var(--font-ui);
+}
+.bootShell::before {
+  position: fixed;
+  z-index: 1;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 2px;
+  background: var(--accent);
+  content: "";
+}
+.bootFrame {
+  display: grid;
+  width: min(304px, 100%);
+  justify-items: center;
+  gap: var(--s-8);
+}
+.bootIdentity {
+  display: flex;
+  align-items: center;
+  gap: var(--s-5);
+}
+
+/* The queue. Four slots of `--boot-gap`, so the travelled span is three gaps
+ * and the cluster is that span plus one dot. Sizes are held in custom
+ * properties because the keyframes and the reduced-motion resting positions
+ * both have to agree with them exactly. */
+.bootQueue {
+  --boot-dot: 14px;
+  --boot-gap: 38px;
+  --boot-cycle: 1760ms;
+  --boot-span: calc(var(--boot-dot) + var(--boot-gap) * 3);
+  /* The rule sits low in the box so the arc has somewhere to go without
+     overrunning the wordmark above it. */
+  --boot-base: 70%;
+
+  position: relative;
+  width: 100%;
+  height: calc(var(--boot-dot) * 4.8);
+}
+/* The rule runs the full width of the lockup, not just under the cluster: the
+ * records are a short section of a much longer ledger, and the rule is the
+ * alignment spine the mark and the status line are centred on. */
+.bootQueue::before {
+  position: absolute;
+  top: var(--boot-base);
+  right: 0;
+  left: 0;
+  height: 1px;
+  background: var(--rule-strong);
+  content: "";
+  /* Both ends fade out, so the rule reads as a section of a ledger that
+     continues past the frame rather than as a 304px line with two hard stops.
+     The stops are an alpha stencil, not a surface colour — the rule itself
+     stays `--rule-strong`. */
+  mask-image: linear-gradient(90deg, transparent, black 22%, black 78%, transparent);
+}
+.bootDot {
+  position: absolute;
+  top: calc(var(--boot-base) - var(--boot-dot) / 2);
+  left: calc(50% - var(--boot-span) / 2);
+  width: var(--boot-dot);
+  height: var(--boot-dot);
+  border-radius: 50%;
+  background: var(--ink);
+  animation: bootQueueAdvance var(--boot-cycle) linear infinite;
+  will-change: transform;
+}
+/* The champagne head of the queue. Colour is not keyframed: an accent copy
+ * sits over the graphite dot and only its opacity moves, which keeps the whole
+ * loop on transform and opacity. */
+.bootDot::before {
+  position: absolute;
+  border-radius: 50%;
+  background: var(--accent);
+  content: "";
+  inset: 0;
+  opacity: 0;
+  animation: bootQueueLead var(--boot-cycle) linear infinite;
+  animation-delay: inherit;
+}
+/* Each record also carries its slot as a plain declaration, which the running
+ * keyframes override. That base state is what shows whenever the animation is
+ * not running — reduced motion, a paused or cancelled timeline, a screenshot
+ * taken with animations disabled, a browser that drops the keyframes — and
+ * without it all four records collapsed onto slot 0 and read as one dot. The
+ * offsets match phase 0 of the loop, so nothing jumps when it starts. */
+.bootDot:nth-child(2) {
+  transform: translate3d(var(--boot-gap), 0, 0);
+  animation-delay: calc(var(--boot-cycle) / -4);
+}
+.bootDot:nth-child(3) {
+  transform: translate3d(calc(var(--boot-gap) * 2), 0, 0);
+  animation-delay: calc(var(--boot-cycle) / -2);
+}
+.bootDot:nth-child(4) {
+  transform: translate3d(calc(var(--boot-gap) * 3), 0, 0);
+  animation-delay: calc(var(--boot-cycle) / -4 * 3);
+}
+
+/* Each quarter is a step: the dot rests, then advances one slot on
+ * `--ease-enter` so the move settles instead of sliding at constant speed. The
+ * final quarter lifts the head record off the rule and files it at the tail. */
+@keyframes bootQueueAdvance {
+  0%, 17.5% { transform: translate3d(0, 0, 0) scale(1); animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1); }
+  25%, 42.5% { transform: translate3d(var(--boot-gap), 0, 0) scale(1); animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1); }
+  50%, 67.5% { transform: translate3d(calc(var(--boot-gap) * 2), 0, 0) scale(1); animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1); }
+  75% { transform: translate3d(calc(var(--boot-gap) * 3), 0, 0) scale(1); animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1); }
+  80% { transform: translate3d(calc(var(--boot-gap) * 2.63), calc(var(--boot-dot) * -1.5), 0) scale(1.14); }
+  84% { transform: translate3d(calc(var(--boot-gap) * 2.05), calc(var(--boot-dot) * -2.2), 0) scale(1.22); }
+  87.5% { transform: translate3d(calc(var(--boot-gap) * 1.5), calc(var(--boot-dot) * -2.35), 0) scale(1.24); animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1); }
+  91% { transform: translate3d(calc(var(--boot-gap) * 0.95), calc(var(--boot-dot) * -2.2), 0) scale(1.22); }
+  95% { transform: translate3d(calc(var(--boot-gap) * 0.37), calc(var(--boot-dot) * -1.5), 0) scale(1.14); }
+  100% { transform: translate3d(0, 0, 0) scale(1); }
+}
+/* Champagne only while the record is off the rule. The window is narrower than
+ * the 25% that separates two dots, so exactly one record is ever the accent —
+ * one focal object, not two competing ones. */
+@keyframes bootQueueLead {
+  0%, 76% { opacity: 0; }
+  81%, 93% { opacity: 1; }
+  98%, 100% { opacity: 0; }
+}
+
+.bootStatus {
+  max-width: 32ch;
+  margin: 0;
+  color: var(--ink-2);
+  font-size: var(--t-body);
+  line-height: var(--lh-prose);
+  text-align: center;
+  text-wrap: pretty;
+}
+
+/* Reduced motion gets an authored still, not a slower loop. `globals.css`
+ * clamps every animation to 1ms and one iteration under `reduce`, house-wide,
+ * so nothing on this surface can keep cycling — an earlier revision of this
+ * block tried to walk the accent at half speed and measured as four grey dots
+ * with no accent at all. The still state is the loop's phase 0: the records
+ * hold their slots (already their base transform) and the one at the head is
+ * champagne. The status line carries the progress. */
+@media (prefers-reduced-motion: reduce) {
+  .bootDot { animation: none; will-change: auto; }
+  .bootDot:nth-child(4)::before { opacity: 1; }
+}
 
 /* ── 11. mobile shell (declared here, enabled in §12) ──────────────────── */
 

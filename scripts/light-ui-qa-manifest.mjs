@@ -42,6 +42,7 @@ export const QA_PRIMARY_DEVICE = Object.freeze({
 });
 
 export const QA_REQUIRED_STATES = Object.freeze([
+  "boot",
   "login",
   "demo-login",
   "demo-reset",

@@ -152,7 +152,10 @@ test("Basic access renders no secondary credential field in either lane", () => 
   assert.match(workspace, /className=\{styles\.loginFrame\}/u);
   assert.match(workspace, /GHOST Osaka 1階VIPフロア座席図/u);
   assert.match(workspace, /if \(!demo\.config\)/u);
-  assert.match(workspace, /ユーザー名とパスワードを確認しています/u);
+  /* This frame answers one state only — a failed connection. The in-flight
+   * session probe belongs to the boot screen; when it rendered here it
+   * produced a login page with no form in it. */
+  assert.match(workspace, /接続を完了できませんでした/u);
   assert.match(workspace, /ブラウザのBasic認証から直接/u);
   assert.match(workspace, /window\.location\.reload\(\)/u);
   assert.match(workspace, /VIP予約デモへ再接続/u);
@@ -240,6 +243,93 @@ test("the public website's black-violet never leaks onto the operator surface", 
   const raw = rawOklchOutsideFloorSection();
   assert.ok(raw.length <= 1,
     `raw oklch() outside the floor section must stay <= 1, found ${raw.length}: ${raw.join(", ")}`);
+});
+
+test("every pre-ledger frame renders the one boot screen", async () => {
+  /*
+   * A cold load used to cross four unrelated full-page layouts: the route
+   * Suspense fallback rendered an empty `<main>`, `app/loading.tsx` rendered
+   * three static grey bars, and the owner session probe rendered the entire
+   * OWNER ACCESS login frame — display wordmark, floor-plan figure, a right
+   * column more than half empty, 64px taller than the venue iPad's viewport —
+   * as a progress screen with no form in it. Each one was then discarded.
+   * These assertions keep the three entry points on a single frame.
+   * docs/DESIGN.md 7.2.
+   */
+  const [bootScreen, routeLoading, routePage] = await Promise.all([
+    readFile(new URL("../../src/components/admin/vip-floor-v2/VipBootScreen.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../../src/app/loading.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../../src/app/page.tsx", import.meta.url), "utf8"),
+  ]);
+  for (const [name, source] of [["app/loading.tsx", routeLoading], ["app/page.tsx", routePage]]) {
+    assert.match(source, /VipBootScreen/u, `${name} must render the shared boot screen`);
+  }
+  // The Suspense fallback is the very first paint; an empty element there is
+  // what made the sequence start on a blank page.
+  assert.doesNotMatch(routePage, /fallback=\{<main[^}]*\/>\}/u);
+  // The session probe must not fall through to the OWNER ACCESS frame.
+  assert.match(workspace, /auth\.status === "checking"[\s\S]{0,220}?<VipBootScreen/u);
+  assert.doesNotMatch(workspace, /VIP Managerを開いています/u);
+
+  // The boot screen is server-safe, so the first byte can carry it.
+  assert.doesNotMatch(bootScreen, /"use client"/u);
+  assert.doesNotMatch(bootScreen, /\buse(?:State|Effect|Ref|Memo)\b/u);
+  // Four records, one ruled line.
+  assert.equal((bootScreen.match(/styles\.bootDot/gu) ?? []).length, 4);
+
+  // Content-box plus padding is what pushed the login frame past 810 points.
+  assert.match(workspaceStyles, /\.bootShell \{[^}]*box-sizing: border-box/u);
+
+  // The loop stays on the compositor: the dots may only translate and scale,
+  // and the champagne head is an opacity crossfade over a graphite dot rather
+  // than an animated colour.
+  const bootFrames = [...workspaceStyles.matchAll(/@keyframes bootQueue[A-Za-z]+ \{([\s\S]*?)\n\}/gu)];
+  assert.equal(bootFrames.length, 2, "boot keyframes: advance and lead");
+  for (const frame of bootFrames) {
+    const properties = [...frame[1].matchAll(/([a-z-]+)\s*:/gu)]
+      .map((match) => match[1])
+      .filter((property) => property !== "animation-timing-function");
+    assert.ok(properties.length > 0, "boot keyframes must declare something");
+    for (const property of properties) {
+      assert.ok(["transform", "opacity"].includes(property),
+        `boot keyframes may only animate transform and opacity, found ${property}`);
+    }
+  }
+
+  /* Every record carries its slot as a plain declaration too. Without it the
+   * four dots collapse onto slot 0 and read as a single dot the moment the
+   * animation is not running — which is exactly what the QA gate captures,
+   * since it screenshots with animations disabled. */
+  const bootBase = workspaceStyles.slice(
+    workspaceStyles.indexOf("── 10b. boot"),
+    workspaceStyles.indexOf("@media (prefers-reduced-motion: reduce) {\n  .bootQueue"),
+  );
+  assert.ok(bootBase.length > 0, "the boot section banner anchors this check");
+  for (const [slot, offset] of [[2, "var(--boot-gap)"], [3, "calc(var(--boot-gap) * 2)"], [4, "calc(var(--boot-gap) * 3)"]]) {
+    assert.match(
+      bootBase,
+      new RegExp(`\\.bootDot:nth-child\\(${slot}\\) \\{[^}]*transform: translate3d\\(${offset.replace(/[(){}*|\\^$+?.[\]]/gu, "\\$&")}, 0, 0\\)`, "u"),
+      `boot record ${slot} must rest on its own slot without the animation`,
+    );
+  }
+
+  /* Reduced motion is an authored still, not a slower loop: `globals.css`
+   * clamps every animation to 1ms and a single iteration under `reduce`,
+   * house-wide, so a fallback that keeps cycling silently renders as four grey
+   * dots with no accent at all. The head record must be champagne without an
+   * animation. */
+  assert.match(globals, /@media \(prefers-reduced-motion: reduce\)[\s\S]*?animation-iteration-count:\s*1\s*!important/u);
+  assert.match(
+    workspaceStyles,
+    /@media \(prefers-reduced-motion: reduce\) \{\s*\.bootDot \{ animation: none;[^}]*\}\s*\.bootDot:nth-child\(4\)::before \{ opacity: 1; \}/u,
+  );
+  assert.doesNotMatch(workspaceStyles, /bootQueueLeadResting/u);
+
+  // The boot screen is a required QA state, so it is audited at every viewport.
+  const qaManifest = await readFile(
+    new URL("../../scripts/light-ui-qa-manifest.mjs", import.meta.url), "utf8",
+  );
+  assert.match(qaManifest, /QA_REQUIRED_STATES = Object\.freeze\(\[\s*"boot"/u);
 });
 
 test("banned styling and animation runtimes cannot enter the dependency tree", () => {
