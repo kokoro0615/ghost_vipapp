@@ -105,9 +105,13 @@ test("the ruler and the grid land on the times they name", async () => {
   assert.match(declarations, /\.nowMarker \{/u);
 });
 
-test("the band blinks on its frame, never on the surface its label sits on", async () => {
+test("the alarm is a light on the track, never a second frame around the label", async () => {
   const styles = await readFile(
     new URL("../../src/components/admin/vip-floor-v2/VipFloorWorkspace.module.css", import.meta.url),
+    "utf8",
+  );
+  const source = await readFile(
+    new URL("../../src/components/admin/vip-floor-v2/chart/ChartView.tsx", import.meta.url),
     "utf8",
   );
   const chartStart = styles.indexOf("── 7. chart");
@@ -118,33 +122,69 @@ test("the band blinks on its frame, never on the surface its label sits on", asy
   );
   const chartSection = styles.slice(chartStart, chartEnd);
 
-  /* DESIGN.md §7.1: an animated backdrop makes a label's contrast a function of
-   * the animation phase. Only the ring overlay may animate, and only opacity. */
+  /* The defect this replaced: an overlay pinned to the band's inside edge, so
+   * fading it in and out read as the band's own border thickening and thinning
+   * — a picture frame with a gap in it. Nothing may reintroduce a second
+   * full-perimeter contour inside a band. */
+  assert.doesNotMatch(styles, /timelineBarSignal/u);
+  assert.doesNotMatch(source, /timelineBarSignal/u);
+  /* Selection takes the same champagne spine every other ledger entry on this
+   * surface takes. A ring around a band that already has a coloured frame is
+   * the same picture-frame artefact by another name. */
+  assert.match(chartSection, /\.timelineBar\[data-selected\] \{\s*z-index: 3;\s*box-shadow: inset 0 -3px var\(--accent\);\s*\}/u);
+  assert.doesNotMatch(chartSection, /\.timelineBar\[data-selected\] \{[^}]*outline/u);
+
+  /* The light is a sibling of the band inside the track, so no amount of it can
+   * reach the label and make a contrast ratio a function of the animation phase
+   * (DESIGN.md §7.1). A descendant of the button could. */
+  assert.match(source, /className=\{styles\.timelineDeadline\}/u);
+  /* Anchor on the band itself. The first `<button>` in this file is the zoom
+   * control, so slicing from it audited a region the light was never in. */
+  const bandStart = source.indexOf("className={styles.timelineBar}");
+  const bandEnd = source.indexOf("</button>", bandStart);
+  assert.ok(bandStart > 0 && bandEnd > bandStart, "the band button is the anchor for this check");
+  assert.doesNotMatch(
+    source.slice(bandStart, bandEnd),
+    /timelineDeadline/u,
+    "the light must not be drawn inside the band",
+  );
+  assert.match(source, /data-edge=\{edge\}/u);
+  /* And its spill is aimed away from the band at both ends. */
+  assert.match(chartSection, /\.timelineDeadline\[data-edge="head"\]::before \{\s*right: 2px;/u);
+  assert.match(chartSection, /\.timelineDeadline\[data-edge="tail"\]::before \{\s*left: 2px;/u);
+
   for (const [tier, duration] of [["low", "2.4s"], ["medium", "1.8s"], ["high", "900ms"]]) {
     assert.match(
       chartSection,
       new RegExp(
-        `\\.timelineBar\\[data-signal="${tier}"\\]:not\\(\\[data-acknowledged\\]\\)[\\s\\S]{0,120}?`
+        `\\.timelineDeadline\\[data-signal="${tier}"\\]:not\\(\\[data-acknowledged\\]\\)[\\s\\S]{0,120}?`
         + `animation: timelineSignal[A-Za-z]+ ${duration}`,
         "u",
       ),
-      `the ${tier} tier must animate the signal ring at ${duration}`,
+      `the ${tier} tier must animate the deadline light at ${duration}`,
     );
   }
-  for (const frame of chartSection.matchAll(/@keyframes timelineSignal[A-Za-z]+ \{([\s\S]*?)\n\}/gu)) {
+  /* A lamp switching fully off is a smoke detector, not instrumentation: the
+   * state has to be readable in every frame, which is also what makes the
+   * reduced-motion still the same object with the motion removed. */
+  const tiers = [...chartSection.matchAll(/@keyframes timelineSignal[A-Za-z]+ \{([\s\S]*?)\n\}/gu)];
+  assert.equal(tiers.length, 3, "one keyframe per tier");
+  for (const frame of tiers) {
     const declarations = frame[1].match(/[a-z-]+(?=:)/gu) ?? [];
     assert.deepEqual(
       [...new Set(declarations)],
       ["opacity"],
       "signal keyframes may animate opacity and nothing else",
     );
+    const stops = [...frame[1].matchAll(/opacity: (0?\.\d+|1)/gu)].map((match) => Number(match[1]));
+    assert.ok(Math.min(...stops) >= 0.2, `a tier may dim to ${Math.min(...stops)} but never extinguish`);
+    assert.ok(Math.max(...stops) === 1, "every tier reaches full strength");
   }
+  assert.doesNotMatch(chartSection, /animation: timelineSignal[A-Za-z]+ [^;]*steps\(/u,
+    "a square wave is a switch, not a beacon");
 
-  /* Handled bands keep their state and lose their motion. */
-  assert.match(
-    chartSection,
-    /\.timelineBar\[data-acknowledged\] \.timelineBarSignal \{ animation: none;/u,
-  );
+  /* Handled signals keep their state and lose their motion. */
+  assert.match(chartSection, /\.timelineDeadline\[data-acknowledged\] \{ animation: none; opacity: 0\.\d+; \}/u);
   /* §6.1: the browser's tap flash was removed on purpose, so every control has
    * to acknowledge its own press. The band cannot use the shared background
    * press — that surface is the service status. */
@@ -153,11 +193,24 @@ test("the band blinks on its frame, never on the surface its label sits on", asy
   /* Backgrounded all night on the venue iPad. */
   assert.match(
     chartSection,
-    /\.timelineView\[data-motion="paused"\] \.timelineBarSignal \{ animation-play-state: paused; \}/u,
+    /\.timelineView\[data-motion="paused"\] \.timelineDeadline \{ animation-play-state: paused; \}/u,
   );
   /* Reduced motion keeps all three tiers legible as an authored still state. */
   const reduced = chartSection.slice(chartSection.lastIndexOf("@media (prefers-reduced-motion: reduce)"));
   for (const tier of ["low", "medium", "high"]) {
-    assert.match(reduced, new RegExp(`\\[data-signal="${tier}"\\] \\.timelineBarSignal \\{ opacity:`, "u"));
+    assert.match(reduced, new RegExp(`\\.timelineDeadline\\[data-signal="${tier}"\\] \\{ opacity:`, "u"));
   }
+});
+
+test("the top of the alarm ladder owns the band's colour on its own", async () => {
+  const styles = await readFile(
+    new URL("../../src/components/admin/vip-floor-v2/VipFloorWorkspace.module.css", import.meta.url),
+    "utf8",
+  );
+
+  /* A seated table past its release was painting a green status rule straight
+   * onto a red alarm frame. The status keeps its rule weight, its pattern and
+   * its printed word — the discriminator §7.0b actually relies on — and gives
+   * up only the hue, so one band never argues with itself. */
+  assert.match(styles, /\.timelineBar\[data-signal="high"\] \{ --band-rule: var\(--ink-2\); \}/u);
 });

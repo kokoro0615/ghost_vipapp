@@ -102,11 +102,14 @@ Measured before → after (dense 14-reservation board):
     touch equivalent; every control acknowledges its own press, because the
     browser's tap flash was removed on purpose (`DESIGN.md` §6.1).
 
-12. **An alarm that cannot be answered is noise.** The timeline is the one place
-    that may blink. It blinks on the band's frame and never on the surface a
-    label sits on; three tiers say how soon, not just that something is wrong;
-    and the blink stops the moment the floor answers it, leaving the state and
-    the countdown exactly where they were (`DESIGN.md` §7.0b).
+12. **An alarm that cannot be answered is noise, and an alarm that surrounds the
+    content is decoration.** The timeline is the one place that may raise one,
+    and it raises a *light standing on the minute that is running out* — head
+    for arrivals, tail for releases — never a ring around the band. Three tiers
+    say how soon rather than merely that something is wrong; no tier ever goes
+    dark, so the state is readable in every frame; and the motion stops the
+    moment the floor answers it, leaving the light, the state and the countdown
+    exactly where they were (`DESIGN.md` §7.0b).
 
 ### The 2026-08-02 timeline pass — what the band was not saying
 

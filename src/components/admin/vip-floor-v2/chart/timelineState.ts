@@ -19,35 +19,45 @@ export type TimelinePhaseKey = (typeof TIMELINE_PHASE_ORDER)[number];
  * and rhythm is the last. IEC 60601-1-8 — the clinical alarm standard — encodes
  * priority the same way: the faster and harder the burst repeats, the sooner
  * someone has to move. We borrow the ladder, not the frequencies. The fastest
- * band here blinks at ~1.1Hz, comfortably under the three-flashes-per-second
+ * light here repeats at ~1.1Hz, comfortably under the three-flashes-per-second
  * threshold of WCAG 2.3.1, and every tier keeps an authored still state (§7).
  *
  *   low    → the guest is due               → one slow swell
  *   medium → the table is due back          → a double pulse
- *   high   → the clock has already run out  → a hard square blink
+ *   high   → the clock has already run out  → a beacon: hard strike, long decay
  */
 export const TIMELINE_SIGNAL_ORDER = ["none", "low", "medium", "high"] as const;
 
 export type TimelineSignal = (typeof TIMELINE_SIGNAL_ORDER)[number];
 
 /*
+ * Which end of the booking is running out. This is the whole reason the alarm
+ * is legible at a glance: an arrival exception is a problem at the band's
+ * *head* — the start time the party has not answered — and a release exception
+ * is a problem at its *tail*. The light is drawn on the track at exactly that
+ * instant, so the operator's eye lands on the minute, not on a rectangle.
+ */
+export type TimelineEdge = "head" | "tail";
+
+/*
  * One table, so the legend and the bands can never drift into describing
- * different rhythms. The legend swatch blinks at its own tier, which makes the
- * key teach the code instead of merely naming it. The meaning never lives in
- * the movement alone: every band also spells its phase out in words.
+ * different rhythms. The legend swatch is drawn in the band's own language —
+ * the phase frame with its light on the correct edge — so the key teaches the
+ * code instead of merely naming it. The meaning never lives in the movement
+ * alone: every band also spells its phase out in words.
  */
 export const TIMELINE_PHASE_META: Record<TimelinePhaseKey, {
   shortLabel: string;
-  glyph: string;
   signal: TimelineSignal;
+  edge: TimelineEdge | null;
 }> = {
-  scheduled: { shortLabel: "予定", glyph: "○", signal: "none" },
-  arrival_soon: { shortLabel: "来店前", glyph: "◉", signal: "low" },
-  arrival_overdue: { shortLabel: "未着", glyph: "!", signal: "high" },
-  active: { shortLabel: "接客中", glyph: "▶", signal: "none" },
-  closing_soon: { shortLabel: "延長確認", glyph: "◫", signal: "medium" },
-  overdue: { shortLabel: "解放超過", glyph: "!", signal: "high" },
-  resolved: { shortLabel: "完了", glyph: "✓", signal: "none" },
+  scheduled: { shortLabel: "予定", signal: "none", edge: null },
+  arrival_soon: { shortLabel: "来店前", signal: "low", edge: "head" },
+  arrival_overdue: { shortLabel: "未着", signal: "high", edge: "head" },
+  active: { shortLabel: "接客中", signal: "none", edge: null },
+  closing_soon: { shortLabel: "延長確認", signal: "medium", edge: "tail" },
+  overdue: { shortLabel: "解放超過", signal: "high", edge: "tail" },
+  resolved: { shortLabel: "完了", signal: "none", edge: null },
 };
 
 export type TimelinePhase = {

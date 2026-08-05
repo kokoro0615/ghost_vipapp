@@ -1421,37 +1421,46 @@
   letter-spacing: var(--track-caps);
 }
 .timelineLegend > span {
+  --band-frame: var(--rule-strong);
+  --legend-reach: 0px;
   display: inline-flex;
   min-width: 0;
   align-items: center;
   gap: var(--s-2);
   white-space: nowrap;
 }
+/* A miniature of the real band — the phase frame, and for the tiers that raise
+ * one, the light standing on the edge that is running out. The key teaches
+ * *where to look*; a glyph could only name a colour. Nothing here moves: an
+ * operator learns the ladder once, and a legend that blinks all night is idle
+ * decoration in the corner of their eye for the other seven hours (§7). */
 .timelineLegend i {
-  display: inline-grid;
-  width: 16px;
-  height: 16px;
-  place-items: center;
-  border-bottom: 2px solid var(--rule-strong);
-  color: var(--ink-2);
-  font-family: var(--font-figure);
-  font-size: 10px;
-  font-style: normal;
-  font-weight: var(--weight-strong);
-  line-height: 1;
+  position: relative;
+  display: inline-block;
+  width: 22px;
+  height: 13px;
+  border: 1px solid var(--band-frame);
+  border-top: 2px solid var(--band-frame);
+  border-radius: var(--r-chip);
+  background: var(--surface);
 }
+.timelineLegend [data-edge] i::before {
+  position: absolute;
+  top: calc(-1px - var(--legend-reach));
+  bottom: calc(-1px - var(--legend-reach));
+  width: 2px;
+  background: var(--band-frame);
+  content: "";
+}
+.timelineLegend [data-edge="head"] i::before { left: -1px; }
+.timelineLegend [data-edge="tail"] i::before { right: -1px; }
+/* The ladder, stated as reach: the harder the tier, the further its light
+ * stands out of the band. */
+.timelineLegend [data-signal="low"] { --legend-reach: 1px; }
+.timelineLegend [data-signal="medium"] { --legend-reach: 3px; }
+.timelineLegend [data-signal="high"] { --legend-reach: 5px; }
+.timelineLegend [data-signal="high"] i::before { width: 3px; }
 .timelineLegend b { color: var(--ink-3); font-weight: var(--weight-ui); }
-.timelineLegend [data-phase="arrival_soon"] i { border-bottom-color: var(--accent); color: var(--accent-ink); }
-.timelineLegend [data-phase="arrival_overdue"] i { border-bottom-color: var(--alert); color: var(--alert); }
-.timelineLegend [data-phase="active"] i { border-bottom-color: var(--live); color: var(--live); }
-.timelineLegend [data-phase="closing_soon"] i { border-bottom-color: var(--warn); color: var(--warn); }
-.timelineLegend [data-phase="overdue"] i { border-bottom-color: var(--alert); color: var(--alert); }
-.timelineLegend [data-phase="resolved"] i { border-bottom-color: var(--ink-3); color: var(--live); }
-/* The key states the alarm ladder without moving: the thicker the underline,
- * the harder the band it names blinks. */
-.timelineLegend [data-signal="low"] i { border-bottom-width: 2px; }
-.timelineLegend [data-signal="medium"] i { border-bottom-width: 3px; }
-.timelineLegend [data-signal="high"] i { border-bottom-width: 4px; }
 
 .timelineScroller { min-height: 0; flex: 1; overflow: auto; overscroll-behavior: contain; background: var(--surface); }
 .timelineGrid {
@@ -1643,20 +1652,20 @@
 .timelineBarStatus { flex: 0 0 auto; color: var(--ink-2); font-weight: var(--weight-ui); }
 .timelineBarGuests { flex: 0 0 auto; color: var(--ink-2); font-weight: var(--weight-ui); }
 .timelineBar small { min-width: 0; color: var(--ink-3); font-weight: var(--weight-ui); }
-.timelineClosingWindow,
-.timelineBarSignal {
+/* The release window only means something while the table is live. Drawn on a
+ * booking four hours out, or on one that has already finished, it is noise.
+ * It marks where the last fifteen minutes begin and stops there: the amber
+ * dashed rule and amber fill this replaced put a third colour and a fourth
+ * layer inside a band that was already carrying a status wash, a status rule
+ * and a phase frame, and read as a stray divider dropped between two words. */
+.timelineClosingWindow {
   position: absolute;
   z-index: 1;
-  pointer-events: none;
-}
-/* The release window only means something while the table is live. Drawn on a
- * booking four hours out, or on one that has already finished, it is noise. */
-.timelineClosingWindow {
   display: none;
   inset: 0 0 0 auto;
   width: var(--closing-window);
-  border-left: 1px dashed var(--warn-line);
-  background: color-mix(in oklch, var(--warn) 10%, transparent);
+  border-left: 1px solid color-mix(in oklch, var(--band-frame) 45%, transparent);
+  pointer-events: none;
 }
 .timelineBar[data-phase="active"] .timelineClosingWindow,
 .timelineBar[data-phase="closing_soon"] .timelineClosingWindow,
@@ -1685,80 +1694,160 @@
 
 /* ── band layer 2 · how soon someone has to move ─────────────────────────
  * Only the frame carries the clock, so the two readings never overwrite each
- * other and the text keeps one fixed contrast pair all night. */
-.timelineBar[data-phase="arrival_soon"] { --band-frame: var(--accent); }
-.timelineBar[data-phase="arrival_overdue"] { --band-frame: var(--alert); }
-.timelineBar[data-phase="active"] { --band-frame: var(--live); }
-.timelineBar[data-phase="closing_soon"] { --band-frame: var(--warn); }
-.timelineBar[data-phase="overdue"] { --band-frame: var(--alert); }
+ * other and the text keeps one fixed contrast pair all night. One palette,
+ * declared once and shared by the band, the light it puts on the track and the
+ * key that explains them, so the three can never drift apart. */
+.timelineBar[data-phase="arrival_soon"],
+.timelineDeadline[data-phase="arrival_soon"],
+.timelineLegend [data-phase="arrival_soon"] { --band-frame: var(--accent); }
+.timelineBar[data-phase="arrival_overdue"],
+.timelineDeadline[data-phase="arrival_overdue"],
+.timelineLegend [data-phase="arrival_overdue"] { --band-frame: var(--alert); }
+.timelineBar[data-phase="active"],
+.timelineLegend [data-phase="active"] { --band-frame: var(--live); }
+.timelineBar[data-phase="closing_soon"],
+.timelineDeadline[data-phase="closing_soon"],
+.timelineLegend [data-phase="closing_soon"] { --band-frame: var(--warn); }
+.timelineBar[data-phase="overdue"],
+.timelineDeadline[data-phase="overdue"],
+.timelineLegend [data-phase="overdue"] { --band-frame: var(--alert); }
 /* Quiet, not borderless. At `--rule` the frame all but vanished on the sunken
  * fill and the band read as unfinished rather than as deliberately done. */
 .timelineBar[data-phase="resolved"] { --band-frame: var(--rule-strong); color: var(--ink-2); }
 .timelineBar[data-phase="resolved"] small { color: var(--ink-3); }
-/* Selection is drawn around the band, never through it. Repainting the borders
- * would make the two semantic layers lie for as long as a band is selected. */
+/* One colour per band at a time. A seated table that has run past its release
+ * was painting a green status rule directly onto a red alarm frame — two
+ * saturated hues fighting across 44px, which is what made the loudest band on
+ * the chart also the hardest to read. At the top of the ladder the alarm owns
+ * the colour; the status keeps its rule weight, its pattern and its printed
+ * word, which is the discriminator the contract actually relies on. */
+.timelineBar[data-signal="high"] { --band-rule: var(--ink-2); }
+/* Selection never repaints the border — that would make the two semantic layers
+ * lie for as long as a band is selected — and it no longer draws a ring around
+ * it either. A champagne outline floating one pixel outside a coloured frame
+ * gave every selected band a picture-frame edge (champagne, white, phase
+ * colour, then finally the label) and made the calmest phase on the chart its
+ * loudest object. A band is a ledger entry, so it takes the mark every other
+ * ledger entry on this surface takes: the champagne spine on its baseline,
+ * matching `.queueItem`, `.reservationTable tr` and `.checkGrid label`.
+ * Keyboard focus is separate and still draws its own ring (§6.1). */
 .timelineBar[data-selected] {
   z-index: 3;
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
   box-shadow: inset 0 -3px var(--accent);
 }
 
-/* The alarm is a second frame drawn just inside the first, so what blinks is
- * the band's own edge — never its fill, never its label. `opacity` is the only
- * animated property: compositor work the venue's A12 can hold until 05:00. */
-.timelineBarSignal {
-  inset: 0;
-  border: 2px solid var(--band-frame);
-  border-radius: calc(var(--r-chip) - 2px);
-  opacity: 0;
+/* ── the alarm · a light standing on the minute ──────────────────────────
+ *
+ * What used to blink was a second border drawn just inside the band's own, so
+ * every pulse read as the band's edge thickening and thinning: a picture frame
+ * with a gap in it, which is the most recognisably machine-made artefact this
+ * surface can produce. It also said only "something on this row", while the
+ * fact the floor needs is *which minute has run out*.
+ *
+ * So the alarm left the band and moved onto the track, where this chart
+ * already keeps its other authority. Same 2px stem as the now-line, same full
+ * lane height, plus a spill of light falling away into empty track. The
+ * now-line is graphite and still — where we are. This is the phase colour and
+ * alive — where we are about to be late. A band merely coloured red is a
+ * state; a light standing on 02:30 is an instruction.
+ *
+ * Head for arrivals, tail for releases: the light stands on the end that is
+ * running out, so eight lanes read as lit positions on a rack instead of eight
+ * rectangles flashing at each other. Living outside the band also means a
+ * label's contrast can never become a function of the animation phase — the
+ * defect §7.1 records — and `opacity` stays the only animated property:
+ * compositor work the venue's A12 holds from 22:00 to 05:00.
+ */
+.timelineDeadline {
+  /* Never draw an invisible light: a phase that reaches this element without a
+   * colour still marks its minute. */
+  --band-frame: var(--rule-strong);
+  --signal-rest: 0.3;
+  --signal-spill: 14px;
+  position: absolute;
+  /* Level with a selected band, which lifts to 3, so a band can never clip the
+   * deadline it is counting to. The now-line is also 3 and is painted after
+   * these, so "where we are" still wins every overlap. */
+  z-index: 3;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--band-frame);
+  opacity: var(--signal-rest);
+  pointer-events: none;
 }
-.timelineBar[data-signal="high"] .timelineBarSignal {
-  border-width: 3px;
-  box-shadow: inset 0 0 0 1px var(--band-frame);
+.timelineDeadline[data-edge="head"] { left: var(--bar-start); }
+.timelineDeadline[data-edge="tail"] { left: calc(var(--bar-start) + var(--bar-width)); }
+/* The spill falls away from the band, never across it, so no amount of light
+ * can reach the label. */
+.timelineDeadline::before {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: var(--signal-spill);
+  content: "";
 }
+.timelineDeadline[data-edge="head"]::before {
+  right: 2px;
+  background: linear-gradient(to left, color-mix(in oklch, var(--band-frame) 30%, transparent), transparent);
+}
+.timelineDeadline[data-edge="tail"]::before {
+  left: 2px;
+  background: linear-gradient(to right, color-mix(in oklch, var(--band-frame) 30%, transparent), transparent);
+}
+/* The top of the ladder is also the widest stem and the longest spill, so the
+ * tier survives with the motion switched off and from the far side of a dark
+ * room, where hue goes first. */
+.timelineDeadline[data-signal="high"] { --signal-rest: 0.26; --signal-spill: 20px; width: 3px; }
 
 /* Three rhythms, loudest last, in the ladder clinical alarm systems use
  * (IEC 60601-1-8): priority reads as waveform and amplitude, not just speed.
- * Every tier stays at or under ~1.1 flashes per second — roughly a third of
- * the WCAG 2.3.1 three-per-second threshold. */
+ * None of them extinguishes — the floor of every tier stays lit, so the state
+ * is legible in any frame and the still version is the same object with the
+ * motion removed rather than a different design. The top tier strikes hard and
+ * decays like a beacon; the `steps(1, end)` square wave it replaces was a
+ * lamp being switched on and off, which is the sound of a smoke detector, not
+ * of instrumentation. At 900ms it repeats ~1.1 times per second, roughly a
+ * third of the WCAG 2.3.1 threshold, on an area far below the flash bounds. */
 @keyframes timelineSignalLow {
-  0%, 100% { opacity: 0.12; }
-  50% { opacity: 0.85; }
+  0%, 100% { opacity: 0.32; }
+  50% { opacity: 1; }
 }
 @keyframes timelineSignalMedium {
-  0%, 60%, 100% { opacity: 0.1; }
-  12%, 40% { opacity: 0.95; }
-  26% { opacity: 0.1; }
+  0%, 64%, 100% { opacity: 0.3; }
+  13%, 35% { opacity: 1; }
+  24% { opacity: 0.44; }
 }
 @keyframes timelineSignalHigh {
-  0%, 46% { opacity: 1; }
-  50%, 96% { opacity: 0.05; }
-  100% { opacity: 1; }
+  0% { opacity: 1; }
+  10% { opacity: 0.95; }
+  42% { opacity: 0.42; }
+  70%, 100% { opacity: 0.26; }
 }
 @media (prefers-reduced-motion: no-preference) {
-  .timelineBar[data-signal="low"]:not([data-acknowledged]) .timelineBarSignal {
+  .timelineDeadline[data-signal="low"]:not([data-acknowledged]) {
     animation: timelineSignalLow 2.4s var(--ease-ui) infinite;
   }
-  .timelineBar[data-signal="medium"]:not([data-acknowledged]) .timelineBarSignal {
+  .timelineDeadline[data-signal="medium"]:not([data-acknowledged]) {
     animation: timelineSignalMedium 1.8s var(--ease-ui) infinite;
   }
-  .timelineBar[data-signal="high"]:not([data-acknowledged]) .timelineBarSignal {
-    animation: timelineSignalHigh 900ms steps(1, end) infinite;
+  .timelineDeadline[data-signal="high"]:not([data-acknowledged]) {
+    animation: timelineSignalHigh 900ms linear infinite;
   }
 }
-/* Handled: the alarm stops, the state stays. A band that keeps blinking after
- * the floor has dealt with it is how operators learn to ignore blinking. */
-.timelineBar[data-acknowledged] .timelineBarSignal { animation: none; opacity: 0.3; }
-.timelineView[data-motion="paused"] .timelineBarSignal { animation-play-state: paused; }
+/* Handled: the light stops, the state stays. A signal that keeps moving after
+ * the floor has dealt with it is how operators learn to ignore signals. */
+.timelineDeadline[data-acknowledged] { animation: none; opacity: 0.22; }
+.timelineView[data-motion="paused"] .timelineDeadline { animation-play-state: paused; }
 @media (prefers-reduced-motion: reduce) {
-  /* Same three tiers, authored still: how strongly the ring is drawn says how
+  /* Same three tiers, authored still: how strongly the light is drawn says how
    * urgent it is, so nothing lives in the movement alone. */
-  .timelineBarSignal { animation: none !important; }
-  .timelineBar[data-signal="low"] .timelineBarSignal { opacity: 0.5; }
-  .timelineBar[data-signal="medium"] .timelineBarSignal { opacity: 0.75; }
-  .timelineBar[data-signal="high"] .timelineBarSignal { opacity: 1; }
-  .timelineBar[data-acknowledged] .timelineBarSignal { opacity: 0.3; }
+  .timelineDeadline { animation: none !important; }
+  .timelineDeadline[data-signal="low"] { opacity: 0.5; }
+  .timelineDeadline[data-signal="medium"] { opacity: 0.75; }
+  .timelineDeadline[data-signal="high"] { opacity: 1; }
+  .timelineDeadline[data-acknowledged] { opacity: 0.22; }
 }
 /* What a narrowing band gives up, in reverse order of what the floor needs:
  * the identifier first — a tap opens the inspector for that — then the status

@@ -605,7 +605,7 @@ also the place where the rules have to be written down rather than inferred.
 | Layer | Answers | Carried by |
 |---|---|---|
 | Service status (13) | *what kind of table is this* | the fill wash, the top rule's colour/weight/pattern, and the status word on the band |
-| Time phase (7) | *how soon must someone move, and why* | the other three border sides, the action label, and whether they blink |
+| Time phase (7) | *how soon must someone move, and why* | the other three border sides, the action label, and the light the phase puts on the track at the minute it is counting to |
 
 The fill is the layer that never moves. Text sits on it, so animating it would
 make the label's contrast a function of the animation phase — the defect §7.1
@@ -641,15 +641,58 @@ reads as pills scattered on white rather than as occupancy. `clamp(44px, 64%,
 carried by waveform and amplitude, in the ladder clinical alarm systems use
 (IEC 60601-1-8), because rhythm is the last thing to survive peripheral vision:
 
-| Tier | Phase | Rhythm | Ring |
+| Tier | Phase | Rhythm | Light |
 |---|---|---|---|
-| `low` | 来店15分前 | one slow swell, 2.4s | 2px, champagne |
-| `medium` | 延長確認（利用終了15分前） | double pulse, 1.8s | 2px, warn |
-| `high` | 未着 / 解放超過 | hard square blink, 900ms | 3px + inner hairline, alert |
+| `low` | 来店15分前 | one slow swell, 2.4s, floor 0.32 | 2px stem, 14px spill, champagne |
+| `medium` | 延長確認（利用終了15分前） | double pulse, 1.8s, floor 0.30 | 2px stem, 14px spill, warn |
+| `high` | 未着 / 解放超過 | beacon — hard strike, long decay, 900ms, floor 0.26 | 3px stem, 20px spill, alert |
 
 Every tier stays at or under ~1.1 flashes per second — roughly a third of the
-WCAG 2.3.1 three-per-second threshold. What blinks is a ring drawn just inside
-the band's own frame, and `opacity` is the only property it animates.
+WCAG 2.3.1 three-per-second threshold — on an area far below its flash bounds,
+and `opacity` is the only property any of them animates.
+
+**No tier extinguishes.** Every floor above is lit. A signal that switches fully
+off is unreadable in half its frames, forces the still version to be a different
+design from the moving one, and reads as a fault rather than as a state. It is
+also what separates a beacon from a smoke detector: the top tier strikes hard
+and decays, where the `steps(1, end)` square wave it replaced simply toggled.
+
+**The light stands on the minute, not around the label.** Until 2026-08-06 the
+alarm was a second full-perimeter ring pinned to the inside of the band's own
+frame. Fading it in and out read as the band's edge thickening and thinning — a
+picture frame with a gap in it, the most recognisably machine-made artefact this
+surface can produce — and it said only *something on this row* when the fact the
+floor needs is *which minute has run out*. The alarm now lives on the track as
+`.timelineDeadline`, a sibling of the band:
+
+- **Head for arrivals, tail for releases.** `arrival_soon` and `arrival_overdue`
+  light the band's start; `closing_soon` and `overdue` light its release. The
+  light stands on the end that is running out, so eight lanes read as lit
+  positions on a rack rather than as eight rectangles flashing at each other.
+- **Same family as the now-line.** Same 2px stem, same full lane height. The
+  now-line is graphite and still — where we are. This is the phase colour and
+  alive — where we are about to be late.
+- **The spill is aimed away from the band**, into empty track, at both ends.
+  Because the light is never a descendant of the band and never overlaps it, a
+  label's contrast cannot become a function of the animation phase — §7.1 — and
+  the guard for that is structural rather than a measurement.
+- **The tier survives the motion being switched off**: stem width and spill
+  length carry it too, so reduced motion and a dark room lose nothing.
+
+**One colour per band at a time.** At `high`, the status top rule drops to
+graphite (`--band-rule: var(--ink-2)`). A seated table past its release was
+painting a saturated green rule directly onto a saturated red frame, which made
+the loudest band on the chart also the hardest one to read. The status keeps its
+rule weight, its pattern and its printed word — the discriminator this section
+already relies on — and gives up only the hue.
+
+**Selection is the ledger spine, not a ring.** A champagne outline floating one
+pixel outside a coloured frame is the same picture-frame artefact by another
+name, and it made `scheduled` — the calmest phase on the chart — its loudest
+object. A band is a ledger entry and takes the mark every other ledger entry on
+this surface takes: `inset 0 -3px var(--accent)`, matching `.queueItem`,
+`.reservationTable tr` and `.checkGrid label`. Keyboard focus is a separate
+concern and still draws its own ring (§6.1).
 
 **Arrival and release are different exceptions.** A booking that passes its
 start without an arrival is `arrival_overdue` (`未着N分`) and remains so even

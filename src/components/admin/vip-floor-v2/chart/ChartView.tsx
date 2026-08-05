@@ -192,9 +192,17 @@ export default function ChartView({ board, reservations, selectedReservationId, 
 
       <div className={styles.timelineLegend} aria-label="予約帯ステータス">
         <strong>運行帯</strong>
+        {/* The swatch is a miniature of the real band — the phase frame with
+            its light on the same edge the chart puts it on — so the key teaches
+            where to look instead of naming a colour. */}
         {TIMELINE_PHASE_ORDER.map((phase) => (
-          <span key={phase} data-phase={phase} data-signal={TIMELINE_PHASE_META[phase].signal}>
-            <i aria-hidden>{TIMELINE_PHASE_META[phase].glyph}</i>
+          <span
+            key={phase}
+            data-phase={phase}
+            data-signal={TIMELINE_PHASE_META[phase].signal}
+            data-edge={TIMELINE_PHASE_META[phase].edge ?? undefined}
+          >
+            <i aria-hidden />
             {TIMELINE_PHASE_META[phase].shortLabel}
             <b className="tabular-nums">{phaseCounts[phase]}</b>
           </span>
@@ -260,7 +268,6 @@ export default function ChartView({ board, reservations, selectedReservationId, 
                         aria-label={`${reservation.publicCode}、${reservation.guestLabel}、${reservation.guestCount}名、${reservation.startLabel}から${timeFormatter.format(new Date(endAt))}、${meta.label}。${phase.description}`}
                       >
                         <i className={styles.timelineClosingWindow} aria-hidden />
-                        <i className={styles.timelineBarSignal} aria-hidden />
                         <span className={styles.timelineBarTime}>{reservation.startLabel}</span>
                         <strong className={styles.timelineBarPhase}>{phase.label}</strong>
                         <span className={`${styles.timelineBarGuests} tabular-nums`}>{reservation.guestCount}名</span>
@@ -272,6 +279,34 @@ export default function ChartView({ board, reservations, selectedReservationId, 
                         )}
                         <small>{reservation.publicCode}</small>
                       </button>
+                    );
+                  })}
+                  {/* The alarm, drawn on the track rather than around the band.
+                      A rectangle that flashes says only "something here"; a
+                      light standing on the minute that is running out says
+                      which minute, and stays out of the band's text entirely so
+                      the label's contrast can never depend on the phase of an
+                      animation (§7.1). Head for arrivals, tail for releases. */}
+                  {items.map((reservation) => {
+                    const band = bandByReservation.get(reservation.id);
+                    const edge = band ? TIMELINE_PHASE_META[band.phase.key].edge : null;
+                    if (!band || !edge) return null;
+                    return (
+                      <span
+                        key={`deadline-${reservation.id}`}
+                        className={styles.timelineDeadline}
+                        style={positionStyle(
+                          reservation.startAt,
+                          band.endAt,
+                          operatingWindow.startAt,
+                          operatingWindow.endAt,
+                        )}
+                        data-phase={band.phase.key}
+                        data-signal={band.phase.signal}
+                        data-edge={edge}
+                        data-acknowledged={band.phase.acknowledged || undefined}
+                        aria-hidden="true"
+                      />
                     );
                   })}
                   {board.blocks.filter((block) => block.targets.tableIds.includes(table.id)).map((block) => (
