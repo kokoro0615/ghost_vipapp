@@ -70,7 +70,7 @@ export default function FloorView({
   return (
     <section className={styles.floorView} aria-labelledby="floor-view-title">
       <div className={styles.viewStrip}>
-        <h2 id="floor-view-title">VIPフロア</h2>
+        <h1 id="floor-view-title">VIPフロア</h1>
         <span className="tabular-nums">稼働 {occupied}/{board.tables.length}</span>
         {unassignedCount > 0 ? <span className={styles.exceptionText}>未割当 {unassignedCount}</span> : null}
         <span className={styles.stripSpacer} />

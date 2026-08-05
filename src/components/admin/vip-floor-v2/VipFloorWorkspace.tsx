@@ -147,6 +147,7 @@ export default function VipFloorWorkspace() {
     runCommand,
     runOperation,
     loadOperationOptions,
+    loadOperationBusinessDays,
     loadWaitlist,
     runWaitlistAction,
     loadStaff,
@@ -161,6 +162,7 @@ export default function VipFloorWorkspace() {
     businessDate,
     offline,
     reconnect,
+    unlock,
     logout,
     loadBoard,
     setBusinessDate,
@@ -170,6 +172,8 @@ export default function VipFloorWorkspace() {
   const [editingReservationId, setEditingReservationId] = useState<string | null>(null);
   const [operationOptions, setOperationOptions] = useState<OperationOptions | null>(null);
   const [operationDatePending, setOperationDatePending] = useState(false);
+  const [operationBusinessDates, setOperationBusinessDates] = useState<string[]>([]);
+  const [operationBusinessDatesPending, setOperationBusinessDatesPending] = useState(false);
   const [waitlistOpen, setWaitlistOpen] = useState(false);
   const [waitlistEntries, setWaitlistEntries] = useState<WaitlistEntry[]>([]);
   const [staffOpen, setStaffOpen] = useState(false);
@@ -180,6 +184,9 @@ export default function VipFloorWorkspace() {
   const [resetOpen, setResetOpen] = useState(false);
   const [queueOpen, setQueueOpen] = useState(false);
   const [turnoverContext, setTurnoverContext] = useState<TurnoverContext | null>(null);
+  const [unlockUsername, setUnlockUsername] = useState("");
+  const [unlockPassword, setUnlockPassword] = useState("");
+  const [unlockFailed, setUnlockFailed] = useState(false);
   const menuRef = useRef<HTMLElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const mobileSheetRef = useRef<HTMLDivElement>(null);
@@ -392,9 +399,17 @@ export default function VipFloorWorkspace() {
     setEditingReservationId(null);
     setOperationOpen(true);
     setOperationOptions(null);
+    setOperationBusinessDates([]);
     setOperationDatePending(true);
     try {
-      setOperationOptions(await loadOperationOptions());
+      const nextOptions = await loadOperationOptions();
+      setOperationOptions(nextOptions);
+      if (!nextOptions) {
+        setOperationBusinessDatesPending(true);
+        void loadOperationBusinessDays().then(setOperationBusinessDates).finally(() => {
+          setOperationBusinessDatesPending(false);
+        });
+      }
     } finally {
       setOperationDatePending(false);
     }
@@ -406,6 +421,7 @@ export default function VipFloorWorkspace() {
     dispatch({ type: "mobileInspector", open: false });
     setEditingReservationId(selectedReservation.id);
     setOperationOpen(true);
+    setOperationBusinessDates([]);
     setOperationOptions(await loadOperationOptions());
   }
 
@@ -422,12 +438,18 @@ export default function VipFloorWorkspace() {
     dispatch({ type: "clearConflict" });
     try {
       const nextOptions = await loadOperationOptions(nextBusinessDate);
-      if (!nextOptions) return false;
+      if (!nextOptions) {
+        setOperationBusinessDatesPending(true);
+        setOperationBusinessDates(await loadOperationBusinessDays(nextBusinessDate));
+        setOperationBusinessDatesPending(false);
+        return false;
+      }
 
       const boardLoaded = await setBusinessDate(nextBusinessDate);
       if (!boardLoaded) return false;
 
       setOperationOptions(nextOptions);
+      setOperationBusinessDates([]);
       updateRoute({ date: nextBusinessDate });
       return true;
     } finally {
@@ -490,6 +512,7 @@ export default function VipFloorWorkspace() {
       return <VipBootScreen label="Ownerの認証情報を確認しています。" />;
     }
     if (!demo.config) {
+      const lockedOwnerAccess = auth.status === "locked";
       return (
         <DemoModeProvider value={{
           enabled: false,
@@ -529,19 +552,77 @@ export default function VipFloorWorkspace() {
                   <span>OWNER ACCESS</span>
                 </div>
                 <div className={styles.loginIntro}>
-                  <h1 id="owner-access-title">接続を完了できませんでした</h1>
-                  <p>通信状態を確認し、もう一度接続してください。</p>
+                  <h1 id="owner-access-title">
+                    {lockedOwnerAccess ? "端末をロックしました" : "接続を完了できませんでした"}
+                  </h1>
+                  <p>
+                    {lockedOwnerAccess
+                      ? "Ownerの認証情報を入力し直すまで、予約台帳は開きません。"
+                      : "通信状態を確認し、もう一度接続してください。"}
+                  </p>
                 </div>
-                <div className={styles.ownerAccessStatus} role="status" aria-live="polite">
-                  <span aria-hidden />
-                  再接続が必要です
-                </div>
-                <button type="button" onClick={() => window.location.reload()}>
-                  <RefreshCw size={18} aria-hidden />
-                  再接続
-                </button>
+                {lockedOwnerAccess ? (
+                  <form
+                    className={styles.loginUnlockForm}
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      setUnlockFailed(false);
+                      void unlock({ username: unlockUsername, password: unlockPassword }).then((ok) => {
+                        if (!ok) {
+                          setUnlockPassword("");
+                          setUnlockFailed(true);
+                        }
+                      });
+                    }}
+                  >
+                    <label>
+                      <span>ユーザー名</span>
+                      <input
+                        data-credential
+                        name="username"
+                        autoComplete="username"
+                        value={unlockUsername}
+                        onChange={(event) => setUnlockUsername(event.target.value)}
+                        required
+                      />
+                    </label>
+                    <label>
+                      <span>パスワード</span>
+                      <input
+                        data-credential
+                        name="password"
+                        type="password"
+                        autoComplete="current-password"
+                        value={unlockPassword}
+                        onChange={(event) => setUnlockPassword(event.target.value)}
+                        aria-invalid={unlockFailed || undefined}
+                        required
+                      />
+                    </label>
+                    <p className={styles.loginMessage} data-tone={unlockFailed ? "danger" : undefined} aria-live="polite">
+                      {unlockFailed ? "認証情報を確認してください。" : "ブラウザに残るBasic認証だけでは解除できません。"}
+                    </p>
+                    <button type="submit" disabled={state.pending}>
+                      <ShieldCheck size={18} aria-hidden />
+                      {state.pending ? "確認中…" : "ロックを解除"}
+                    </button>
+                  </form>
+                ) : (
+                  <div className={styles.ownerAccessStatus} role="status" aria-live="polite">
+                    <span aria-hidden />
+                    再接続が必要です
+                  </div>
+                )}
+                {!lockedOwnerAccess ? (
+                  <button type="button" onClick={() => window.location.reload()}>
+                    <RefreshCw size={18} aria-hidden />
+                    再接続
+                  </button>
+                ) : null}
                 <p className={styles.loginHint}>
-                  ブラウザのBasic認証から直接、管理台帳へ移動します。
+                  {lockedOwnerAccess
+                    ? "共有端末では、離席前にこのロックを使用してください。"
+                    : "ブラウザのBasic認証から直接、管理台帳へ移動します。"}
                 </p>
               </section>
             </div>
@@ -716,7 +797,7 @@ export default function VipFloorWorkspace() {
         </div>
         <div className={styles.operatorIdentity}>
           <span>{auth.session.displayName ?? "Owner"} / {isDemo ? "デモ" : isOwner ? "Owner" : "閲覧のみ"}</span>
-          <button type="button" onClick={() => void logout()}><LogOut size={14} aria-hidden />ログアウト</button>
+          <button type="button" onClick={() => void logout()}><LogOut size={14} aria-hidden />端末をロック</button>
         </div>
       </header>
 
@@ -1005,7 +1086,7 @@ export default function VipFloorWorkspace() {
               </button>
             ) : null}
             <button type="button" onClick={() => void logout()}>
-              <LogOut size={18} aria-hidden /><span>ログアウト</span>
+              <LogOut size={18} aria-hidden /><span>端末をロック</span>
             </button>
           </div>
         </section>
@@ -1099,11 +1180,14 @@ export default function VipFloorWorkspace() {
       />
 
       <OperationCenter
+        key={operationOpen ? "open" : "closed"}
         open={operationOpen}
         pending={state.pending}
         board={state.board}
         options={operationOptions}
         datePending={operationDatePending}
+        suggestedBusinessDates={operationBusinessDates}
+        suggestionsPending={operationBusinessDatesPending}
         selectedTableId={editingReservationId || !state.selectedReservationId
           ? state.selectedTableId
           : null}
@@ -1117,7 +1201,9 @@ export default function VipFloorWorkspace() {
           setOperationOpen(false);
           setEditingReservationId(null);
           setOperationOptions(null);
+          setOperationBusinessDates([]);
           setOperationDatePending(false);
+          setOperationBusinessDatesPending(false);
         }}
         onRun={runOperation}
         onBusinessDateChange={changeOperationBusinessDate}

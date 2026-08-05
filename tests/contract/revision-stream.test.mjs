@@ -40,7 +40,9 @@ test("revision stream is authenticated, day-scoped, PII-free, and bounded", asyn
   assert.match(hook, /STALE_READ_ONLY/u);
   assert.match(hook, /readSafeBoardCache/u);
   assert.match(hook, /writeSafeBoardCache/u);
-  assert.match(cache, /customer: null/u);
-  assert.match(cache, /payment: null/u);
+  assert.match(cache, /type SafeFloorGeometry/u);
+  assert.match(cache, /geometry: \{/u);
+  assert.doesNotMatch(cache, /operatorNote/u);
+  assert.doesNotMatch(cache, /publicCode/u);
   assert.match(cache, /adminMutationEnabled: false/u);
 });

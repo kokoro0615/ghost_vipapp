@@ -1,3 +1,5 @@
+import { VIP_MANAGER_ERROR_CODES } from "@/generated/vipManagerRuntimeContract";
+
 export const VIP_FLOOR_SCHEMA_VERSION = "vip-floor.v2" as const;
 
 export const VIP_SERVICE_STATUSES = [
@@ -36,25 +38,7 @@ export const VIP_FLOOR_CAPABILITIES = [
 
 export type VipFloorCapability = (typeof VIP_FLOOR_CAPABILITIES)[number];
 
-export const VIP_FLOOR_ERROR_CODES = [
-  "INVALID_COMMAND",
-  "UNAUTHENTICATED",
-  "FORBIDDEN",
-  "ADMIN_MUTATION_DISABLED",
-  "NOT_FOUND",
-  "VERSION_CONFLICT",
-  "TABLE_TIME_CONFLICT",
-  "BLOCK_CONFLICT",
-  "TABLE_LOCKED",
-  "INVALID_STATE_TRANSITION",
-  "IDEMPOTENCY_MISMATCH",
-  "IDEMPOTENCY_IN_PROGRESS",
-  "REFUND_PAYMENT_MISSING",
-  "REFUND_AMOUNT_INVALID",
-  "REFUND_BINDING_INVALID",
-  "CAPACITY_WARNING_REQUIRES_OVERRIDE",
-  "SLOT_COMPATIBILITY_MISSING",
-] as const;
+export const VIP_FLOOR_ERROR_CODES = VIP_MANAGER_ERROR_CODES;
 
 export type VipFloorErrorCode = (typeof VIP_FLOOR_ERROR_CODES)[number];
 export type VipFloorAdminRole = "staff" | "manager" | "owner" | "engineer" | "accountant";
@@ -162,7 +146,7 @@ export type VipFloorReservationV2 = {
   businessDate: string;
   lifecycleStatus: string;
   serviceStatus: VipServiceStatus | null;
-  sourceChannel: "online" | "admin_hold" | "walk_in";
+  sourceChannel: "online" | "phone" | "walk_in" | "admin";
   scheduledStartAt: string;
   scheduledEndAt: string;
   expectedReleaseAt: string;
@@ -380,6 +364,15 @@ export function readBusinessDate(value: unknown, field = "businessDate") {
   }
 
   return value;
+}
+
+export function isBusinessDate(value: unknown): value is string {
+  try {
+    readBusinessDate(value);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function readIsoTimestamp(value: unknown, field: string) {

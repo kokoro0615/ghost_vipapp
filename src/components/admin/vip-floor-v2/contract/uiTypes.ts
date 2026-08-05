@@ -44,6 +44,10 @@ export type LiveCommandDraft = {
     sourceChannel?: "walk_in";
     cancelReason?: WalkInCancellationReason;
     reasonNote?: string;
+    confirmedCapacityOverride?: boolean;
+    capacityOverrideReason?: string;
+    confirmedServiceOverride?: boolean;
+    serviceOverrideReason?: string;
   };
 };
 
@@ -78,6 +82,8 @@ export type WalkInDraft = {
     guestLabel: string | null;
     operatorNote: string | null;
     expectedTableVersions: Array<{ tableId: string; expectedVersion: number }>;
+    confirmedCapacityOverride?: true;
+    capacityOverrideReason?: string;
   };
 };
 
@@ -137,10 +143,12 @@ export type ReservationCreateDraft = {
     languageCode: string | null;
     guestLabel: string | null;
     operatorNote: string | null;
-    sourceChannel: "admin_hold" | "online";
+    sourceChannel: "online" | "phone" | "admin";
     serviceStatus: VipServiceStatus;
     bookingStaffMemberId: string | null;
     notificationPreference: "none" | "email";
+    confirmedCapacityOverride?: true;
+    capacityOverrideReason?: string;
   };
 };
 
@@ -157,10 +165,12 @@ export type ReservationUpdateDraft = {
     expectedTableVersions: Array<{ tableId: string; expectedVersion: number }>;
     guestLabel: string | null;
     operatorNote: string | null;
-    sourceChannel: "admin_hold" | "online";
+    sourceChannel: "online" | "phone" | "admin";
     serviceStatus: VipServiceStatus;
     bookingStaffMemberId: string | null;
     notificationPreference: "none" | "email";
+    confirmedCapacityOverride?: true;
+    capacityOverrideReason?: string;
   };
 };
 
@@ -280,7 +290,7 @@ export type UiReservation = {
   guestCount: number;
   tableIds: string[];
   tableCodes: string[];
-  sourceChannel: "online" | "admin_hold" | "walk_in";
+  sourceChannel: "online" | "phone" | "walk_in" | "admin";
   sourceLabel: string;
   exceptionLabel: string | null;
   flags: string[];

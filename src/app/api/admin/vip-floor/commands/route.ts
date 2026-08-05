@@ -6,17 +6,17 @@ import {
 } from "@/lib/adminPermissions";
 import { isGhostOperatingTimestamp } from "@/lib/ghostOperatingHours";
 import { VIP_SERVICE_STATUSES, type VipServiceStatus } from "@/lib/vipFloorV2Contract";
+import { parseOwnerCapacityOverride } from "@/lib/server/ownerCapacityOverride";
+import { isValidVipManagerIdempotencyKey } from "@/generated/vipManagerRuntimeContract";
 import {
   copyJson,
   ghostAdminFetch,
-  readAdminSession,
-  readAdminToken,
+  requireAdminOperation,
 } from "@/lib/server/ghostAdminProxy";
 
 export const runtime = "nodejs";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
-const IDEMPOTENCY_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$/u;
 const COMMANDS = {
   check_in: (id: string) => `/api/admin/v2/reservations/${encodeURIComponent(id)}/check-in`,
   assignment: (id: string) => `/api/admin/v2/reservations/${encodeURIComponent(id)}/assignments`,
@@ -58,6 +58,11 @@ type CommandBody = {
     sourceChannel?: unknown;
     cancelReason?: unknown;
     reasonNote?: unknown;
+    capacityOverride?: unknown;
+    confirmedCapacityOverride?: unknown;
+    capacityOverrideReason?: unknown;
+    confirmedServiceOverride?: unknown;
+    serviceOverrideReason?: unknown;
   };
 };
 
@@ -95,13 +100,18 @@ function toCommandPayload(kind: CommandKind, body: CommandBody, expectedVersion:
       if (tableIds.length < 1 || tableIds.length > 8) {
         return { ok: false, error: "invalid_table_assignment" as const };
       }
+      const capacity = parseOwnerCapacityOverride(body.payload ?? {});
+      if (!capacity.ok) {
+        return { ok: false, error: capacity.error };
+      }
       return {
         ok: true,
         payload: {
           expectedVersion,
           operation: "replace",
           tableIds,
-          capacityOverride: false,
+          capacityOverride: capacity.capacityOverride,
+          reason: capacity.reason,
         },
       };
     }
@@ -141,6 +151,24 @@ function toCommandPayload(kind: CommandKind, body: CommandBody, expectedVersion:
       }
       try {
         const occurredAt = boundedIsoDate(body.payload.occurredAt, "occurredAt", false);
+        const confirmationSupplied = body.payload.confirmedServiceOverride !== undefined;
+        const reasonSupplied = body.payload.serviceOverrideReason !== undefined;
+        if (confirmationSupplied || reasonSupplied) {
+          const overrideReason = boundedString(body.payload.serviceOverrideReason, 240);
+          if (body.payload.confirmedServiceOverride !== true || !overrideReason) {
+            return { ok: false, error: "service_override_confirmation_required" as const };
+          }
+          return {
+            ok: true,
+            payload: {
+              expectedVersion,
+              toStatus: serviceStatus,
+              occurredAt,
+              confirmedOverride: true,
+              overrideReason,
+            },
+          };
+        }
         return { ok: true, payload: { expectedVersion, toStatus: serviceStatus, occurredAt } };
       } catch {
         return { ok: false, error: "invalid_occurredAt" as const };
@@ -266,19 +294,13 @@ function normalizeCommandFailurePayload(status: number, payload: Record<string, 
 }
 
 export async function POST(request: Request) {
-  const token = readAdminToken(request);
-  if (!token) {
-    return NextResponse.json({ ok: false, error: "missing_admin_session" }, { status: 401 });
-  }
+  const access = await requireAdminOperation(request);
+  if (!access.ok) return access.response;
+  const token = access.token;
 
   const idempotencyKey = request.headers.get("idempotency-key");
-  if (!idempotencyKey || !IDEMPOTENCY_PATTERN.test(idempotencyKey)) {
+  if (!isValidVipManagerIdempotencyKey(idempotencyKey)) {
     return NextResponse.json({ ok: false, error: "invalid_idempotency_key" }, { status: 400 });
-  }
-
-  const session = await readAdminSession(token);
-  if (!session.ok) {
-    return NextResponse.json({ ok: false, error: "invalid_admin_session" }, { status: session.status || 401 });
   }
 
   const body = await request.json().catch(() => null) as CommandBody | null;
@@ -286,7 +308,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "unsupported_command" }, { status: 400 });
   }
 
-  if (!canExecuteVipCommand(session.actor.role, body.kind as VipCommandKind)) {
+  if (!canExecuteVipCommand(access.actor.role, body.kind as VipCommandKind)) {
     return NextResponse.json({ ok: false, error: "insufficient_role" }, { status: 403 });
   }
 
@@ -303,16 +325,26 @@ export async function POST(request: Request) {
   if (!commandPayload?.ok) {
     return NextResponse.json({ ok: false, error: commandPayload?.error ?? "invalid_command_payload" }, { status: 400 });
   }
+  const outgoingPayload = commandPayload.payload;
+  if (!outgoingPayload) {
+    return NextResponse.json({ ok: false, error: "invalid_command_payload" }, { status: 400 });
+  }
 
+  const serviceOverride = body.kind === "service_status"
+    && "confirmedOverride" in outgoingPayload
+    && outgoingPayload.confirmedOverride === true;
+  const commandPath = serviceOverride
+    ? `${COMMANDS.service_status(body.reservationId)}/override`
+    : COMMANDS[body.kind](body.reservationId);
   const response = await ghostAdminFetch(
-    COMMANDS[body.kind](body.reservationId),
+    commandPath,
     {
       method: "POST",
       headers: {
         "content-type": "application/json",
         "idempotency-key": idempotencyKey,
       },
-      body: JSON.stringify(commandPayload.payload),
+      body: JSON.stringify(outgoingPayload),
     },
     token,
   );
@@ -336,7 +368,7 @@ export async function POST(request: Request) {
     {
       ok: true,
       action: rawPayload.action,
-      actor: session.actor,
+      actor: access.actor,
       reused: rawPayload.reused,
       auditLogId: rawPayload.auditLogId,
       entityVersion: rawPayload.entityVersion,

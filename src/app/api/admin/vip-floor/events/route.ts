@@ -72,8 +72,35 @@ export async function GET(request: Request) {
           const revision = payload.revision;
 
           if (!response.ok) {
+            const remoteError = payload.error;
+            const remoteCode = typeof remoteError === "string"
+              ? remoteError
+              : remoteError && typeof remoteError === "object" && "code" in remoteError
+                ? remoteError.code
+                : null;
+            if (response.status === 404 && remoteCode === "NOT_FOUND") {
+              controller.enqueue(encoder.encode(
+                `event: day_state\ndata: ${JSON.stringify({ state: "missing", businessDate })}\n\n`,
+              ));
+              close();
+              return;
+            }
             controller.enqueue(encoder.encode(
               `event: unavailable\ndata: ${JSON.stringify({ status: response.status })}\n\n`,
+            ));
+            close();
+            return;
+          }
+
+          const dayState = payload.dayState;
+          if (
+            dayState
+            && typeof dayState === "object"
+            && "state" in dayState
+            && (dayState.state === "missing" || dayState.state === "closed")
+          ) {
+            controller.enqueue(encoder.encode(
+              `event: day_state\ndata: ${JSON.stringify(dayState)}\n\n`,
             ));
             close();
             return;

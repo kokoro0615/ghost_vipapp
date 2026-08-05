@@ -17,6 +17,7 @@ test("light UI QA freezes the exact Chromium and WebKit release matrix", () => {
        * regression cover for the shells that still exist. */
       "chromium-1080x810",
       "chromium-810x1080",
+      "chromium-1920x1080",
       "chromium-1440x900",
       "chromium-1366x768",
       "chromium-1194x834",
@@ -90,7 +91,7 @@ test("light UI QA freezes the exact Chromium and WebKit release matrix", () => {
   ]) {
     assert.ok(QA_REQUIRED_STATES.includes(state), `missing QA state: ${state}`);
   }
-  assert.equal(QA_REQUIRED_STATES.filter((state) => state.startsWith("reservation-create-")).length, 8);
+  assert.equal(QA_REQUIRED_STATES.filter((state) => state.startsWith("reservation-create-")).length, 9);
   assert.equal(QA_REQUIRED_STATES.filter((state) => state.startsWith("command-")).length, 7);
 });
 

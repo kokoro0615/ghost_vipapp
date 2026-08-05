@@ -4,8 +4,7 @@ import { normalizeGhostBusinessDay } from "@/lib/ghostOperatingHours";
 import {
   copyJson,
   ghostAdminFetch,
-  readAdminSession,
-  readAdminToken,
+  requireAdminOperation,
 } from "@/lib/server/ghostAdminProxy";
 
 export const runtime = "nodejs";
@@ -13,24 +12,8 @@ export const runtime = "nodejs";
 const BUSINESS_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/u;
 
 export async function GET(request: Request) {
-  const token = readAdminToken(request);
-
-  if (!token) {
-    return NextResponse.json({ ok: false, error: "missing_admin_session" }, { status: 401 });
-  }
-
-  const session = await readAdminSession(token);
-
-  if (!session.ok) {
-    return NextResponse.json(
-      { ok: false, error: "invalid_admin_session" },
-      { status: session.status || 401 },
-    );
-  }
-
-  if (session.actor.role !== "owner") {
-    return NextResponse.json({ ok: false, error: "insufficient_role" }, { status: 403 });
-  }
+  const access = await requireAdminOperation(request, { ownerOnly: true });
+  if (!access.ok) return access.response;
 
   const url = new URL(request.url);
   const businessDate = url.searchParams.get("date");
@@ -46,7 +29,7 @@ export async function GET(request: Request) {
   const response = await ghostAdminFetch(
     `/api/admin/v2/vip-floor/options?businessDate=${encodeURIComponent(businessDate)}`,
     {},
-    token,
+    access.token,
   );
   const payload = await copyJson(response);
 

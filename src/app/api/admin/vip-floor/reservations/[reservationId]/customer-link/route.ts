@@ -3,8 +3,7 @@ import { NextResponse } from "next/server";
 import {
   copyJson,
   ghostAdminFetch,
-  readAdminSession,
-  readAdminToken,
+  requireAdminOperation,
 } from "@/lib/server/ghostAdminProxy";
 
 export const runtime = "nodejs";
@@ -17,14 +16,9 @@ type RouteContext = {
 };
 
 export async function PATCH(request: Request, context: RouteContext) {
-  const token = readAdminToken(request);
-  if (!token) {
-    return NextResponse.json({ ok: false, error: "missing_admin_session" }, { status: 401 });
-  }
-  const session = await readAdminSession(token);
-  if (!session.ok || session.actor.role !== "owner") {
-    return NextResponse.json({ ok: false, error: "insufficient_role" }, { status: 403 });
-  }
+  const access = await requireAdminOperation(request, { ownerOnly: true });
+  if (!access.ok) return access.response;
+  const token = access.token;
   const { reservationId } = await context.params;
   const idempotencyKey = request.headers.get("idempotency-key");
   const body = await request.json().catch(() => null) as Record<string, unknown> | null;

@@ -3,8 +3,7 @@ import { NextResponse } from "next/server";
 import {
   copyJson,
   ghostAdminFetch,
-  readAdminSession,
-  readAdminToken,
+  requireAdminOperation,
 } from "@/lib/server/ghostAdminProxy";
 
 export const runtime = "nodejs";
@@ -12,7 +11,7 @@ export const runtime = "nodejs";
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/u;
 
 export async function GET(request: Request) {
-  const auth = await requireOwner(request);
+  const auth = await requireAdminOperation(request, { ownerOnly: true });
   if (!auth.ok) return auth.response;
   const url = new URL(request.url);
   const rawWindow = Number(url.searchParams.get("windowMinutes") ?? 60);
@@ -28,7 +27,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const auth = await requireOwner(request);
+  const auth = await requireAdminOperation(request, { ownerOnly: true });
   if (!auth.ok) return auth.response;
   const body = await request.json().catch(() => null) as Record<string, unknown> | null;
   const event = body?.event === "realtime_gap" || body?.event === "realtime_unavailable"
@@ -61,22 +60,4 @@ export async function POST(request: Request) {
     auth.token,
   );
   return NextResponse.json(await copyJson(response), { status: response.status });
-}
-
-async function requireOwner(request: Request) {
-  const token = readAdminToken(request);
-  if (!token) {
-    return {
-      ok: false as const,
-      response: NextResponse.json({ ok: false, error: "missing_admin_session" }, { status: 401 }),
-    };
-  }
-  const session = await readAdminSession(token);
-  if (!session.ok || session.actor.role !== "owner") {
-    return {
-      ok: false as const,
-      response: NextResponse.json({ ok: false, error: "insufficient_role" }, { status: 403 }),
-    };
-  }
-  return { ok: true as const, token };
 }

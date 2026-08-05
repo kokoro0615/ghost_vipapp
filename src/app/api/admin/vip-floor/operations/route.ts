@@ -1,17 +1,20 @@
 import { NextResponse } from "next/server";
 
 import { isGhostOperatingInterval } from "@/lib/ghostOperatingHours";
+import { parseOwnerCapacityOverride } from "@/lib/server/ownerCapacityOverride";
+import {
+  isValidVipManagerIdempotencyKey,
+  isVipManagerReservationProvenance,
+} from "@/generated/vipManagerRuntimeContract";
 import {
   copyJson,
   ghostAdminFetch,
-  readAdminSession,
-  readAdminToken,
+  requireAdminOperation,
 } from "@/lib/server/ghostAdminProxy";
 
 export const runtime = "nodejs";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
-const IDEMPOTENCY_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$/u;
 const BUSINESS_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/u;
 const FIXED_REASON = "管理画面操作";
 
@@ -21,29 +24,14 @@ type OperationBody = {
 };
 
 export async function POST(request: Request) {
-  const token = readAdminToken(request);
-
-  if (!token) {
-    return NextResponse.json({ ok: false, error: "missing_admin_session" }, { status: 401 });
-  }
+  const access = await requireAdminOperation(request, { ownerOnly: true });
+  if (!access.ok) return access.response;
+  const token = access.token;
 
   const idempotencyKey = request.headers.get("idempotency-key");
 
-  if (!idempotencyKey || !IDEMPOTENCY_PATTERN.test(idempotencyKey)) {
+  if (!isValidVipManagerIdempotencyKey(idempotencyKey)) {
     return NextResponse.json({ ok: false, error: "invalid_idempotency_key" }, { status: 400 });
-  }
-
-  const session = await readAdminSession(token);
-
-  if (!session.ok) {
-    return NextResponse.json(
-      { ok: false, error: "invalid_admin_session" },
-      { status: session.status || 401 },
-    );
-  }
-
-  if (session.actor.role !== "owner") {
-    return NextResponse.json({ ok: false, error: "insufficient_role" }, { status: 403 });
   }
 
   const body = await request.json().catch(() => null) as OperationBody | null;
@@ -80,7 +68,7 @@ export async function POST(request: Request) {
           "content-type": "application/json",
           "idempotency-key": idempotencyKey,
         },
-        body: JSON.stringify({ ...payload.value, reason: FIXED_REASON }),
+        body: JSON.stringify(payload.value),
       },
       token,
     );
@@ -141,7 +129,7 @@ export async function POST(request: Request) {
           "content-type": "application/json",
           "idempotency-key": idempotencyKey,
         },
-        body: JSON.stringify({ ...payload.value.command, reason: FIXED_REASON }),
+        body: JSON.stringify(payload.value.command),
       },
       token,
     );
@@ -195,7 +183,24 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, error: payload.error }, { status: 400 });
     }
 
-    return createRepeatedBlocks(payload.value, idempotencyKey, token);
+    return forwardOperation(
+      "/api/admin/v2/vip-blocks/series",
+      {
+        eventDayId: payload.value.eventDayId,
+        repeatDays: payload.value.repeatDays,
+        scope: payload.value.scope,
+        kind: payload.value.blockKind,
+        startAt: payload.value.startAt,
+        endAt: payload.value.endAt,
+        memo: payload.value.memo,
+        seatResourceIds: payload.value.seatResourceIds,
+        floorSectionIds: [],
+        venueWide: payload.value.venueWide,
+        reason: FIXED_REASON,
+      },
+      idempotencyKey,
+      token,
+    );
   }
 
   if (body.kind === "block_update") {
@@ -246,6 +251,7 @@ export async function POST(request: Request) {
 }
 
 function parseWalkIn(payload: Record<string, unknown>) {
+  const capacity = parseOwnerCapacityOverride(payload);
   const eventDayId = readUuid(payload.eventDayId);
   const offeringId = readUuid(payload.offeringId);
   const scheduledStartAt = readIso(payload.scheduledStartAt);
@@ -262,7 +268,8 @@ function parseWalkIn(payload: Record<string, unknown>) {
     : readUuid(payload.bookingStaffMemberId);
 
   if (
-    !eventDayId
+    !capacity.ok
+    || !eventDayId
     || !offeringId
     || !scheduledStartAt
     || !scheduledEndAt
@@ -309,13 +316,14 @@ function parseWalkIn(payload: Record<string, unknown>) {
       operatorNote,
       bookingStaffMemberId,
       expectedTableVersions: versions,
-      capacityOverride: false,
-      reason: FIXED_REASON,
+      capacityOverride: capacity.capacityOverride,
+      reason: capacity.reason,
     },
   };
 }
 
 function parseReservationCreate(payload: Record<string, unknown>) {
+  const capacity = parseOwnerCapacityOverride(payload);
   const eventDayId = readUuid(payload.eventDayId);
   const offeringId = readUuid(payload.offeringId);
   const scheduledStartAt = readIso(payload.scheduledStartAt);
@@ -329,7 +337,8 @@ function parseReservationCreate(payload: Record<string, unknown>) {
   const languageCode = readNullableString(payload.languageCode, 16);
   const guestLabel = readNullableString(payload.guestLabel, 80);
   const operatorNote = readNullableString(payload.operatorNote, 500);
-  const sourceChannel = payload.sourceChannel === "admin_hold" || payload.sourceChannel === "online"
+  const sourceChannel = isVipManagerReservationProvenance(payload.sourceChannel)
+    && payload.sourceChannel !== "walk_in"
     ? payload.sourceChannel
     : null;
   const serviceStatuses = [
@@ -348,7 +357,8 @@ function parseReservationCreate(payload: Record<string, unknown>) {
     ? payload.notificationPreference
     : null;
   if (
-    !eventDayId || !offeringId || !scheduledStartAt || !scheduledEndAt
+    !capacity.ok
+    || !eventDayId || !offeringId || !scheduledStartAt || !scheduledEndAt
     || Date.parse(scheduledStartAt) >= Date.parse(scheduledEndAt)
     || guestCount === null || !tableIds || !versions
     || displayName === undefined || phone === undefined || email === undefined
@@ -384,12 +394,14 @@ function parseReservationCreate(payload: Record<string, unknown>) {
       serviceStatus,
       bookingStaffMemberId,
       notificationPreference,
-      capacityOverride: false,
+      capacityOverride: capacity.capacityOverride,
+      reason: capacity.reason,
     },
   };
 }
 
 function parseReservationUpdate(payload: Record<string, unknown>) {
+  const capacity = parseOwnerCapacityOverride(payload);
   const reservationId = readUuid(payload.reservationId);
   const expectedVersion = readInteger(payload.expectedVersion, 1, Number.MAX_SAFE_INTEGER);
   const offeringId = readUuid(payload.offeringId);
@@ -400,7 +412,8 @@ function parseReservationUpdate(payload: Record<string, unknown>) {
   const versions = readTableVersions(payload.expectedTableVersions, tableIds);
   const guestLabel = readNullableString(payload.guestLabel, 80);
   const operatorNote = readNullableString(payload.operatorNote, 500);
-  const sourceChannel = payload.sourceChannel === "admin_hold" || payload.sourceChannel === "online"
+  const sourceChannel = isVipManagerReservationProvenance(payload.sourceChannel)
+    && payload.sourceChannel !== "walk_in"
     ? payload.sourceChannel
     : null;
   const serviceStatuses = [
@@ -419,7 +432,8 @@ function parseReservationUpdate(payload: Record<string, unknown>) {
     ? payload.notificationPreference
     : null;
   if (
-    !reservationId || expectedVersion === null || !offeringId
+    !capacity.ok
+    || !reservationId || expectedVersion === null || !offeringId
     || !scheduledStartAt || !scheduledEndAt
     || Date.parse(scheduledStartAt) >= Date.parse(scheduledEndAt)
     || guestCount === null || !tableIds || !versions
@@ -450,7 +464,8 @@ function parseReservationUpdate(payload: Record<string, unknown>) {
         serviceStatus,
         bookingStaffMemberId,
         notificationPreference,
-        capacityOverride: false,
+        capacityOverride: capacity.capacityOverride,
+        reason: capacity.reason,
       },
     },
   };
@@ -580,91 +595,6 @@ function parseBlockMutation(payload: Record<string, unknown>, requireIdentity: b
   };
 }
 
-async function createRepeatedBlocks(
-  payload: ReturnType<typeof parseBlock> & { ok: true } extends { value: infer Value } ? Value : never,
-  idempotencyKey: string,
-  token: string,
-) {
-  const results: unknown[] = [];
-
-  for (let index = 0; index < payload.repeatDays; index += 1) {
-    const businessDate = shiftBusinessDate(payload.businessDate, index);
-    let eventDayId = payload.eventDayId;
-
-    if (index > 0) {
-      const optionsResponse = await ghostAdminFetch(
-        `/api/admin/v2/vip-floor/options?businessDate=${encodeURIComponent(businessDate)}`,
-        {},
-        token,
-      );
-      const optionsPayload = await copyJson(optionsResponse) as Record<string, unknown>;
-      const businessDay = optionsPayload.businessDay as Record<string, unknown> | undefined;
-      const resolvedId = readUuid(businessDay?.id);
-
-      if (!optionsResponse.ok || !resolvedId) {
-        return NextResponse.json(
-          {
-            ok: false,
-            error: "repeat_event_day_unavailable",
-            completedCount: results.length,
-            failedBusinessDate: businessDate,
-          },
-          { status: optionsResponse.status || 409 },
-        );
-      }
-
-      eventDayId = resolvedId;
-    }
-
-    const response = await ghostAdminFetch(
-      "/api/admin/v2/vip-blocks",
-      {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          "idempotency-key": `${idempotencyKey}:${String(index + 1).padStart(2, "0")}`,
-        },
-        body: JSON.stringify({
-          eventDayId,
-          scope: payload.scope,
-          kind: payload.blockKind,
-          startAt: shiftIso(payload.startAt, index),
-          endAt: shiftIso(payload.endAt, index),
-          memo: payload.memo,
-          seatResourceIds: payload.seatResourceIds,
-          floorSectionIds: [],
-          venueWide: payload.venueWide,
-          reason: FIXED_REASON,
-        }),
-      },
-      token,
-    );
-    const result = await copyJson(response);
-
-    if (!response.ok) {
-      return NextResponse.json(
-        {
-          ok: false,
-          error: "block_create_failed",
-          completedCount: results.length,
-          failedBusinessDate: businessDate,
-          cause: result,
-        },
-        { status: response.status },
-      );
-    }
-
-    results.push(result);
-  }
-
-  return NextResponse.json({
-    ok: true,
-    action: payload.repeatDays > 1 ? "reservation_block.series_created" : "reservation_block.created",
-    createdCount: results.length,
-    results,
-  });
-}
-
 async function forwardOperation(
   path: string,
   payload: Record<string, unknown>,
@@ -753,19 +683,4 @@ function readNullableString(value: unknown, maximum: number) {
   if (typeof value !== "string") return undefined;
   const normalized = value.trim();
   return normalized.length <= maximum ? normalized || null : undefined;
-}
-
-function shiftIso(value: string, days: number) {
-  return new Date(Date.parse(value) + days * 86_400_000).toISOString();
-}
-
-function shiftBusinessDate(value: string, days: number) {
-  const date = new Date(`${value}T12:00:00+09:00`);
-  date.setUTCDate(date.getUTCDate() + days);
-  return new Intl.DateTimeFormat("sv-SE", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    timeZone: "Asia/Tokyo",
-  }).format(date);
 }

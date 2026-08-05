@@ -238,12 +238,13 @@ GHOSTの状態集合は次の13状態だけとする。TableCheckで確認した
 
 ## 13. 認証・権限・監査
 
-- 外周は共通Basic認証。
-- アプリ内は利用者別PIN。初期利用者はOwner 1名、Owner専用PIN 1件とする。
+- Production認証は共通Basic-onlyとし、信頼済み外周identityから短時間のOwner sessionへ交換する。
+- PIN入力・PIN session・Owner PINはDEMO専用であり、Production routeでは受理・転送・検証しない。
 - OwnerだけがmutationとPII閲覧を行う。
 - 将来ロール用に`staff`、`manager`、`owner`、`engineer`、`accountant`をschema上保持するが、
   初期画面ではOwner以外を表示しない。
-- PINは平文保存しない。短時間session、rate limit、失敗ロックを実装する。
+- Productionのlogout後はterminal lockを維持し、Basic資格情報の明示的な再入力なしにOwner sessionを再発行しない。
+- DEMO PINは平文保存せず、短時間session、rate limit、失敗ロックを適用する。
 - 最小監査ログに操作者ID、時刻、操作、変更対象、変更前後、固定理由、request IDを保存する。
 - 端末情報は必須監査項目にしない。
 
@@ -308,7 +309,7 @@ GHOSTの状態集合は次の13状態だけとする。TableCheckで確認した
 | D-02 | 現行Timelineを独立`Chart`として残す |
 | D-03 | 延長は15分単位、最大120分、60分プリセット付き |
 | D-04 | 顧客は電話番号一致、電話がなければEメール一致で自動集約する |
-| D-05 | 共通Basic認証＋Owner専用PIN 1件 |
+| D-05 | ProductionはBasic-only、PINはDEMO専用 |
 | D-06 | Waitlist呼出期限は30分 |
 | D-07 | 初期スタッフマスタは実装後にOwnerが登録する |
 | D-08 | 既存GHOST差出人を使い、失敗時は最大3回自動再送する |

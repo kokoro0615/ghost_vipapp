@@ -28,7 +28,7 @@ export default function ReservationListView({
   return (
     <section className={styles.listView} aria-labelledby="list-view-title" data-density={density}>
       <div className={styles.viewStrip}>
-        <h2 id="list-view-title">来店台帳</h2>
+        <h1 id="list-view-title">来店台帳</h1>
         <span className="tabular-nums">{reservations.length}件</span>
         {attentionCount > 0 ? <span className={styles.exceptionText}>要対応 {attentionCount}</span> : null}
         <span className={styles.stripSpacer} />

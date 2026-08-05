@@ -3,19 +3,18 @@ import { NextResponse } from "next/server";
 import {
   copyJson,
   ghostAdminFetch,
-  readAdminSession,
-  readAdminToken,
+  requireAdminOperation,
 } from "@/lib/server/ghostAdminProxy";
+import { isValidVipManagerIdempotencyKey } from "@/generated/vipManagerRuntimeContract";
 
 export const runtime = "nodejs";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 const BUSINESS_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/u;
-const IDEMPOTENCY_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$/u;
 const FIXED_REASON = "管理画面操作";
 
 export async function GET(request: Request) {
-  const auth = await requireOwner(request);
+  const auth = await requireAdminOperation(request, { ownerOnly: true });
   if (!auth.ok) return auth.response;
   const url = new URL(request.url);
   const date = url.searchParams.get("date");
@@ -34,10 +33,10 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const auth = await requireOwner(request);
+  const auth = await requireAdminOperation(request, { ownerOnly: true });
   if (!auth.ok) return auth.response;
   const idempotencyKey = request.headers.get("idempotency-key");
-  if (!idempotencyKey || !IDEMPOTENCY_PATTERN.test(idempotencyKey)) {
+  if (!isValidVipManagerIdempotencyKey(idempotencyKey)) {
     return NextResponse.json({ ok: false, error: "invalid_idempotency_key" }, { status: 400 });
   }
   const body = await request.json().catch(() => null) as Record<string, unknown> | null;
@@ -117,39 +116,6 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json({ ok: false, error: "unsupported_waitlist_action" }, { status: 400 });
-}
-
-async function requireOwner(request: Request) {
-  const token = readAdminToken(request);
-  if (!token) {
-    return {
-      ok: false as const,
-      response: NextResponse.json(
-        { ok: false, error: "missing_admin_session" },
-        { status: 401 },
-      ),
-    };
-  }
-  const session = await readAdminSession(token);
-  if (!session.ok) {
-    return {
-      ok: false as const,
-      response: NextResponse.json(
-        { ok: false, error: "invalid_admin_session" },
-        { status: session.status || 401 },
-      ),
-    };
-  }
-  if (session.actor.role !== "owner") {
-    return {
-      ok: false as const,
-      response: NextResponse.json(
-        { ok: false, error: "insufficient_role" },
-        { status: 403 },
-      ),
-    };
-  }
-  return { ok: true as const, token };
 }
 
 async function forward(path: string, init: RequestInit, token: string) {

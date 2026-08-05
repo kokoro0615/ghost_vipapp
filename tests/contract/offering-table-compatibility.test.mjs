@@ -17,7 +17,9 @@ test("Walk-in and reservation creation enforce offering-table compatibility", as
   assert.match(operationCenter, /canSelectWalkInTable/u);
   assert.match(operationCenter, /この人数で登録できる卓の組み合わせを選び直してください/u);
   assert.doesNotMatch(operationCenter, /name="offeringId"/u);
-  assert.match(wizard, /availableTables/u);
+  assert.match(wizard, /board\.tables\.map/u);
+  assert.match(wizard, /disabled=\{!compatible\}/u);
+  assert.match(wizard, /data-unavailable=\{!compatible \|\| undefined\}/u);
   assert.match(wizard, /tableIds:\s*draft\.tableIds\.filter/u);
   assert.match(clientErrors, /OFFERING_TABLE_MISMATCH/u);
 });

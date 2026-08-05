@@ -14,18 +14,18 @@ test("Owner operation adapters expose only canonical Walk-in and block routes", 
     read("src/components/admin/vip-floor-v2/operations/ReservationWizard.tsx"),
   ]);
 
-  assert.match(operations, /session\.actor\.role !== "owner"/u);
-  assert.match(options, /session\.actor\.role !== "owner"/u);
+  assert.match(operations, /requireAdminOperation\(request, \{ ownerOnly: true \}\)/u);
+  assert.match(options, /requireAdminOperation\(request, \{ ownerOnly: true \}\)/u);
   assert.match(operations, /"\/api\/admin\/v2\/walk-ins"/u);
-  assert.match(operations, /"\/api\/admin\/v2\/vip-blocks"/u);
+  assert.match(operations, /\/api\/admin\/v2\/vip-blocks\//u);
   assert.match(operations, /token,\n\s+"PATCH"/u);
   assert.match(operations, /token,\n\s+"DELETE"/u);
   assert.match(operations, /expectedVersion/u);
   assert.match(options, /\/api\/admin\/v2\/vip-floor\/options\?businessDate=/u);
   assert.match(operations, /const FIXED_REASON = "管理画面操作"/u);
   assert.match(operations, /readInteger\(payload\.repeatDays, 1, 14\)/u);
-  assert.match(operations, /completedCount: results\.length/u);
-  assert.ok(operations.includes("idempotencyKey}:${String(index + 1)"));
+  assert.match(operations, /"\/api\/admin\/v2\/vip-blocks\/series"/u);
+  assert.doesNotMatch(operations, /idempotencyKey\}:\$\{String\(index \+ 1\)/u);
   assert.doesNotMatch(operations, /vipapp-command/u);
 
   assert.match(hook, /Date\.now\(\) - 5 \* 60 \* 60 \* 1000/u);

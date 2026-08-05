@@ -21,6 +21,7 @@
 export const QA_VIEWPORTS = Object.freeze([
   { browser: "chromium", width: 1080, height: 810, touch: true, scale: 2, motion: true },
   { browser: "chromium", width: 810, height: 1080, touch: true, scale: 2, motion: true },
+  { browser: "chromium", width: 1920, height: 1080 },
   { browser: "chromium", width: 1440, height: 900 },
   { browser: "chromium", width: 1366, height: 768 },
   { browser: "chromium", width: 1194, height: 834 },
@@ -71,6 +72,7 @@ export const QA_REQUIRED_STATES = Object.freeze([
   "reservation-create-6",
   "reservation-create-7",
   "reservation-create-8",
+  "reservation-create-shortcut",
   "reservation-edit",
   "command-check-in",
   "command-arrival-time",

@@ -36,8 +36,15 @@ import { ReservationWizard } from "./ReservationWizard";
 import styles from "../VipFloorWorkspace.module.css";
 
 type OperationKind = "walk_in" | "block_create" | "reservation_create";
-type WalkInField = "guestLabel" | "operatorNote" | "tableIds";
+type WalkInField = "guestLabel" | "operatorNote" | "tableIds" | "capacityOverride";
 type WalkInErrors = Partial<Record<WalkInField, string>>;
+
+const BUSINESS_DATE_SUGGESTION_FORMATTER = new Intl.DateTimeFormat("ja-JP", {
+  month: "numeric",
+  day: "numeric",
+  weekday: "short",
+  timeZone: "Asia/Tokyo",
+});
 
 type Props = {
   open: boolean;
@@ -45,6 +52,8 @@ type Props = {
   board: VipFloorBoardV2;
   options: OperationOptions | null;
   datePending: boolean;
+  suggestedBusinessDates: string[];
+  suggestionsPending: boolean;
   selectedTableId: string | null;
   conflict: CommandOutcome | null;
   staffData: StaffWorkspaceData | null;
@@ -60,6 +69,8 @@ export function OperationCenter({
   board,
   options,
   datePending,
+  suggestedBusinessDates,
+  suggestionsPending,
   selectedTableId,
   conflict,
   staffData,
@@ -70,12 +81,21 @@ export function OperationCenter({
 }: Props) {
   const demoMode = useDemoMode();
   const [kind, setKind] = useState<OperationKind>("walk_in");
+  const [operationKindTouched, setOperationKindTouched] = useState(false);
   const [venueWide, setVenueWide] = useState(false);
   const [editingBlockId, setEditingBlockId] = useState<string | null>(null);
   const [walkInGuestCount, setWalkInGuestCount] = useState(2);
   const [walkInTableIds, setWalkInTableIds] = useState<string[] | null>(null);
   const [walkInBookingStaffMemberId, setWalkInBookingStaffMemberId] = useState("");
+  const [walkInCapacityConfirmed, setWalkInCapacityConfirmed] = useState(false);
+  const [walkInCapacityReason, setWalkInCapacityReason] = useState("");
   const [walkInErrors, setWalkInErrors] = useState<WalkInErrors>({});
+  const [recoveryBusinessDate, setRecoveryBusinessDate] = useState(
+    board.businessDay.businessDate,
+  );
+  const [failedBusinessDate, setFailedBusinessDate] = useState<string | null>(
+    board.businessDay.businessDate,
+  );
   const panelRef = useRef<HTMLDivElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
   const defaults = useMemo(() => operationDefaults(board), [board]);
@@ -86,6 +106,18 @@ export function OperationCenter({
     (member) => member.id === walkInBookingStaffMemberId,
   ) ?? null;
   const selectedWalkInTables = board.tables.filter((table) => activeWalkInTableIds.includes(table.id));
+  const selectedWalkInCapacity = selectedWalkInTables.reduce(
+    (sum, table) => sum + table.capacityMax,
+    0,
+  );
+  const walkInCapacityShort = selectedWalkInTables.length > 0
+    && selectedWalkInCapacity < walkInGuestCount;
+  const activeKind: OperationKind = !editReservation
+    && !operationKindTouched
+    && !datePending
+    && !options
+    ? "reservation_create"
+    : kind;
 
   useEffect(() => {
     if (!open) return;
@@ -128,7 +160,7 @@ export function OperationCenter({
     const form = event.currentTarget;
     const data = new FormData(form);
     if (!options) {
-      await onBusinessDateChange(String(data.get("businessDate") ?? ""));
+      await openRecoveryBusinessDate(String(data.get("businessDate") ?? ""));
       return;
     }
     const tableIds = kind === "walk_in"
@@ -151,6 +183,20 @@ export function OperationCenter({
         }));
         window.requestAnimationFrame(() => {
           form.querySelector<HTMLElement>('input[name="tableIds"]')?.focus();
+        });
+        return;
+      }
+      if (
+        walkInCapacityShort
+        && (!walkInCapacityConfirmed || walkInCapacityReason.trim().length < 1)
+      ) {
+        setWalkInErrors((current) => ({
+          ...current,
+          capacityOverride: "定員超過を承認し、理由を入力してください。",
+        }));
+        window.requestAnimationFrame(() => {
+          const reasonField = form.elements.namedItem("capacityOverrideReason");
+          if (reasonField instanceof HTMLElement) reasonField.focus();
         });
         return;
       }
@@ -183,6 +229,12 @@ export function OperationCenter({
             tableId,
             expectedVersion: board.tables.find((table) => table.id === tableId)?.version ?? 0,
           })),
+          ...(walkInCapacityShort && walkInCapacityConfirmed
+            ? {
+                confirmedCapacityOverride: true as const,
+                capacityOverrideReason: walkInCapacityReason.trim(),
+              }
+            : {}),
         },
       };
     } else {
@@ -221,6 +273,8 @@ export function OperationCenter({
     setWalkInGuestCount(2);
     setWalkInTableIds(null);
     setWalkInBookingStaffMemberId("");
+    setWalkInCapacityConfirmed(false);
+    setWalkInCapacityReason("");
     onClose();
   }
 
@@ -231,6 +285,20 @@ export function OperationCenter({
       delete next[field];
       return next;
     });
+  }
+
+  async function openRecoveryBusinessDate(nextBusinessDate: string) {
+    if (!nextBusinessDate || datePending) return;
+    const intendedKind = activeKind;
+    setKind(intendedKind);
+    setRecoveryBusinessDate(nextBusinessDate);
+    setFailedBusinessDate(null);
+    if (await onBusinessDateChange(nextBusinessDate)) {
+      // A missing-day dialog defaults to the phone-reservation task, while an
+      // explicit tab choice remains intact across the canonical date switch.
+      return;
+    }
+    setFailedBusinessDate(nextBusinessDate);
   }
 
   function validateWalkInField(field: WalkInField, value: string) {
@@ -271,21 +339,31 @@ export function OperationCenter({
     }
   }
 
-  const operationTabId = kind === "walk_in"
+  const operationTabId = activeKind === "walk_in"
     ? "operation-tab-walk-in"
-    : kind === "reservation_create"
+    : activeKind === "reservation_create"
       ? "operation-tab-reservation"
       : "operation-tab-block";
-  const operationContextLabel = kind === "walk_in"
+  const operationContextLabel = activeKind === "walk_in"
     ? "店頭受付・即時着席"
-    : kind === "reservation_create"
+    : activeKind === "reservation_create"
       ? "電話・事前予約"
       : "販売・運用停止";
+  const displayedOperationContextLabel = !options
+    ? datePending
+      ? "受付日を確認中"
+      : operationContextLabel
+    : operationContextLabel;
   const conflictTitle = conflict && !conflict.ok
     ? conflict.code === "event_day_not_found"
-      ? "営業日未登録"
+      ? "予約受付対象外"
       : conflict.code
     : null;
+  const displayedBusinessDate = options?.businessDay.businessDate ?? recoveryBusinessDate;
+  const visibleConflict = conflict && !conflict.ok && (
+    conflict.code !== "event_day_not_found"
+    || failedBusinessDate === recoveryBusinessDate
+  ) ? conflict : null;
 
   return (
     <div
@@ -326,11 +404,12 @@ export function OperationCenter({
             type="button"
             role="tab"
             aria-controls="operation-panel"
-            aria-selected={kind === "walk_in"}
-            tabIndex={kind === "walk_in" ? 0 : -1}
-            data-active={kind === "walk_in" || undefined}
+            aria-selected={activeKind === "walk_in"}
+            tabIndex={activeKind === "walk_in" ? 0 : -1}
+            data-active={activeKind === "walk_in" || undefined}
             onClick={() => {
               setKind("walk_in");
+              setOperationKindTouched(true);
               setWalkInErrors({});
             }}
           >
@@ -341,11 +420,12 @@ export function OperationCenter({
             type="button"
             role="tab"
             aria-controls="operation-panel"
-            aria-selected={kind === "block_create"}
-            tabIndex={kind === "block_create" ? 0 : -1}
-            data-active={kind === "block_create" || undefined}
+            aria-selected={activeKind === "block_create"}
+            tabIndex={activeKind === "block_create" ? 0 : -1}
+            data-active={activeKind === "block_create" || undefined}
             onClick={() => {
               setKind("block_create");
+              setOperationKindTouched(true);
               setWalkInErrors({});
             }}
           >
@@ -356,11 +436,12 @@ export function OperationCenter({
             type="button"
             role="tab"
             aria-controls="operation-panel"
-            aria-selected={kind === "reservation_create"}
-            tabIndex={kind === "reservation_create" ? 0 : -1}
-            data-active={kind === "reservation_create" || undefined}
+            aria-selected={activeKind === "reservation_create"}
+            tabIndex={activeKind === "reservation_create" ? 0 : -1}
+            data-active={activeKind === "reservation_create" || undefined}
             onClick={() => {
               setKind("reservation_create");
+              setOperationKindTouched(true);
               setWalkInErrors({});
             }}
           >
@@ -368,7 +449,7 @@ export function OperationCenter({
           </button>
         </div> : null}
 
-        {(kind === "reservation_create" || editReservation) && options ? (
+        {(activeKind === "reservation_create" || editReservation) && options ? (
           <ReservationWizard
             key={`${editReservation ? "edit" : "create"}:${options.businessDay.id}`}
             board={board}
@@ -387,7 +468,7 @@ export function OperationCenter({
             id="operation-panel"
             role="tabpanel"
             aria-labelledby={operationTabId}
-            key={`${kind}:${editingBlockId ?? "new"}`}
+            key={`${activeKind}:${editingBlockId ?? "new"}`}
             className={styles.commandForm}
             onSubmit={submit}
           >
@@ -398,8 +479,8 @@ export function OperationCenter({
                 reach. The body scrolls; the footer does not move. */}
             <div className={styles.commandScroll}>
 	          <div className={styles.commandContext}>
-	            <strong>{operationContextLabel}</strong>
-	            <span className="tabular-nums">{board.businessDay.businessDate} / 22:00–翌05:00</span>
+	            <strong>{displayedOperationContextLabel}</strong>
+	            <span className="tabular-nums">{displayedBusinessDate} / 22:00–翌05:00</span>
 	          </div>
 
           {!options ? (
@@ -410,7 +491,11 @@ export function OperationCenter({
                   <strong>{datePending ? "営業日とプランを確認中" : "受付日を選択"}</strong>
                   <small>{datePending
                     ? "予約可能なプランと席を読み込んでいます。"
-                    : "事前予約は、お電話で確認した来店日を選んで続けてください。"}</small>
+                    : activeKind === "reservation_create"
+                      ? "事前予約は、お電話で確認した来店日を選んで続けてください。"
+                      : activeKind === "walk_in"
+                        ? "Walk-inを登録する営業日を選んで続けてください。"
+                        : "受付ブロックを設定する営業日を選んで続けてください。"}</small>
                 </span>
               </div>
               <label>
@@ -418,22 +503,44 @@ export function OperationCenter({
                 <input
                   type="date"
                   name="businessDate"
-                  defaultValue={board.businessDay.businessDate}
+                  value={recoveryBusinessDate}
                   required
                   disabled={datePending}
+                  onChange={(event) => {
+                    setRecoveryBusinessDate(event.target.value);
+                    setFailedBusinessDate(null);
+                  }}
                 />
               </label>
-              <p>営業日未登録の日は保存せず、日付を選び直せます。</p>
+              {suggestionsPending ? (
+                <p role="status">次に予約を受けられる営業日を確認しています…</p>
+              ) : suggestedBusinessDates.length > 0 ? (
+                <div className={styles.operationDateSuggestions} aria-label="次の予約受付日">
+                  <span>次の予約受付日</span>
+                  {suggestedBusinessDates.map((businessDate) => (
+                    <button
+                      key={businessDate}
+                      type="button"
+                      className={styles.secondaryButton}
+                      disabled={datePending}
+                      onClick={() => void openRecoveryBusinessDate(businessDate)}
+                    >
+                      {formatBusinessDateSuggestion(businessDate)}を開く
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+              <p>定休日または営業日未登録の日は保存せず、日付を選び直せます。</p>
             </div>
           ) : (
             <fieldset disabled={pending}>
               <legend>
-                {kind === "walk_in"
+                {activeKind === "walk_in"
                   ? "現在時刻・到着済みで登録します"
                   : "競合確認後、対象卓の受付を停止します"}
               </legend>
 
-	              {kind === "walk_in" ? (
+	              {activeKind === "walk_in" ? (
 	                <div className={styles.walkInDesk}>
 	                  <div className={styles.walkInIntake}>
 	                    <section className={styles.walkInSection} aria-labelledby="walk-in-time-title">
@@ -441,7 +548,7 @@ export function OperationCenter({
 	                        <strong id="walk-in-time-title">滞在時間</strong>
 	                      </div>
 	                      <BusinessTimeFormFields
-	                        key={`${kind}:${options.businessDay.businessDate}`}
+	                        key={`${activeKind}:${options.businessDay.businessDate}`}
 	                        businessDate={options.businessDay.businessDate}
 	                        initialValue={{ startAt: defaults.start, endAt: defaults.end }}
 	                        disabled={pending}
@@ -465,6 +572,8 @@ export function OperationCenter({
 	                            onChange={(event) => {
 	                              const guestCount = Number(event.target.value);
 	                              setWalkInGuestCount(guestCount);
+	                              setWalkInCapacityConfirmed(false);
+	                              setWalkInCapacityReason("");
 	                              if (
 	                                activeWalkInTableIds.length > 0
 	                                && !resolveWalkInOffering(options.offerings, activeWalkInTableIds, guestCount)
@@ -537,6 +646,8 @@ export function OperationCenter({
 	                                  setWalkInTableIds(event.target.checked
 	                                    ? [...activeWalkInTableIds, table.id]
 	                                    : activeWalkInTableIds.filter((id) => id !== table.id));
+	                                  setWalkInCapacityConfirmed(false);
+	                                  setWalkInCapacityReason("");
 	                                  clearWalkInError("tableIds");
 	                                }}
 	                              />
@@ -555,6 +666,39 @@ export function OperationCenter({
 	                          プランは人数・配席から内部で自動判定します。
 	                        </small>
 	                      )}
+	                      {walkInCapacityShort ? (
+	                        <section className={styles.capacityOverrideRail} aria-label="Walk-in Owner定員超過確認">
+	                          <strong>定員超過 — {selectedWalkInCapacity}名枠に{walkInGuestCount}名</strong>
+	                          <p>配席を変えられない場合だけ、現場判断の理由を監査へ残します。</p>
+	                          <label className={styles.choiceRow}>
+	                            <input
+	                              type="checkbox"
+	                              checked={walkInCapacityConfirmed}
+	                              onChange={(event) => {
+	                                setWalkInCapacityConfirmed(event.target.checked);
+	                                clearWalkInError("capacityOverride");
+	                              }}
+	                            />
+	                            定員超過をOwner権限で承認
+	                          </label>
+	                          <label>
+	                            承認理由
+	                            <textarea
+	                              name="capacityOverrideReason"
+	                              value={walkInCapacityReason}
+	                              maxLength={240}
+	                              disabled={!walkInCapacityConfirmed}
+	                              onChange={(event) => {
+	                                setWalkInCapacityReason(event.target.value);
+	                                clearWalkInError("capacityOverride");
+	                              }}
+	                            />
+	                          </label>
+	                          {walkInErrors.capacityOverride ? (
+	                            <small className={styles.fieldError} role="alert">{walkInErrors.capacityOverride}</small>
+	                          ) : null}
+	                        </section>
+	                      ) : null}
 	                    </section>
 
 	                    <label>
@@ -631,7 +775,7 @@ export function OperationCenter({
 	              ) : (
 	                <>
 	                  <BusinessTimeFormFields
-	                    key={`${kind}:${editingBlock?.id ?? "new"}:${options.businessDay.businessDate}`}
+	                    key={`${activeKind}:${editingBlock?.id ?? "new"}:${options.businessDay.businessDate}`}
 	                    businessDate={options.businessDay.businessDate}
 	                    initialValue={{
 	                      startAt: editingBlock ? localInputValue(editingBlock.startAt) : defaults.start,
@@ -694,7 +838,7 @@ export function OperationCenter({
                 </>
               )}
 
-	              {!venueWide && kind !== "walk_in" ? (
+	              {!venueWide && activeKind !== "walk_in" ? (
                 <>
                 <div
 	                  className={styles.checkGrid}
@@ -724,13 +868,13 @@ export function OperationCenter({
             </fieldset>
           )}
 
-          {conflict && !conflict.ok ? (
+          {visibleConflict ? (
             <div className={styles.conflictBox} role="alert">
               <AlertTriangle size={18} aria-hidden />
               <div>
                 <strong>{conflictTitle}</strong>
-                <p>{conflict.message}</p>
-                <small>{conflict.recovery}</small>
+                <p>{visibleConflict.message}</p>
+                <small>{visibleConflict.recovery}</small>
               </div>
             </div>
           ) : null}
@@ -756,7 +900,7 @@ export function OperationCenter({
           </form>
         )}
 
-        {kind === "block_create" && board.blocks.length > 0 ? (
+        {activeKind === "block_create" && board.blocks.length > 0 ? (
           <section className={styles.blockLedger} aria-label="有効ブロック">
             <header>
               <strong>ACTIVE BLOCKS</strong>
@@ -810,6 +954,11 @@ function operationDefaults(board: VipFloorBoardV2) {
     start: localInputValue(new Date(startAt).toISOString()),
     end: localInputValue(new Date(endAt).toISOString()),
   };
+}
+
+function formatBusinessDateSuggestion(businessDate: string) {
+  const date = new Date(`${businessDate}T12:00:00+09:00`);
+  return BUSINESS_DATE_SUGGESTION_FORMATTER.format(date);
 }
 
 function validateSyntheticWalkIn(

@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 
 import { normalizeVipAdminRole, type VipAdminRole } from "@/lib/adminPermissions";
 import { readTrustedAccessLane } from "@/lib/demo/accessContract";
+import { resolveAdminOperationAccess } from "./adminOperationAccess";
 
 const SESSION_COOKIE = "ghost_vipapp_admin_session";
 const BACKEND_ORIGIN = (process.env.GHOST_ADMIN_API_ORIGIN ?? "https://ghost-ruby-one.vercel.app").replace(/\/$/u, "");
@@ -93,4 +94,26 @@ export async function readAdminSession(token: string) {
       displayName: typeof payload.displayName === "string" ? payload.displayName : null,
     } as AdminSessionActor,
   };
+}
+
+export async function requireAdminOperation(
+  request: Request,
+  options: { ownerOnly?: boolean } = {},
+) {
+  const access = await resolveAdminOperationAccess(request, {
+    readToken: readAdminToken,
+    readSession: readAdminSession,
+  }, options);
+
+  if (!access.ok) {
+    return {
+      ok: false as const,
+      response: NextResponse.json(
+        { ok: false, error: access.error },
+        { status: access.status },
+      ),
+    };
+  }
+
+  return access;
 }

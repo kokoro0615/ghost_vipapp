@@ -142,6 +142,143 @@ test("runtime Basic access session survives missing subrequest Authorization wit
   );
 });
 
+test("an application lock blocks cached Basic access until credentials are explicitly re-entered", async () => {
+  const api = await loadTypeScriptModule("src/lib/demo/accessContract.ts");
+  const config = {
+    ownerUsername: "owner-runtime",
+    ownerPassword: "owner-password-runtime",
+    demoEnabled: true,
+    demoUsername: "demo-runtime",
+    demoPassword: "demo-password-runtime",
+  };
+  const cachedAuthorization = basic(config.ownerUsername, config.ownerPassword);
+  const outerSession = api.createBasicAccessSession("owner", config);
+
+  assert.equal(
+    api.resolveBasicAccessRequest(cachedAuthorization, outerSession.token, config, Date.now(), true),
+    null,
+    "the browser's cached Authorization header must not bypass the explicit logout lock",
+  );
+  assert.equal(
+    api.resolveExplicitAccessCredentials(
+      config.ownerUsername,
+      config.ownerPassword,
+      config,
+    ),
+    "owner",
+  );
+  assert.equal(
+    api.resolveExplicitAccessCredentials(config.ownerUsername, "wrong-password", config),
+    null,
+  );
+});
+
+test("session route logout clears every access cookie and only explicit credentials unlock it", async () => {
+  const access = await loadTypeScriptModule("src/lib/demo/accessContract.ts");
+  class RuntimeResponse {
+    static json(body, init = {}) {
+      return new RuntimeResponse(body, init);
+    }
+
+    constructor(body, init = {}) {
+      this.body = body;
+      this.status = init.status ?? 200;
+      this.headers = new Headers(init.headers);
+      this.cookieMutations = [];
+      this.cookies = {
+        set: (name, value, options) => this.cookieMutations.push({ name, value, options }),
+      };
+      this.ok = this.status >= 200 && this.status < 300;
+    }
+  }
+  const backendResponse = {
+    ok: true,
+    status: 200,
+    json: async () => ({ ok: true }),
+  };
+  const route = await loadTypeScriptModule(
+    "src/app/api/admin/session/route.ts",
+    {
+      "next/server": { NextResponse: RuntimeResponse },
+      "@/lib/demo/accessContract": access,
+      "@/lib/demo/session.server": {
+        clearDemoSessionCookie(response) {
+          response.cookies.set(access.DEMO_SESSION_COOKIE, "", { path: "/api", maxAge: 0 });
+        },
+        createDemoSession: () => null,
+        getDemoAccessState: () => ({ status: "inactive" }),
+        getDemoPublicConfiguration: () => ({}),
+        readDemoSessionCookie: () => null,
+        setDemoSessionCookie() {},
+        verifyDemoSession: () => ({ ok: false, reason: "invalid" }),
+      },
+      "@/lib/server/ghostAdminProxy": {
+        clearAdminToken(response) {
+          response.cookies.set(access.OWNER_SESSION_COOKIE, "", { path: "/api", maxAge: 0 });
+        },
+        copyJson: (response) => response.json(),
+        ghostAdminFetch: async () => backendResponse,
+        loginBasicOwnerSession: () => null,
+        readAdminToken: () => "inner-owner-token",
+        setAdminToken() {},
+      },
+      "@/lib/adminPermissions": { normalizeVipAdminRole: (role) => role },
+    },
+    {
+      Headers,
+      process: {
+        env: {
+          NODE_ENV: "production",
+          VIPAPP_BASIC_USER: "owner-runtime",
+          VIPAPP_BASIC_PASSWORD: "owner-password-runtime",
+          VIPAPP_DEMO_ENABLED: "false",
+        },
+      },
+    },
+  );
+
+  const logout = await route.DELETE(new Request("https://vip.invalid/api/admin/session", {
+    method: "DELETE",
+    headers: { [access.TRUSTED_ACCESS_LANE_HEADER]: "owner" },
+  }));
+  const logoutCookies = new Map(logout.cookieMutations.map((cookie) => [cookie.name, cookie]));
+  assert.equal(logout.status, 200);
+  assert.equal(logoutCookies.get(access.OWNER_SESSION_COOKIE).options.maxAge, 0);
+  assert.equal(logoutCookies.get(access.DEMO_SESSION_COOKIE).options.maxAge, 0);
+  assert.equal(logoutCookies.get(access.BASIC_ACCESS_COOKIE).options.maxAge, 0);
+  assert.equal(logoutCookies.get(access.ACCESS_LOCK_COOKIE).options.maxAge, access.BASIC_ACCESS_MAX_AGE_SECONDS);
+
+  const locked = await route.GET(new Request("https://vip.invalid/api/admin/session", {
+    headers: { [access.TRUSTED_ACCESS_LOCK_HEADER]: "1" },
+  }));
+  assert.equal(locked.status, 423);
+  assert.equal(locked.body.error, "access_locked");
+
+  const unlocked = await route.POST(new Request("https://vip.invalid/api/admin/session", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      [access.TRUSTED_ACCESS_LOCK_HEADER]: "1",
+    },
+    body: JSON.stringify({ username: "owner-runtime", password: "owner-password-runtime" }),
+  }));
+  const unlockCookies = new Map(unlocked.cookieMutations.map((cookie) => [cookie.name, cookie]));
+  assert.equal(unlocked.status, 200);
+  assert.equal(unlockCookies.get(access.ACCESS_LOCK_COOKIE).options.maxAge, 0);
+  assert.equal(unlockCookies.get(access.BASIC_ACCESS_COOKIE).options.maxAge, access.BASIC_ACCESS_MAX_AGE_SECONDS);
+
+  const rejected = await route.POST(new Request("https://vip.invalid/api/admin/session", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      [access.TRUSTED_ACCESS_LOCK_HEADER]: "1",
+    },
+    body: JSON.stringify({ username: "owner-runtime", password: "wrong" }),
+  }));
+  assert.equal(rejected.status, 401);
+  assert.equal(rejected.cookieMutations.length, 0);
+});
+
 test("runtime demo HMAC session verifies only inside the exact bounded workspace", async () => {
   const processValue = {
     env: {

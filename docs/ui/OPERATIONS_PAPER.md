@@ -420,8 +420,20 @@ authored here.
   illegible grey line at ~293px, and it never marked the selection.
 - **確認 reviews everything that gets saved**: 営業日, 時刻, 人数, 卓 (+定員), 顧客,
   入口表示名, 経路 / 状態, 担当, 通知, 現場メモ, 版. It previously showed four of them.
+- **Optional detail does not become a toll gate.** After 卓, a new reservation
+  can move directly to 確認 with 顧客 / 追加 / 担当 explicitly marked as 既定値.
+  All three steps remain in the ruler and are reachable in one tap from the
+  confirmation footer; the 8/8 review and save contract do not change.
 - The footer keeps 戻る / position / 次へ・保存 in the same place on every step and
   at every width, so the primary action never moves.
+
+On a date without an `event_day`, the intake remains read-only and calls the
+state **予約受付対象外** because the current schema cannot distinguish a regular
+closure from an omitted setup row. The date field is the dialog's immediate
+source of truth, stale warnings remain attached only to the date that failed,
+and the next three registered business days come from an owner-only read
+endpoint. Following that phone-reservation recovery opens 事前予約; opening the
+same dialog on a valid day still keeps Walk-in as the fast default.
 
 ### Floor plan
 

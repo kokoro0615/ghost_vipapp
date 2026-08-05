@@ -2,12 +2,14 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
 import {
+  ACCESS_LOCK_COOKIE,
   BASIC_ACCESS_COOKIE,
   BASIC_ACCESS_MAX_AGE_SECONDS,
   createBasicAccessSession,
   DEMO_SESSION_COOKIE,
   OWNER_SESSION_COOKIE,
   resolveBasicAccessRequest,
+  TRUSTED_ACCESS_LOCK_HEADER,
   TRUSTED_ACCESS_LANE_HEADER,
   type AccessLane,
   type BasicAccessConfiguration,
@@ -56,6 +58,30 @@ function clearBasicAccessCookie(response: NextResponse) {
   });
 }
 
+function forwardLockedRequest(requestHeaders: Headers) {
+  requestHeaders.set(TRUSTED_ACCESS_LOCK_HEADER, "1");
+  for (const cookieName of [BASIC_ACCESS_COOKIE, OWNER_SESSION_COOKIE, DEMO_SESSION_COOKIE]) {
+    const sanitizedCookie = withoutCookie(requestHeaders.get("cookie"), cookieName);
+    if (sanitizedCookie) requestHeaders.set("cookie", sanitizedCookie);
+    else requestHeaders.delete("cookie");
+  }
+  const response = NextResponse.next({ request: { headers: requestHeaders } });
+  clearBasicAccessCookie(response);
+  expireSessionCookie(response, OWNER_SESSION_COOKIE);
+  expireSessionCookie(response, DEMO_SESSION_COOKIE);
+  return response;
+}
+
+function expireSessionCookie(response: NextResponse, cookieName: string) {
+  response.cookies.set(cookieName, "", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+    path: "/api",
+    maxAge: 0,
+  });
+}
+
 function authenticationRequired() {
   const response = new NextResponse("Authentication required.", {
     status: 401,
@@ -73,6 +99,10 @@ function authenticationRequired() {
 export function proxy(request: NextRequest) {
   const requestHeaders = new Headers(request.headers);
   requestHeaders.delete(TRUSTED_ACCESS_LANE_HEADER);
+  requestHeaders.delete(TRUSTED_ACCESS_LOCK_HEADER);
+  if (request.cookies.get(ACCESS_LOCK_COOKIE)?.value) {
+    return forwardLockedRequest(requestHeaders);
+  }
   const configuration: BasicAccessConfiguration = {
     ownerUsername: process.env.VIPAPP_BASIC_USER,
     ownerPassword: process.env.VIPAPP_BASIC_PASSWORD,
@@ -84,6 +114,8 @@ export function proxy(request: NextRequest) {
     request.headers.get("authorization"),
     request.cookies.get(BASIC_ACCESS_COOKIE)?.value ?? null,
     configuration,
+    Date.now(),
+    false,
   );
 
   if (access) {

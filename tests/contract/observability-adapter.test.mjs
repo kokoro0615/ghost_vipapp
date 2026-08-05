@@ -7,7 +7,7 @@ const hook = read("src/components/admin/vip-floor-v2/state/useVipFloorWorkspace.
 const panel = read("src/components/admin/vip-floor-v2/observability/ObservabilityPanel.tsx");
 
 test("observability adapter is Owner-only, bounded and PII-free", () => {
-  assert.ok(route.includes('session.actor.role !== "owner"'));
+  assert.ok(route.includes('requireAdminOperation(request, { ownerOnly: true })'));
   assert.ok(route.includes("/api/admin/v2/observability/slo"));
   assert.ok(route.includes("/api/admin/v2/observability/events"));
   assert.ok(route.includes('"realtime_gap"'));

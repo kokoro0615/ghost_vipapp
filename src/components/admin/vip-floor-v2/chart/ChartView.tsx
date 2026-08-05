@@ -179,7 +179,7 @@ export default function ChartView({ board, reservations, selectedReservationId, 
     >
       <p className="sr-only" role="status" aria-atomic="true">{phaseAnnouncement}</p>
       <div className={styles.viewStrip}>
-        <h2 id="chart-view-title">席の時間軸</h2>
+        <h1 id="chart-view-title">席の時間軸</h1>
         <span className="tabular-nums">{board.tables.length}席 / {reservations.length}件</span>
         {conflicts.length > 0 ? <span className={styles.exceptionText}>競合 {conflicts.length}</span> : null}
         <span className={styles.stripSpacer} />
@@ -298,12 +298,12 @@ export default function ChartView({ board, reservations, selectedReservationId, 
           {board.tables.length === 0 ? (
             <div className={`${styles.timelineRow} ${styles.timelineEmptyRow}`}>
               <div className={styles.timelineTableLabel}>
-                <strong>営業日</strong>
-                <span>未登録</span>
+                <strong>予約受付</strong>
+                <span>対象外</span>
               </div>
               <div className={styles.timelineTrack}>
                 <p className={styles.timelineEmptyMessage} role="status">
-                  この日は席データがありません。営業日を切り替えてください。
+                  定休日または営業日未登録です。予約受付日へ切り替えてください。
                 </p>
               </div>
             </div>

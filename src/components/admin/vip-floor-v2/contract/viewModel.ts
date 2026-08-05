@@ -50,7 +50,13 @@ export function toUiReservations(board: VipFloorBoardV2): UiReservation[] {
         tableIds: reservation.tableIds,
         tableCodes: reservation.tableIds.map((id) => tableCodeById.get(id) ?? "未割当"),
         sourceChannel: reservation.sourceChannel,
-        sourceLabel: reservation.sourceChannel === "walk_in" ? "店頭" : reservation.sourceChannel === "admin_hold" ? "管理枠" : "オンライン",
+        sourceLabel: reservation.sourceChannel === "walk_in"
+          ? "店頭"
+          : reservation.sourceChannel === "phone"
+            ? "電話"
+            : reservation.sourceChannel === "admin"
+              ? "管理者"
+              : "オンライン",
         exceptionLabel,
         flags: reservation.flags,
         version: reservation.version,

@@ -12,7 +12,7 @@ test("eight-step reservation create is Owner-only, versioned, and notification-s
     read("src/components/admin/vip-floor-v2/state/useVipFloorWorkspace.ts"),
   ]);
 
-  assert.match(proxy, /session\.actor\.role !== "owner"/u);
+  assert.match(proxy, /requireAdminOperation\(request, \{ ownerOnly: true \}\)/u);
   assert.match(proxy, /"\/api\/admin\/v2\/reservations"/u);
   assert.match(proxy, /expectedTableVersions/u);
   assert.match(proxy, /notificationPreference/u);
@@ -23,7 +23,7 @@ test("eight-step reservation create is Owner-only, versioned, and notification-s
   assert.match(wizard, /電話の完全一致を優先/u);
   assert.match(wizard, /送信しない/u);
   assert.match(wizard, /Eメール送信/u);
-  assert.match(operationCenter, /kind === "reservation_create"/u);
+  assert.match(operationCenter, /activeKind === "reservation_create"/u);
   assert.match(hook, /reservation_create: "予約を作成しました"/u);
   assert.doesNotMatch(wizard, /name="reason"/u);
 });

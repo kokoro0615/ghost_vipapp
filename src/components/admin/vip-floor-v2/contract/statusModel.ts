@@ -56,3 +56,25 @@ export function getStatusMeta(status: string | null | undefined) {
   if (!status || !(status in STATUS_META)) return FALLBACK_STATUS_META;
   return STATUS_META[status as VipServiceStatus];
 }
+
+export function isStandardServiceTransition(
+  fromStatus: VipServiceStatus | null | undefined,
+  toStatus: VipServiceStatus,
+) {
+  if (fromStatus === toStatus) return false;
+  if (!fromStatus) return toStatus === "expected" || toStatus === "seated";
+  const transitions: Partial<Record<VipServiceStatus, readonly VipServiceStatus[]>> = {
+    expected: ["late", "no_contact", "arrived", "seated", "no_show"],
+    late: ["no_contact", "arrived", "no_show"],
+    no_contact: ["arrived", "no_show"],
+    arrived: ["partial_arrival", "seated"],
+    partial_arrival: ["seated"],
+    seated: ["bottle_pending", "bill_requested"],
+    bottle_pending: ["bottle_served"],
+    bottle_served: ["bill_requested"],
+    bill_requested: ["paid"],
+    paid: ["resetting"],
+    resetting: ["completed"],
+  };
+  return transitions[fromStatus]?.includes(toStatus) ?? false;
+}

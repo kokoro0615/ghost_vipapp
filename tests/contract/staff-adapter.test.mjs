@@ -13,7 +13,7 @@ test("staff master and table assignments keep the Owner API boundary while demo 
     read("src/components/admin/vip-floor-v2/staff/StaffPanel.tsx"),
   ]);
 
-  assert.match(proxy, /session\.actor\.role !== "owner"/u);
+  assert.match(proxy, /requireAdminOperation\(request, \{ ownerOnly: true \}\)/u);
   assert.match(proxy, /const FIXED_REASON = "管理画面操作"/u);
   assert.match(proxy, /expectedAssignmentVersion/u);
   assert.match(proxy, /\/api\/admin\/v2\/staff\/assignments/u);

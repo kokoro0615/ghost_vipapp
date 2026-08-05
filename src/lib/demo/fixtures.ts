@@ -115,7 +115,7 @@ function makeReservation(
     businessDate,
     lifecycleStatus: "confirmed",
     serviceStatus: seed.status,
-    sourceChannel: seed.source ?? "admin_hold",
+    sourceChannel: seed.source ?? "admin",
     scheduledStartAt: startAt,
     scheduledEndAt: endAt,
     expectedReleaseAt: endAt,

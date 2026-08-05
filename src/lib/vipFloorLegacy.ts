@@ -203,9 +203,10 @@ export function adaptLegacyVipBoard(source: LegacyVipBoard, requestedDate: strin
       businessDate,
       lifecycleStatus: reservation.status,
       serviceStatus: deriveServiceStatus(reservation),
-      sourceChannel:
-        reservation.sourceChannel === "walk_in" || reservation.sourceChannel === "admin_hold"
-          ? reservation.sourceChannel
+      sourceChannel: reservation.sourceChannel === "walk_in"
+        ? "walk_in"
+        : reservation.sourceChannel === "admin_hold"
+          ? "admin"
           : "online",
       scheduledStartAt: startAt,
       scheduledEndAt: endAt,

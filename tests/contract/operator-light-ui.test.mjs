@@ -129,7 +129,9 @@ test("the reservation wizard keeps one dominant column and a persistent record",
   assert.match(reservationWizard, /\$\{step \+ 1\}\/8/u);
   assert.match(reservationWizard, /aria-current=\{index === step \? "step" : undefined\}/u);
   // Step state is carried by more than colour.
-  assert.match(reservationWizard, /index < step \? "入力済み" : index === step \? "現在の段階" : "未入力"/u);
+  for (const spokenState of ["入力済み", "既定値を使用", "現在の段階", "未入力"]) {
+    assert.ok(reservationWizard.includes(`"${spokenState}"`));
+  }
   // The plan is a real instrument on the table step: true colour, real geometry.
   assert.match(workspaceStyles, /\.wizardMapImage \{[\s\S]*?filter: none;/u);
   assert.doesNotMatch(workspaceStyles, /invert\(1\)/u);
@@ -148,24 +150,22 @@ test("the wizard never spends alert colour on a state the operator cannot act on
   assert.doesNotMatch(reservationWizard, /data-ok=/u);
 });
 
-test("Basic access renders no secondary credential field in either lane", () => {
+test("Basic access stays browser-native until terminal logout requires explicit unlock", () => {
   assert.match(workspace, /className=\{styles\.loginFrame\}/u);
   assert.match(workspace, /GHOST Osaka 1階VIPフロア座席図/u);
   assert.match(workspace, /if \(!demo\.config\)/u);
-  /* This frame answers one state only — a failed connection. The in-flight
-   * session probe belongs to the boot screen; when it rendered here it
-   * produced a login page with no form in it. */
+  /* This frame answers two states only — the terminal lock and a failed
+   * connection. The in-flight session probe belongs to the boot screen; when
+   * it rendered here it produced a login page with no form in it. */
   assert.match(workspace, /接続を完了できませんでした/u);
+  assert.match(workspace, /端末をロックしました/u);
   assert.match(workspace, /ブラウザのBasic認証から直接/u);
   assert.match(workspace, /window\.location\.reload\(\)/u);
   assert.match(workspace, /VIP予約デモへ再接続/u);
   assert.match(workspace, /onClick=\{\(\) => void reconnect\(\)\}/u);
-  assert.doesNotMatch(workspace, /デモ専用PIN|owner-pin|type="password"|submitPin|loginInputRef/u);
-  const ownerBoundary = workspace.slice(
-    workspace.indexOf("if (!demo.config)"),
-    workspace.indexOf("return (", workspace.indexOf("if (!demo.config)") + 1),
-  );
-  assert.doesNotMatch(ownerBoundary, /<input|type="password"/u);
+  assert.doesNotMatch(workspace, /デモ専用PIN|owner-pin|submitPin|loginInputRef/u);
+  assert.match(workspace, /lockedOwnerAccess[\s\S]*?<form[\s\S]*?autoComplete="username"[\s\S]*?type="password"[\s\S]*?ロックを解除/u);
+  assert.match(workspace, /ブラウザに残るBasic認証だけでは解除できません/u);
   assert.match(workspaceStyles, /\.loginFrame \{[\s\S]*?grid-template-columns:/u);
   assert.match(workspaceStyles, /vipmapv3\.9239fd2174\.webp/u);
   assert.match(

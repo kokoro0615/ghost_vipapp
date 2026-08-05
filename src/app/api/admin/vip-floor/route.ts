@@ -28,6 +28,17 @@ export async function GET(request: Request) {
   const versionedPayload = await copyJson(versionedResponse);
 
   if (
+    typeof versionedPayload === "object"
+    && versionedPayload !== null
+    && "dayState" in versionedPayload
+  ) {
+    return NextResponse.json(versionedPayload, {
+      status: versionedResponse.status,
+      headers: { "Cache-Control": "no-store", "X-GHOST-Board-Contract": VIP_FLOOR_SCHEMA_VERSION },
+    });
+  }
+
+  if (
     versionedResponse.ok
     && typeof versionedPayload === "object"
     && versionedPayload !== null

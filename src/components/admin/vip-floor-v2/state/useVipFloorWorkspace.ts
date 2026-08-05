@@ -17,15 +17,18 @@ import {
 } from "@/lib/vipFloorLegacy";
 import { canExecuteVipCommand, type VipAdminRole } from "@/lib/adminPermissions";
 import {
+  isBusinessDate,
   VIP_FLOOR_SCHEMA_VERSION,
   type VipFloorBoardV2,
 } from "@/lib/vipFloorV2Contract";
 import {
   classifyBoardRevision,
+  purgeSafeBoardCache,
   readSafeBoardCache,
   writeSafeBoardCache,
 } from "@/lib/vipFloorRealtime";
 import { readVipOperationFailure } from "@/lib/vipFloorClientErrors";
+import { readVipFloorDayStateEvent } from "@/lib/vipFloorDayState";
 
 import type {
   LiveCommandDraft,
@@ -51,6 +54,7 @@ type Session = {
 
 type AuthState =
   | { status: "checking"; session: null }
+  | { status: "locked"; session: null }
   | { status: "unauthenticated"; session: null }
   | { status: "authenticated"; session: Session };
 
@@ -174,12 +178,31 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
       });
       const payload = await response.json().catch(() => ({})) as Record<string, unknown>;
       if (response.status === 401) {
+        purgeSafeBoardCache();
         setAuth({ status: "unauthenticated", session: null });
         dispatch({
           type: "globalState",
           state: "error",
           description: "管理セッションが終了しました。",
           message: "ユーザー名とパスワードで再接続してください",
+        });
+        return false;
+      }
+      const dayState = readVipFloorDayStateEvent(payload.dayState);
+      if (dayState && dayState.businessDate === date) {
+        purgeSafeBoardCache();
+        dispatch({
+          type: "hydrate",
+          board: createEmptyVipBoard(date),
+          message: dayState.state === "closed" ? "休業日" : "営業日未登録",
+        });
+        dispatch({
+          type: "globalState",
+          state: "empty",
+          description: dayState.state === "closed"
+            ? `この営業日は休業です${dayState.reason ? `（${dayState.reason}）` : ""}。`
+            : "この営業日はまだ登録されていません。",
+          message: dayState.state === "closed" ? "休業日" : "営業日未登録",
         });
         return false;
       }
@@ -229,7 +252,12 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
           if (response.status === 410 && publicDemoConfig) {
             setDemoLeaseState("expired");
           }
-          setAuth({ status: "unauthenticated", session: null });
+          if (response.status === 401 || response.status === 410 || response.status === 423) {
+            purgeSafeBoardCache();
+          }
+          setAuth(response.status === 423
+            ? { status: "locked", session: null }
+            : { status: "unauthenticated", session: null });
           dispatch({
             type: "globalState",
             state: "loading",
@@ -468,6 +496,34 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
         markStreamUnavailable();
       }
     });
+    events.addEventListener("day_state", (event) => {
+      try {
+        const payload = readVipFloorDayStateEvent(
+          JSON.parse((event as MessageEvent<string>).data),
+        );
+        if (!payload || payload.businessDate !== businessDate) {
+          markStreamUnavailable();
+          return;
+        }
+        events.close();
+        purgeSafeBoardCache();
+        dispatch({
+          type: "hydrate",
+          board: createEmptyVipBoard(businessDate),
+          message: payload.state === "closed" ? "休業日" : "営業日未登録",
+        });
+        dispatch({
+          type: "globalState",
+          state: "empty",
+          description: payload.state === "closed"
+            ? `この営業日は休業です${payload.reason ? `（${payload.reason}）` : ""}。`
+            : "この営業日はまだ登録されていません。",
+          message: payload.state === "closed" ? "休業日" : "営業日未登録",
+        });
+      } catch {
+        markStreamUnavailable();
+      }
+    });
     events.addEventListener("unavailable", markStreamUnavailable);
     events.addEventListener("error", scheduleStreamUnavailable);
 
@@ -510,6 +566,12 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
         const publicDemoConfig = readDemoConfig(payload);
         if (publicDemoConfig) setDemoConfig(publicDemoConfig);
         if (response.status === 410 && publicDemoConfig) setDemoLeaseState("expired");
+        if (response.status === 401 || response.status === 410 || response.status === 423) {
+          purgeSafeBoardCache();
+          setAuth(response.status === 423
+            ? { status: "locked", session: null }
+            : { status: "unauthenticated", session: null });
+        }
         dispatch({
           type: "commandOutcome",
           outcome: {
@@ -549,18 +611,61 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
     }
   }, [businessDate, loadBoard]);
 
+  const unlock = useCallback(async (credentials: { username: string; password: string }) => {
+    dispatch({ type: "pending", pending: true });
+    try {
+      const response = await fetch("/api/admin/session", {
+        method: "POST",
+        cache: "no-store",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(credentials),
+      });
+      const payload = await response.json().catch(() => ({})) as Record<string, unknown>;
+      if (!response.ok || payload.ok !== true) {
+        setAuth({ status: "locked", session: null });
+        dispatch({
+          type: "commandOutcome",
+          outcome: {
+            ok: false,
+            code: "UNAUTHENTICATED",
+            message: "認証情報を確認できませんでした。",
+            recovery: "Ownerのユーザー名とパスワードを入力し直してください。",
+          },
+        });
+        return false;
+      }
+      setAuth({ status: "checking", session: null });
+      return reconnect();
+    } catch {
+      setAuth({ status: "locked", session: null });
+      dispatch({
+        type: "commandOutcome",
+        outcome: {
+          ok: false,
+          code: "NETWORK_ERROR",
+          message: "認証サーバーへ接続できません。",
+          recovery: "通信状態を確認して再試行してください。",
+        },
+      });
+      return false;
+    } finally {
+      dispatch({ type: "pending", pending: false });
+    }
+  }, [reconnect]);
+
   const logout = useCallback(async () => {
     try {
       await fetch("/api/admin/session", { method: "DELETE" });
     } finally {
+      purgeSafeBoardCache();
       demoTransportRef.current = null;
       setDemoLeaseState(demoConfig ? "checking" : "inactive");
-      setAuth({ status: "unauthenticated", session: null });
+      setAuth({ status: "locked", session: null });
       dispatch({
         type: "globalState",
         state: "loading",
-        description: "Basic認証で再接続してください。",
-        message: "ログアウトしました",
+        description: "端末をロックしました。認証情報を入力し直してください。",
+        message: "Ownerアクセスを終了しました",
       });
     }
   }, [demoConfig]);
@@ -664,7 +769,10 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
       });
       const payload = await response.json().catch(() => ({})) as Record<string, unknown>;
       if (!response.ok) {
-        if (response.status === 401) setAuth({ status: "unauthenticated", session: null });
+        if (response.status === 401 || response.status === 410) {
+          purgeSafeBoardCache();
+          setAuth({ status: "unauthenticated", session: null });
+        }
         const outcome = {
           ok: false as const,
           code: readVipOperationFailure(response.status, payload).code,
@@ -790,16 +898,19 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
 
       if (!response.ok || payload.ok !== true) {
         const eventDayMissing = payload.error === "event_day_not_found";
+        const eventDayClosed = payload.error === "event_day_closed";
         dispatch({
           type: "commandOutcome",
           outcome: {
             ok: false,
             code: readVipOperationFailure(response.status, payload).code,
-            message: eventDayMissing
-              ? "選択した日は予約を受け付ける営業日として登録されていません。"
+            message: eventDayMissing || eventDayClosed
+              ? eventDayClosed
+                ? "選択した営業日は休業です。"
+                : "選択した日は予約受付対象として登録されていません。"
               : readErrorMessage(response.status, payload),
-            recovery: eventDayMissing
-              ? "別の予約日を選ぶか、営業日設定を確認してください。"
+            recovery: eventDayMissing || eventDayClosed
+              ? "営業中の候補日を選ぶか、営業日設定を確認してください。"
               : "営業日を再読込し、Owner sessionを確認してください。",
           },
         });
@@ -825,6 +936,35 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
     operationOptionsBlocked,
     operatorAuthorized,
   ]);
+
+  const loadOperationBusinessDays = useCallback(async (afterBusinessDate = businessDate) => {
+    if (
+      operationOptionsBlocked
+      || !operatorAuthorized
+      || demoTransportRef.current
+      || !isBusinessDate(afterBusinessDate)
+    ) {
+      return [];
+    }
+
+    try {
+      const response = await fetch(
+        `/api/admin/vip-floor/business-days?after=${encodeURIComponent(afterBusinessDate)}&limit=3`,
+        { cache: "no-store" },
+      );
+      const payload = await response.json().catch(() => ({})) as Record<string, unknown>;
+      if (!response.ok || payload.ok !== true || !Array.isArray(payload.businessDates)) {
+        return [];
+      }
+      return payload.businessDates.filter(
+        (value): value is string => isBusinessDate(value),
+      ).slice(0, 3);
+    } catch {
+      // Suggestions are a non-blocking recovery aid. The operator can still use
+      // the controlled date field when this read is unavailable.
+      return [];
+    }
+  }, [businessDate, operationOptionsBlocked, operatorAuthorized]);
 
   const runOperation = useCallback(async (draft: OperationDraft) => {
     if (mutationBlocked || !operatorAuthorized) {
@@ -1332,6 +1472,7 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
     runCommand,
     runOperation,
     loadOperationOptions,
+    loadOperationBusinessDays,
     loadWaitlist,
     runWaitlistAction,
     loadStaff,
@@ -1350,6 +1491,7 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
     businessDate,
     offline,
     reconnect,
+    unlock,
     logout,
     loadBoard: () => loadBoard(businessDate),
     setBusinessDate,

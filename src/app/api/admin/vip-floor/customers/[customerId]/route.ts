@@ -3,8 +3,7 @@ import { NextResponse } from "next/server";
 import {
   copyJson,
   ghostAdminFetch,
-  readAdminSession,
-  readAdminToken,
+  requireAdminOperation,
 } from "@/lib/server/ghostAdminProxy";
 
 export const runtime = "nodejs";
@@ -18,7 +17,7 @@ type RouteContext = {
 };
 
 export async function GET(request: Request, context: RouteContext) {
-  const auth = await requireOwner(request);
+  const auth = await requireAdminOperation(request, { ownerOnly: true });
   if (!auth.ok) return auth.response;
   const { customerId } = await context.params;
   if (!UUID_PATTERN.test(customerId)) {
@@ -33,7 +32,7 @@ export async function GET(request: Request, context: RouteContext) {
 }
 
 export async function PATCH(request: Request, context: RouteContext) {
-  const auth = await requireOwner(request);
+  const auth = await requireAdminOperation(request, { ownerOnly: true });
   if (!auth.ok) return auth.response;
   const { customerId } = await context.params;
   const idempotencyKey = request.headers.get("idempotency-key");
@@ -81,24 +80,6 @@ export async function PATCH(request: Request, context: RouteContext) {
     auth.token,
   );
   return NextResponse.json(await copyJson(response), { status: response.status });
-}
-
-async function requireOwner(request: Request) {
-  const token = readAdminToken(request);
-  if (!token) {
-    return {
-      ok: false as const,
-      response: NextResponse.json({ ok: false, error: "missing_admin_session" }, { status: 401 }),
-    };
-  }
-  const session = await readAdminSession(token);
-  if (!session.ok || session.actor.role !== "owner") {
-    return {
-      ok: false as const,
-      response: NextResponse.json({ ok: false, error: "insufficient_role" }, { status: 403 }),
-    };
-  }
-  return { ok: true as const, token };
 }
 
 function readUuid(value: unknown) {

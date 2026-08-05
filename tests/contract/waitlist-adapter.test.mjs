@@ -12,7 +12,7 @@ test("Waitlist adapter is Owner-only, versioned, fixed-reason, and five-state", 
     read("src/components/admin/vip-floor-v2/VipFloorWorkspace.tsx"),
   ]);
 
-  assert.match(route, /session\.actor\.role !== "owner"/u);
+  assert.match(route, /requireAdminOperation\(request, \{ ownerOnly: true \}\)/u);
   assert.match(route, /const FIXED_REASON = "管理画面操作"/u);
   assert.match(route, /\/api\/admin\/v2\/waitlist/u);
   for (const action of ["call", "expire", "seat", "cancel"]) {

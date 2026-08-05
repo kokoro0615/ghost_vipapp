@@ -30,11 +30,11 @@ test("reservation edit is atomic, versioned and queues notification only after s
 });
 
 test("customer detail and relink adapters remain Owner-only and versioned", () => {
-  assert.ok(customerRoute.includes('session.actor.role !== "owner"'));
+  assert.ok(customerRoute.includes('requireAdminOperation(request, { ownerOnly: true })'));
   assert.ok(customerRoute.includes("/api/admin/v2/customers/${encodeURIComponent(customerId)}"));
   assert.ok(customerRoute.includes("expectedVersion"));
   assert.ok(customerRoute.includes("idempotency-key"));
-  assert.ok(customerLinkRoute.includes('session.actor.role !== "owner"'));
+  assert.ok(customerLinkRoute.includes('requireAdminOperation(request, { ownerOnly: true })'));
   assert.ok(customerLinkRoute.includes("expectedVersion"));
   assert.ok(customerLinkRoute.includes("customerId"));
   assert.ok(customerLinkRoute.includes("FIXED_REASON"));

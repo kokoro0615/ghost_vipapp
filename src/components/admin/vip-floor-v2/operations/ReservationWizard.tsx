@@ -37,7 +37,8 @@ const PHASES = [
 ] as const;
 
 const SOURCE_LABELS: Record<Draft["sourceChannel"], string> = {
-  admin_hold: "管理者作成",
+  phone: "電話受付",
+  admin: "管理者作成",
   online: "GHOST Web",
 };
 
@@ -60,7 +61,7 @@ type Draft = {
   languageCode: string;
   guestLabel: string;
   operatorNote: string;
-  sourceChannel: "admin_hold" | "online";
+  sourceChannel: "online" | "phone" | "admin";
   serviceStatus: VipServiceStatus;
   bookingStaffMemberId: string;
   notificationPreference: "none" | "email";
@@ -121,7 +122,10 @@ export function ReservationWizard({
       || initialOffering?.compatibleTableIds === undefined
       || initialOffering?.compatibleTableIds.includes(tableId));
   const [step, setStep] = useState(0);
+  const [skippedOptionalSteps, setSkippedOptionalSteps] = useState(false);
   const [dateError, setDateError] = useState<string | null>(null);
+  const [capacityOverrideConfirmed, setCapacityOverrideConfirmed] = useState(false);
+  const [capacityOverrideReason, setCapacityOverrideReason] = useState("");
   const [draft, setDraft] = useState<Draft>(() => ({
     startAt: defaults.start,
     endAt: defaults.end,
@@ -134,7 +138,11 @@ export function ReservationWizard({
     languageCode: "ja",
     guestLabel: reservation?.guestLabel ?? "",
     operatorNote: reservation?.operatorNote ?? "",
-    sourceChannel: reservation?.sourceChannel === "online" ? "online" : "admin_hold",
+    sourceChannel: reservation?.sourceChannel === "online"
+      || reservation?.sourceChannel === "phone"
+      || reservation?.sourceChannel === "admin"
+      ? reservation.sourceChannel
+      : "phone",
     serviceStatus: (reservation?.serviceStatus ?? "expected") as VipServiceStatus,
     bookingStaffMemberId: reservation?.bookingStaffMemberId ?? "",
     notificationPreference: reservation?.notificationPreference ?? "none",
@@ -144,26 +152,31 @@ export function ReservationWizard({
     || selectedOffering?.compatibleTableIds === undefined
     ? null
     : new Set(selectedOffering?.compatibleTableIds ?? []);
-  const availableTables = board.tables.filter((table) =>
-    compatibleTableIds === null || compatibleTableIds.has(table.id));
   const hasTableMismatch = draft.tableIds.some((tableId) =>
     compatibleTableIds !== null && !compatibleTableIds.has(tableId));
   const selectedTables = board.tables.filter((table) => draft.tableIds.includes(table.id));
   const capacity = selectedTables.reduce((sum, table) => sum + table.capacityMax, 0);
+  const capacityShort = selectedTables.length > 0 && capacity < draft.guestCount;
+  const capacityOverrideReady = !capacityShort
+    || (capacityOverrideConfirmed && capacityOverrideReason.trim().length > 0);
   const canContinue = !datePending
     && !dateError
     && (step < 3 || !hasTableMismatch)
+    && (step !== 3 && step !== 7 || capacityOverrideReady)
     && stepValid(step, draft, Boolean(reservation), options.businessDay.businessDate);
 
   const phase = PHASES.find((entry) => step >= entry.firstStep && step <= entry.lastStep) ?? PHASES[0];
   const tableCodes = selectedTables.map((table) => table.displayCode).join("・");
-  const capacityShort = selectedTables.length > 0 && capacity < draft.guestCount;
   const staffName = (staffData?.staffMembers ?? [])
     .find((member) => member.id === draft.bookingStaffMemberId)?.displayName ?? null;
   const emailMissing = draft.notificationPreference === "email" && !reservation && !draft.email;
   const guestName = (reservation?.guestLabel ?? draft.displayName) || "匿名";
 
   function patch(next: Partial<Draft>) {
+    if (next.guestCount !== undefined || next.tableIds !== undefined || next.offeringId !== undefined) {
+      setCapacityOverrideConfirmed(false);
+      setCapacityOverrideReason("");
+    }
     setDraft((current) => ({ ...current, ...next }));
   }
 
@@ -191,6 +204,12 @@ export function ReservationWizard({
         serviceStatus: draft.serviceStatus,
         bookingStaffMemberId: nullable(draft.bookingStaffMemberId),
         notificationPreference: draft.notificationPreference,
+        ...(capacityShort && capacityOverrideConfirmed
+          ? {
+              confirmedCapacityOverride: true as const,
+              capacityOverrideReason: capacityOverrideReason.trim(),
+            }
+          : {}),
     };
     const saved = await onRun(reservation
       ? {
@@ -230,7 +249,7 @@ export function ReservationWizard({
     setDateError(null);
     const changed = await onBusinessDateChange(nextBusinessDate);
     if (!changed) {
-      setDateError("この日の予約情報を取得できませんでした。別の日を選ぶか、営業日設定を確認してください。");
+      setDateError("この日は予約受付対象外です。定休日または営業日未登録の可能性があるため、別の日を選んでください。");
       return;
     }
     /* The event-day lookup replaces board/options without remounting this
@@ -257,23 +276,40 @@ export function ReservationWizard({
           <em>{STEPS[step]}</em>
         </p>
         <ol className={styles.wizardRail} aria-label={`予約${reservation ? "編集" : "作成"}ステップ`}>
-          {STEPS.map((label, index) => (
-            <li
-              key={label}
-              data-state={index < step ? "done" : index === step ? "current" : "todo"}
-              data-phase-start={PHASES.some((entry) => entry.firstStep === index) || undefined}
-              aria-current={index === step ? "step" : undefined}
-            >
-              <span className={styles.wizardRailMark} aria-hidden>
-                {index < step ? <Check size={11} strokeWidth={3} /> : index + 1}
-              </span>
-              <small>{label}</small>
-              {/* State is never colour-only: it is also spoken. */}
-              <span className="sr-only">
-                {index < step ? "入力済み" : index === step ? "現在の段階" : "未入力"}
-              </span>
-            </li>
-          ))}
+          {STEPS.map((label, index) => {
+            const stepState = index < step
+              ? skippedOptionalSteps && index >= 4 && index <= 6
+                ? "defaulted"
+                : "done"
+              : index === step
+                ? "current"
+                : "todo";
+            return (
+              <li
+                key={label}
+                data-state={stepState}
+                data-phase-start={PHASES.some((entry) => entry.firstStep === index) || undefined}
+                aria-current={index === step ? "step" : undefined}
+              >
+                <span className={styles.wizardRailMark} aria-hidden>
+                  {stepState === "done" || stepState === "defaulted"
+                    ? <Check size={11} strokeWidth={3} />
+                    : index + 1}
+                </span>
+                <small>{label}</small>
+                {/* State is never colour-only: it is also spoken. */}
+                <span className="sr-only">
+                  {stepState === "done"
+                    ? "入力済み"
+                    : stepState === "defaulted"
+                      ? "既定値を使用"
+                      : stepState === "current"
+                        ? "現在の段階"
+                        : "未入力"}
+                </span>
+              </li>
+            );
+          })}
         </ol>
       </div>
 
@@ -397,10 +433,17 @@ export function ReservationWizard({
           <fieldset>
             <legend>卓を選ぶ</legend>
             <div className={styles.checkGrid} role="group" aria-label="予約卓">
-              {availableTables.map((table) => (
-                <label key={table.id} data-selected={draft.tableIds.includes(table.id) || undefined}>
+              {board.tables.map((table) => {
+                const compatible = compatibleTableIds === null || compatibleTableIds.has(table.id);
+                return (
+                <label
+                  key={table.id}
+                  data-selected={draft.tableIds.includes(table.id) || undefined}
+                  data-unavailable={!compatible || undefined}
+                >
                   <input
                     type="checkbox"
+                    disabled={!compatible}
                     checked={draft.tableIds.includes(table.id)}
                     onChange={(event) => patch({
                       tableIds: event.target.checked
@@ -409,19 +452,47 @@ export function ReservationWizard({
                     })}
                   />
                   <span>{table.displayCode}</span>
-                  <small className="tabular-nums">{table.capacityMax}名</small>
+                  <small className="tabular-nums">
+                    {table.capacityMax}名{compatible ? "" : " / プラン外"}
+                  </small>
                 </label>
-              ))}
+                );
+              })}
             </div>
             <p className={styles.wizardHint}>
-              選択したプランで登録できる卓だけを表示しています。
+              全卓を表示しています。選択中プランで登録できない卓は理由つきで無効になります。
             </p>
             <p className={capacityShort ? styles.wizardWarning : styles.wizardHint}>
               選択 <span className="tabular-nums">{selectedTables.length}</span>卓 / 定員{" "}
-              <span className="tabular-nums">{capacity}</span>名 / 予約{" "}
+              <span className="tabular-nums">{selectedTables.length > 0 ? capacity : "—"}</span>{selectedTables.length > 0 ? "名" : ""} / 予約{" "}
               <span className="tabular-nums">{draft.guestCount}</span>名
               {capacityShort ? " — 定員が不足しています。卓を追加してください。" : null}
             </p>
+            {capacityShort ? (
+              <section className={styles.capacityOverrideRail} aria-label="Owner定員超過確認">
+                <strong>定員超過 — 監査確認が必要</strong>
+                <p>卓を追加できない場合だけ、理由を記録してOwner権限で続行できます。</p>
+                <label className={styles.choiceRow}>
+                  <input
+                    type="checkbox"
+                    checked={capacityOverrideConfirmed}
+                    onChange={(event) => setCapacityOverrideConfirmed(event.target.checked)}
+                  />
+                  定員超過をOwner権限で承認
+                </label>
+                <label>
+                  承認理由
+                  <textarea
+                    value={capacityOverrideReason}
+                    maxLength={240}
+                    disabled={!capacityOverrideConfirmed}
+                    required={capacityOverrideConfirmed}
+                    placeholder="例: V1を6名で利用、導線と補助椅子を確認済み"
+                    onChange={(event) => setCapacityOverrideReason(event.target.value)}
+                  />
+                </label>
+              </section>
+            ) : null}
             {/* The plan is a working instrument on this step only: real venue
               * geometry, real colour, and the selection actually marked. */}
             <figure className={styles.wizardMap}>
@@ -495,7 +566,7 @@ export function ReservationWizard({
           <fieldset>
             <legend>追加情報</legend>
             <div className={styles.formColumns}>
-              <label>経路<select value={draft.sourceChannel} onChange={(event) => patch({ sourceChannel: event.target.value as Draft["sourceChannel"] })}><option value="admin_hold">管理者作成</option><option value="online">GHOST Web</option></select></label>
+              <label>経路<select value={draft.sourceChannel} onChange={(event) => patch({ sourceChannel: event.target.value as Draft["sourceChannel"] })}><option value="phone">電話受付</option><option value="admin">管理者作成</option><option value="online">GHOST Web</option></select></label>
               <label>状態<select value={draft.serviceStatus} onChange={(event) => patch({ serviceStatus: event.target.value as VipServiceStatus })}><option value="expected">来店予定</option><option value="late">遅刻</option><option value="arrived">到着</option><option value="seated">着席</option></select></label>
             </div>
             <label>入口表示名<input value={draft.guestLabel} maxLength={80} onChange={(event) => patch({ guestLabel: event.target.value })} /></label>
@@ -542,7 +613,10 @@ export function ReservationWizard({
               <div><dt>担当</dt><dd data-empty={staffName ? undefined : true}>{staffName ?? "未指定"}</dd></div>
               <div><dt>通知</dt><dd>{draft.notificationPreference === "email" ? "Eメール送信" : "送信しない"}</dd></div>
               <div><dt>現場メモ</dt><dd data-empty={draft.operatorNote ? undefined : true}>{draft.operatorNote || "なし"}</dd></div>
-              <div><dt>版</dt><dd>{reservation ? `v${reservation.version}を更新` : "新規作成"}</dd></div>
+                  <div><dt>版</dt><dd>{reservation ? `v${reservation.version}を更新` : "新規作成"}</dd></div>
+                  {capacityShort ? (
+                    <div><dt>定員超過</dt><dd>{capacityOverrideConfirmed ? `Owner承認 / ${capacityOverrideReason}` : "未承認"}</dd></div>
+                  ) : null}
             </dl>
             <fieldset>
               <legend>顧客通知</legend>
@@ -553,6 +627,9 @@ export function ReservationWizard({
             <p className={styles.wizardHint}>
               保存時に版と席競合を再検証し、{reservation ? "予約変更" : "新規予約作成"}を監査へ記録します。
             </p>
+            {skippedOptionalSteps ? (
+              <p className={styles.wizardHint}>顧客・追加情報・担当は既定値です。必要な場合は下の「任意項目を入力」から追記できます。</p>
+            ) : null}
           </div>
         ) : null}
         </div>
@@ -573,13 +650,46 @@ export function ReservationWizard({
         )}
       </div>
       <footer className={styles.wizardFooter}>
-        <button type="button" className={styles.secondaryButton} disabled={step === 0 || pending} onClick={() => setStep((current) => current - 1)}>
+        <button
+          type="button"
+          className={styles.secondaryButton}
+          disabled={step === 0 || pending}
+          onClick={() => setStep((current) => (
+            current === 7 && skippedOptionalSteps ? 3 : current - 1
+          ))}
+        >
           <ArrowLeft size={16} />戻る
         </button>
-        <span>{step < 7 ? `次は ${STEPS[step + 1]}` : "保存前の最終確認"}</span>
+        {!reservation && (step === 3 || (step === 7 && skippedOptionalSteps)) ? (
+          <button
+            type="button"
+            className={`${styles.secondaryButton} ${styles.wizardOptionalButton}`}
+            disabled={pending}
+            onClick={() => {
+              setSkippedOptionalSteps(false);
+              setStep(4);
+            }}
+          >
+            任意項目を入力
+          </button>
+        ) : (
+          <span>{step < 7 ? `次は ${STEPS[step + 1]}` : "保存前の最終確認"}</span>
+        )}
         {step < 7 ? (
-          <button type="button" className={styles.primaryButton} disabled={!canContinue || pending} onClick={() => setStep((current) => current + 1)}>
-            次へ<ArrowRight size={16} />
+          <button
+            type="button"
+            className={styles.primaryButton}
+            disabled={!canContinue || pending}
+            onClick={() => {
+              if (!reservation && step === 3) {
+                setSkippedOptionalSteps(true);
+                setStep(7);
+                return;
+              }
+              setStep((current) => current + 1);
+            }}
+          >
+            {!reservation && step === 3 ? "確認へ進む" : "次へ"}<ArrowRight size={16} />
           </button>
         ) : (
           <button type="button" className={styles.primaryButton} disabled={!canContinue || pending} onClick={() => void save()}>

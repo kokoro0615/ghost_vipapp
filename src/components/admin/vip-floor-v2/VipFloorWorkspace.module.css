@@ -79,6 +79,7 @@
   top: var(--s-4);
   left: var(--s-4);
   padding: var(--s-4) var(--s-5);
+  min-height: var(--h-control);
   border: 1px solid var(--action);
   border-radius: var(--r-control);
   background: var(--action);
@@ -407,6 +408,7 @@
   line-height: var(--lh-prose);
 }
 .loginField { display: grid; gap: var(--s-3); }
+.loginUnlockForm { display: grid; gap: var(--s-5); }
 .loginPanel label { display: grid; gap: var(--s-4); }
 .loginPanel label > span {
   display: flex;
@@ -449,6 +451,15 @@
   border-color: var(--alert);
   outline-color: var(--alert);
 }
+.loginPanel input[data-credential] {
+  height: var(--h-control);
+  padding: 0 var(--s-4);
+  font-family: var(--font-operator);
+  font-size: var(--t-field);
+  font-weight: var(--weight-ui);
+  letter-spacing: 0;
+  text-align: left;
+}
 .loginMessage {
   min-height: 1.4em;
   margin: 0;
@@ -457,7 +468,8 @@
   line-height: var(--lh-ui);
 }
 .loginMessage[data-tone="danger"] { color: var(--alert); font-weight: var(--weight-strong); }
-.loginPanel > button {
+.loginPanel > button,
+.loginUnlockForm button {
   display: flex;
   min-height: 52px;
   align-items: center;
@@ -474,7 +486,8 @@
     border-color var(--dur-fast) var(--ease-ui),
     color var(--dur-fast) var(--ease-ui);
 }
-.loginPanel > button:active:not(:disabled) { background: var(--action-press); }
+.loginPanel > button:active:not(:disabled),
+.loginUnlockForm button:active:not(:disabled) { background: var(--action-press); }
 .loginHint {
   display: flex;
   align-items: center;
@@ -843,7 +856,7 @@
   color: var(--ink-3);
   font-size: var(--t-micro);
 }
-.viewStrip h2 { margin: 0; color: var(--ink-2); font-size: var(--t-mini); font-weight: var(--weight-strong); letter-spacing: var(--track-caps); }
+.viewStrip h1, .viewStrip h2 { margin: 0; color: var(--ink-2); font-size: var(--t-mini); font-weight: var(--weight-strong); letter-spacing: var(--track-caps); }
 .stripSpacer { margin-left: auto; }
 .viewHeading { display: contents; }
 
@@ -2192,6 +2205,14 @@
 .operationDateRecovery small,
 .operationDateRecovery p { margin: 0; color: var(--ink-2); font-size: var(--t-mini); line-height: var(--lh-ui); }
 .operationDateRecovery p { padding-top: var(--s-4); border-top: 1px solid var(--rule); }
+.operationDateRecovery > .operationDateSuggestions {
+  display: grid;
+  grid-template-columns: minmax(112px, auto) repeat(3, minmax(0, 1fr));
+  align-items: center;
+  gap: var(--s-3);
+}
+.operationDateRecovery > .operationDateSuggestions > span { color: var(--ink-3); font-size: var(--t-micro); font-weight: var(--weight-ui); }
+.operationDateRecovery > .operationDateSuggestions > button { width: 100%; min-width: 0; padding-inline: var(--s-3); }
 .commandForm fieldset, .wizardBody fieldset { display: grid; min-width: 0; gap: var(--s-5); margin: 0; padding: 0; border: 0; }
 .commandForm legend { margin-bottom: var(--s-4); color: var(--ink-3); font-size: var(--t-mini); }
 .commandForm label, .wizardBody label, .staffCreate label,
@@ -2464,6 +2485,7 @@
 /* Phase boundaries are read as a gap, not as another line. */
 .wizardRail li[data-phase-start]:not(:first-child) { margin-left: var(--s-5); }
 .wizardRail li[data-state="done"] { border-top-color: var(--ink-2); color: var(--ink-2); }
+.wizardRail li[data-state="defaulted"] { border-top-color: var(--rule-control); border-top-style: dashed; color: var(--ink-2); }
 .wizardRail li[data-state="current"] { border-top-color: var(--accent); color: var(--ink); font-weight: var(--weight-strong); }
 .wizardRailMark {
   display: grid;
@@ -2477,6 +2499,7 @@
   line-height: 1;
 }
 .wizardRail li[data-state="done"] .wizardRailMark { border-color: var(--ink-2); background: var(--ink-2); color: var(--ink-inverse); }
+.wizardRail li[data-state="defaulted"] .wizardRailMark { border-style: dashed; background: var(--surface); color: var(--ink-2); }
 .wizardRail li[data-state="current"] .wizardRailMark { border-color: var(--action); background: var(--action); color: var(--action-text); }
 .wizardRail small { min-width: 0; overflow: hidden; font-size: inherit; line-height: var(--lh-ui); text-overflow: ellipsis; white-space: nowrap; }
 
@@ -2587,6 +2610,7 @@
   background: var(--surface-quiet);
 }
 .wizardFooter > span { min-width: 0; overflow: hidden; color: var(--ink-2); font-size: var(--t-micro); text-align: center; text-overflow: ellipsis; white-space: nowrap; }
+.wizardOptionalButton { width: fit-content; max-width: 100%; justify-self: center; padding-inline: var(--s-4); }
 
 .blockLedger { display: grid; max-height: 220px; overflow: auto; border-top: 1px solid var(--rule); background: var(--surface); }
 .blockLedger > header, .blockLedger > div {
@@ -3285,6 +3309,9 @@
   .wizardSummaryBar > div:nth-child(odd) { border-right: 1px solid var(--rule); }
   .wizardActive, .wizardAside { padding: var(--s-5); }
   .commandForm { padding: var(--s-4); }
+  .operationDateRecovery > .operationDateSuggestions { grid-template-columns: minmax(0, 1fr); }
+  .operationDateRecovery > .operationDateSuggestions > span { padding-bottom: var(--s-2); border-bottom: 1px solid var(--rule); }
+  .wizardOptionalButton { padding-inline: var(--s-3); font-size: var(--t-micro); }
   .operationDialog .commandFooter {
     margin-right: calc(var(--s-4) * -1);
     margin-bottom: calc(var(--s-4) * -1);
@@ -3429,6 +3456,14 @@
   opacity: 1;
 }
 .workspace .primaryNav button:disabled { background: transparent; }
+/* WebKit can paint a newly enabled turnover action one frame before it
+   invalidates the inherited disabled label colour. Keep both action states on
+   a dark fill with inverse text so every cross-frame pairing remains >= 4.5:1. */
+.workspace .turnoverAction button:disabled {
+  border-color: var(--ink-2);
+  background: var(--ink-2);
+  color: var(--action-text);
+}
 .loginPanel > button:disabled {
   border-color: var(--rule);
   background: var(--surface-sunken);

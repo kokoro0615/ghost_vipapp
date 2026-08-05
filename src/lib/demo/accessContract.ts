@@ -4,6 +4,8 @@ export const TRUSTED_ACCESS_LANE_HEADER = "x-ghost-vip-trusted-access-lane";
 export const OWNER_SESSION_COOKIE = "ghost_vipapp_admin_session";
 export const DEMO_SESSION_COOKIE = "ghost_vipapp_demo_session";
 export const BASIC_ACCESS_COOKIE = "ghost_vipapp_basic_access";
+export const ACCESS_LOCK_COOKIE = "ghost_vipapp_access_locked";
+export const TRUSTED_ACCESS_LOCK_HEADER = "x-ghost-vipapp-access-locked";
 export const BASIC_ACCESS_MAX_AGE_SECONDS = 8 * 60 * 60;
 
 export type AccessLane = "owner" | "demo";
@@ -137,6 +139,20 @@ export function resolveBasicAccessLane(
   configuration: BasicAccessConfiguration,
 ): AccessLane | null {
   const credentials = parseBasicAuthorization(authorization);
+  return resolveAccessCredentials(
+    credentials.username,
+    credentials.password,
+    credentials.valid,
+    configuration,
+  );
+}
+
+function resolveAccessCredentials(
+  username: string,
+  password: string,
+  valid: boolean,
+  configuration: BasicAccessConfiguration,
+): AccessLane | null {
   const ownerConfigured = Boolean(configuration.ownerUsername && configuration.ownerPassword);
   const demoConfigured = Boolean(
     configuration.demoEnabled
@@ -147,28 +163,40 @@ export function resolveBasicAccessLane(
   // Always evaluate both lanes so a failed username or a disabled lane does not
   // change which credential comparisons run.
   const ownerUsernameMatches = constantTimeCredentialEqual(
-    credentials.username,
+    username,
     configuration.ownerUsername,
   );
   const ownerPasswordMatches = constantTimeCredentialEqual(
-    credentials.password,
+    password,
     configuration.ownerPassword,
   );
   const demoUsernameMatches = constantTimeCredentialEqual(
-    credentials.username,
+    username,
     configuration.demoUsername,
   );
   const demoPasswordMatches = constantTimeCredentialEqual(
-    credentials.password,
+    password,
     configuration.demoPassword,
   );
   const ownerMatches = ownerUsernameMatches && ownerPasswordMatches;
   const demoMatches = demoUsernameMatches && demoPasswordMatches;
 
-  const owner = credentials.valid && ownerConfigured && ownerMatches;
-  const demo = credentials.valid && demoConfigured && demoMatches;
+  const owner = valid && ownerConfigured && ownerMatches;
+  const demo = valid && demoConfigured && demoMatches;
   if (owner === demo) return null;
   return owner ? "owner" : "demo";
+}
+
+export function resolveExplicitAccessCredentials(
+  username: string,
+  password: string,
+  configuration: BasicAccessConfiguration,
+): AccessLane | null {
+  const valid = username.length > 0
+    && password.length > 0
+    && username.length <= 256
+    && password.length <= 1024;
+  return resolveAccessCredentials(username, password, valid, configuration);
 }
 
 export function resolveBasicAccessRequest(
@@ -176,7 +204,9 @@ export function resolveBasicAccessRequest(
   accessCookie: string | null,
   configuration: BasicAccessConfiguration,
   now = Date.now(),
+  accessLocked = false,
 ): { lane: AccessLane; source: BasicAccessSource } | null {
+  if (accessLocked) return null;
   if (authorization !== null) {
     const lane = resolveBasicAccessLane(authorization, configuration);
     return lane ? { lane, source: "authorization" } : null;

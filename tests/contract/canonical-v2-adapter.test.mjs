@@ -18,9 +18,11 @@ const commandCenterPath = path.join(
   root,
   "src/components/admin/vip-floor-v2/commands/CommandCenter.tsx",
 );
-const siblingWebsiteRoot = path.resolve(root, "../ghost/website");
+const siblingWebsiteRoot = process.env.GHOST_BACKEND_ROOT
+  ? path.resolve(process.env.GHOST_BACKEND_ROOT)
+  : null;
 const siblingContractPath = path.join(
-  siblingWebsiteRoot,
+  siblingWebsiteRoot ?? root,
   "contracts/vip-manager/v2/routes.json",
 );
 
@@ -76,14 +78,14 @@ test("VIP App maps all seven commands to the canonical v2 backend", () => {
   assert.match(source, /typeof expectedVersion !== "number"/u);
   assert.match(source, /Number\.isSafeInteger\(expectedVersion\)/u);
   assert.match(source, /expectedVersion < 1/u);
-  assert.doesNotMatch(source, /\breason\s*:/u);
+  assert.match(source, /parseOwnerCapacityOverride/u);
 });
 
 test("command payload translation preserves the v2 concurrency and domain fields", () => {
   const source = readFileSync(commandRoutePath, "utf8");
 
   assert.match(source, /operation: "replace"/u);
-  assert.match(source, /capacityOverride: false/u);
+  assert.match(source, /capacityOverride: capacity\.capacityOverride/u);
   assert.match(source, /extendMinutes % 15 !== 0/u);
   assert.match(source, /extendMinutes > 120/u);
   assert.match(source, /toStatus: serviceStatus/u);
@@ -126,11 +128,15 @@ test("board adapter prefers vip-floor.v2 and makes legacy fallback read-only", (
   assert.match(workspaceSource, /payload\.schemaVersion === VIP_FLOOR_SCHEMA_VERSION/u);
 });
 
-test("checked-out GHOST website contract stays synchronized when available", () => {
-  if (!existsSync(siblingContractPath)) return;
+test("an explicitly configured GHOST backend contract stays synchronized", (context) => {
+  if (!siblingWebsiteRoot) {
+    context.skip("GHOST_BACKEND_ROOT is required for the cross-repo contract witness");
+    return;
+  }
+  assert.ok(existsSync(siblingContractPath), `missing configured backend contract: ${siblingContractPath}`);
 
   const contract = JSON.parse(readFileSync(siblingContractPath, "utf8"));
-  assert.equal(contract.contractVersion, "ghost.vip-manager.v2");
+  assert.equal(contract.contractVersion, "ghost.vip-manager.v2.1");
   assert.equal(contract.boardSchemaVersion, "vip-floor.v2");
   assert.equal(
     contract.board.backendPath,

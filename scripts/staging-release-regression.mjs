@@ -668,6 +668,7 @@ function createClient(config) {
       { method: "GET", path: "/api/admin/session" },
       { method: "DELETE", path: "/api/admin/session" },
       { method: "GET", path: "/api/admin/vip-floor" },
+      { method: "GET", path: "/api/admin/vip-floor/business-days" },
       { method: "GET", path: "/api/admin/vip-floor/options" },
       { method: "POST", path: "/api/admin/vip-floor/operations" },
       { method: "POST", path: "/api/admin/vip-floor/commands" },

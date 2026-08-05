@@ -56,7 +56,8 @@ Gate不合格時はproductionを変更せず、既存read-only fallbackを維持
 ### 2.2 検証済みの土台
 
 - 独立Next.js管理アプリ、Vercel production、Basic認証fail-closed。
-- PIN session中継とHttpOnly / Secure / SameSite Strict cookie。
+- ProductionのBasic-only identityを短時間のHttpOnly / Secure / SameSite Strict Owner sessionへ交換する中継。
+- PIN入力とPIN sessionはDEMO専用とし、Production routeへ持ち込まない。
 - Floor / Timeline / List、検索、予約Inspector、例外表示、13状態表示metadata。
 - GHOST本体`/api/admin/vip-status`の中継とlegacy board変換。
 - 6 commandのVIP App側入口、idempotency key、`expectedUpdatedAt`、payload validation。
@@ -152,7 +153,7 @@ Gate不合格時はproductionを変更せず、既存read-only fallbackを維持
 - VIP Appのdirty deploy内容とGHOST本体の未取得commitを、共有remoteの追跡可能なcommitへ復元する。
 - remote-only migration `20260604090000`の内容を監査し、local migration historyへ非破壊で復元する。
 - 2026-07-14のlocal-only 12 migrationを適用前にstagingで順序・互換性・rollback read pathまで検証する。
-- Basic→Owner PIN→board read→隔離予約1 mutation→audit→logoutのstaging contract E2Eを作る。
+- Basic→Owner session交換→board read→隔離予約1 mutation→audit→terminal-lock logoutのstaging contract E2Eを作る。
 - legacy read pathと新v2 read pathをshadow compareし、差分をPIIなしで記録する。
 
 ### 完了条件
@@ -217,8 +218,8 @@ Phase 2のactor/session/audit最小schemaを先に固定し、そのactor IDを�
 
 ### 作業
 
-- Basic認証を継続し、利用者別PIN sessionへ統一する。
-- 初期OwnerとOwner専用PINを各1件作り、PIN hash、rate limit、失敗ロック、session expiryを実装する。
+- ProductionはBasic-onlyを継続し、信頼済み外周identityを短時間Owner sessionへ交換する。logout後はterminal lockを維持し、明示的なBasic再入力まで再交換しない。
+- PIN session、PIN hash、rate limit、失敗ロックはDEMO専用とし、Production APIから分離する。
 - 初期capabilityはOwnerだけにmutation/PIIを許可し、staff/manager/engineer/accountantはschema保持だけにする。
 - Owner actor、session、audit actor/request IDの最小schemaをPhase 1より先に固定する。
 - commandごとの個別allowlistをcapability policyへ統合する。
@@ -444,7 +445,7 @@ Phase 2のactor/session/audit最小schemaを先に固定し、そのactor IDを�
 | G0 正本 | v1.0仕様、v1.1計画、監査文書、D-01〜D-08、旧文書archive |
 | G0.5 Source lineage | 全read/mutationが共有source・commit・deployment・schemaへ追跡可能 |
 | G1 Contract | schema/migration/競合/idempotency test合格 |
-| G2 Security | Basic/PIN/role/PII/kill switch test合格 |
+| G2 Security | Production Basic-only、DEMO PIN分離、role/PII/kill switch test合格 |
 | G3 Booking bridge | 公開確定→Manager→顧客確認E2E合格 |
 | G4 UI parity | 4主要画面、3解像度、visual/a11y合格 |
 | G5 Operations | 6操作、卓回転2短縮操作、Walk-in、Waitlist、block、担当卓合格 |
@@ -495,7 +496,7 @@ W4の各機能はAPI+UI+testを1本ずつ縦切りし、全API完成待ちの大
 | T-002 | P0 | `website` | versioned board/command/error schema | T-001 | schema + contract test |
 | T-003 | P0 | 両方 | test DB、fixture、CI、PII redaction | T-001 | CI green |
 | T-004 | P0 | `ghost_vipapp` | production E2Eをread-onlyへ分離 | T-003 | mutation 0 smoke |
-| T-005 | P0 | `website` | Owner actor/PIN/session/audit最小schema | T-002 | security contract |
+| T-005 | P0 | `website` | Owner actor/Production session/audit最小schema | T-002 | security contract |
 | T-006 | P0 | `ghost_vipapp` | Owner-only capability、表記、UI disable | T-005 | 他role 403 |
 | T-007 | P0 | `website` | 22時business day、8卓master、section撤去互換 | T-002 | boundary/master test |
 | T-008 | P0 | `website` | DB version/idempotency/audit共通middleware | T-005 | conflict/replay test |
@@ -547,7 +548,7 @@ Lunaが実行環境で利用可能な場合は単純なinventory、文言監査�
 - 1024×768、1194×834、1366×1024と補助320pxでoverflow、44px、focus、keyboard、非色cue、長文が合格。
 - 375px、768pxを含む6幅で全主要surface/state/dialogのlight screenshotとcomputed styleが合格し、Chartへ1操作で到達できる。
 - Trial run row/T卓/TRIAL sectionが0、active official卓がexact 8、inactive historical rowの参照が保全される。
-- permanent origin/Basic/PINへ切替後、Trial mode/credential/bypass/staging接続が失効する。
+- permanent origin/Production Basic-onlyへ切替後、Trial mode/DEMO PIN/credential/bypass/staging接続が失効する。
 - staging fixture cleanup後に予約、顧客、block、Waitlist、outbox、auditの孤児が0件。
 - production smokeは本番顧客を変更せず、異常時はkill switch OFFまたは直前deploymentへ即時復旧できる。
 

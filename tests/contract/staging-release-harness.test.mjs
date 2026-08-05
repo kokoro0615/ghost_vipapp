@@ -123,6 +123,7 @@ test("release regression source covers required business and cleanup boundaries"
     "GHOST_VIPAPP_RELEASE_VIP_HOST",
     "GHOST_VIPAPP_RELEASE_BACKEND_HOST",
     "/api/admin/vip-floor/options",
+    "/api/admin/vip-floor/business-days",
     "/api/admin/vip-floor/operations",
     "/api/admin/vip-floor/commands",
     "/api/admin/vip-floor/waitlist",

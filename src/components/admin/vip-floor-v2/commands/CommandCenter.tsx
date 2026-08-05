@@ -13,6 +13,7 @@ import type {
   WalkInCancellationReason,
 } from "../contract/uiTypes";
 import { DemoCue, useDemoMode } from "../demo/DemoMode";
+import { isStandardServiceTransition } from "../contract/statusModel";
 import styles from "../VipFloorWorkspace.module.css";
 
 const commandLabels: Record<CommandKind, string> = {
@@ -59,6 +60,12 @@ export function CommandCenter({
 }: Props) {
   const demoMode = useDemoMode();
   const [renderedAt] = useState(() => Date.now());
+  const [assignmentTableIds, setAssignmentTableIds] = useState<string[]>([]);
+  const [capacityOverrideConfirmed, setCapacityOverrideConfirmed] = useState(false);
+  const [capacityOverrideReason, setCapacityOverrideReason] = useState("");
+  const [serviceTargetStatus, setServiceTargetStatus] = useState<VipServiceStatus>("expected");
+  const [serviceOverrideConfirmed, setServiceOverrideConfirmed] = useState(false);
+  const [serviceOverrideReason, setServiceOverrideReason] = useState("");
   const panelRef = useRef<HTMLDivElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
   const source = reservation
@@ -74,6 +81,15 @@ export function CommandCenter({
       .filter((option) => Date.parse(`${option.value}:00+09:00`) <= renderedAt);
   }, [board.businessDay.businessDate, kind, open, renderedAt]);
   const arrivalDefault = arrivalOptions.at(-1)?.value ?? "";
+  const assignmentCapacity = board.tables
+    .filter((table) => assignmentTableIds.includes(table.id))
+    .reduce((sum, table) => sum + table.capacityMax, 0);
+  const assignmentCapacityShort = kind === "assignment"
+    && assignmentTableIds.length > 0
+    && assignmentCapacity < (reservation?.guestCount ?? 0);
+  const nonStandardServiceTransition = kind === "service_status"
+    && Boolean(source)
+    && !isStandardServiceTransition(source?.serviceStatus, serviceTargetStatus);
   const impact = useMemo(() => {
     if (kind === "assignment") return demoMode.enabled
       ? "browser-local合成台帳の卓割当を置き換え、この端末の各viewへ反映します。"
@@ -93,14 +109,26 @@ export function CommandCenter({
   useEffect(() => {
     if (!open) return;
     previousFocusRef.current = document.activeElement as HTMLElement | null;
-    const frame = window.requestAnimationFrame(() =>
-      panelRef.current?.querySelector<HTMLElement>("button, input, select, textarea")?.focus(),
-    );
+    const frame = window.requestAnimationFrame(() => {
+      if (kind === "assignment" && reservation) {
+        setAssignmentTableIds(
+          [...new Set([...reservation.tableIds, ...(selectedTableId ? [selectedTableId] : [])])],
+        );
+        setCapacityOverrideConfirmed(false);
+        setCapacityOverrideReason("");
+      }
+      if (kind === "service_status" && reservation) {
+        setServiceTargetStatus(reservation.serviceStatus as VipServiceStatus);
+        setServiceOverrideConfirmed(false);
+        setServiceOverrideReason("");
+      }
+      panelRef.current?.querySelector<HTMLElement>("button, input, select, textarea")?.focus();
+    });
     return () => {
       window.cancelAnimationFrame(frame);
       previousFocusRef.current?.focus();
     };
-  }, [open]);
+  }, [kind, open, reservation, selectedTableId]);
 
   useEffect(() => {
     if (!open || kind !== "walk_in_cancel" || step !== 2) return;
@@ -151,7 +179,13 @@ export function CommandCenter({
           kind,
           payload: {
             occurredAt: new Date().toISOString(),
-            serviceStatus: String(formData.get("serviceStatus")) as VipServiceStatus,
+            serviceStatus: serviceTargetStatus,
+            ...(nonStandardServiceTransition && serviceOverrideConfirmed
+              ? {
+                  confirmedServiceOverride: true,
+                  serviceOverrideReason: serviceOverrideReason.trim(),
+                }
+              : {}),
           },
         };
       case "check_in":
@@ -171,10 +205,13 @@ export function CommandCenter({
           ...base,
           kind,
           payload: {
-            tableIds: formData
-              .getAll("tableIds")
-              .map(String)
-              .filter(Boolean),
+            tableIds: assignmentTableIds,
+            ...(assignmentCapacityShort && capacityOverrideConfirmed
+              ? {
+                  confirmedCapacityOverride: true,
+                  capacityOverrideReason: capacityOverrideReason.trim(),
+                }
+              : {}),
           },
         };
       case "seat_extension":
@@ -207,6 +244,18 @@ export function CommandCenter({
   function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (step === 1) {
+      if (
+        assignmentCapacityShort
+        && (!capacityOverrideConfirmed || capacityOverrideReason.trim().length < 1)
+      ) {
+        return;
+      }
+      if (
+        nonStandardServiceTransition
+        && (!serviceOverrideConfirmed || serviceOverrideReason.trim().length < 1)
+      ) {
+        return;
+      }
       onStep(2);
       return;
     }
@@ -253,7 +302,15 @@ export function CommandCenter({
             {kind === "service_status" ? (
               <label>
                 次の状態
-                <select name="serviceStatus" defaultValue={reservation.serviceStatus}>
+                <select
+                  name="serviceStatus"
+                  value={serviceTargetStatus}
+                  onChange={(event) => {
+                    setServiceTargetStatus(event.target.value as VipServiceStatus);
+                    setServiceOverrideConfirmed(false);
+                    setServiceOverrideReason("");
+                  }}
+                >
                   <option value="expected">来店予定</option>
                   <option value="late">遅延</option>
                   <option value="no_contact">連絡未達</option>
@@ -271,6 +328,29 @@ export function CommandCenter({
                 <small className={styles.syntheticInputHint}>
                   着席開始は「チェックイン」で記録すると、利用終了を実時刻から2時間後に設定します。
                 </small>
+                {nonStandardServiceTransition ? (
+                  <section className={styles.capacityOverrideRail} aria-label="Owner状態遷移override確認">
+                    <strong>非標準遷移 — 明示的なOwner判断が必要</strong>
+                    <p>{source.serviceStatus} → {serviceTargetStatus} は通常の接客順序に含まれません。</p>
+                    <label className={styles.choiceRow}>
+                      <input
+                        type="checkbox"
+                        checked={serviceOverrideConfirmed}
+                        onChange={(event) => setServiceOverrideConfirmed(event.target.checked)}
+                      />
+                      非標準の状態遷移をOwner権限で承認
+                    </label>
+                    <label>
+                      承認理由
+                      <textarea
+                        value={serviceOverrideReason}
+                        maxLength={240}
+                        disabled={!serviceOverrideConfirmed}
+                        onChange={(event) => setServiceOverrideReason(event.target.value)}
+                      />
+                    </label>
+                  </section>
+                ) : null}
               </label>
             ) : null}
 
@@ -304,14 +384,41 @@ export function CommandCenter({
                       type="checkbox"
                       name="tableIds"
                       value={table.id}
-                      defaultChecked={
-                        reservation.tableIds.includes(table.id)
-                        || selectedTableId === table.id
-                      }
+                      checked={assignmentTableIds.includes(table.id)}
+                      onChange={(event) => {
+                        setAssignmentTableIds((current) => event.target.checked
+                          ? [...new Set([...current, table.id])]
+                          : current.filter((id) => id !== table.id));
+                        setCapacityOverrideConfirmed(false);
+                        setCapacityOverrideReason("");
+                      }}
                     />
                     <span>{table.displayCode} · {table.name} · {table.capacityMax}名</span>
                   </label>
                 ))}
+                {assignmentCapacityShort ? (
+                  <section className={styles.capacityOverrideRail} aria-label="卓割当 Owner定員超過確認">
+                    <strong>定員超過 — {assignmentCapacity}名枠に{reservation.guestCount}名</strong>
+                    <p>卓追加ができない場合だけ、理由を記録してOwner権限で割当を続行します。</p>
+                    <label className={styles.choiceRow}>
+                      <input
+                        type="checkbox"
+                        checked={capacityOverrideConfirmed}
+                        onChange={(event) => setCapacityOverrideConfirmed(event.target.checked)}
+                      />
+                      定員超過をOwner権限で承認
+                    </label>
+                    <label>
+                      承認理由
+                      <textarea
+                        value={capacityOverrideReason}
+                        maxLength={240}
+                        disabled={!capacityOverrideConfirmed}
+                        onChange={(event) => setCapacityOverrideReason(event.target.value)}
+                      />
+                    </label>
+                  </section>
+                ) : null}
               </div>
             ) : null}
 
