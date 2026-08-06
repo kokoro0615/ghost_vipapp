@@ -13,7 +13,7 @@ test("each primary workspace view owns the document heading", async () => {
 
   assert.match(list, /<h1 id="list-view-title">来店台帳<\/h1>/u);
   assert.match(floor, /<h1 id="floor-view-title">VIPフロア<\/h1>/u);
-  assert.match(chart, /<h1 id="chart-view-title">席の時間軸<\/h1>/u);
+  assert.match(chart, /<h1 id="chart-view-title">席のチャート<\/h1>/u);
 });
 
 test("the 44px control gate includes semantic and ARIA controls", async () => {

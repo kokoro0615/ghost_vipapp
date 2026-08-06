@@ -719,7 +719,7 @@ export default function VipFloorWorkspace() {
     { key: "attention", label: "要対応", value: attentionCount, filter: "attention", alert: attentionCount > 0 },
     {
       key: "unassigned",
-      label: "未割当",
+      label: "卓未定",
       value: state.board.totals.unassignedReservationCount,
       filter: "unassigned",
       alert: state.board.totals.unassignedReservationCount > 0,
@@ -872,7 +872,7 @@ export default function VipFloorWorkspace() {
               <LayoutGrid size={16} aria-hidden /><span>フロア</span>
             </button>
             <button type="button" aria-label="Chart" data-active={state.view === "timeline" || undefined} onClick={() => switchView("timeline")}>
-              <ChartNoAxesGantt size={16} aria-hidden /><span>時間軸</span>
+              <ChartNoAxesGantt size={16} aria-hidden /><span>チャート</span>
             </button>
           </div>
           <label className={styles.toolbarSearch}>
@@ -899,7 +899,7 @@ export default function VipFloorWorkspace() {
             >
               <option value="all">全て</option>
               <option value="attention">要確認</option>
-              <option value="unassigned">未割当</option>
+              <option value="unassigned">卓未定</option>
               <option value="expected">来店予定</option>
               <option value="late">遅延</option>
               <option value="arrived">到着</option>
@@ -1111,7 +1111,7 @@ export default function VipFloorWorkspace() {
           <LayoutGrid size={20} aria-hidden /><span>フロア</span>
         </button>
         <button type="button" aria-label="Chart" aria-current={state.view === "timeline" ? "page" : undefined} data-active={state.view === "timeline" || undefined} onClick={() => switchView("timeline")}>
-          <ChartNoAxesGantt size={20} aria-hidden /><span>時間軸</span>
+          <ChartNoAxesGantt size={20} aria-hidden /><span>チャート</span>
         </button>
         <button
           ref={menuButtonRef}

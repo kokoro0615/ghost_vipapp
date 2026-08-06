@@ -30,6 +30,13 @@ export const TIMELINE_SIGNAL_ORDER = ["none", "low", "medium", "high"] as const;
 
 export type TimelineSignal = (typeof TIMELINE_SIGNAL_ORDER)[number];
 
+/* A lane can hold several bookings across the night, and the lane's own alarm
+ * has to be the worst one on it — an unanswered arrival outranks a release the
+ * floor has already acknowledged. */
+export function signalRank(signal: TimelineSignal) {
+  return TIMELINE_SIGNAL_ORDER.indexOf(signal);
+}
+
 /*
  * Which end of the booking is running out. This is the whole reason the alarm
  * is legible at a glance: an arrival exception is a problem at the band's

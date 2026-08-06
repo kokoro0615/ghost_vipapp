@@ -174,7 +174,7 @@ export function StaffPanel({ open, pending, board, data, onClose, onRefresh, onA
                       <option key={member.id} value={member.id}>{member.displayName}</option>
                     ))}
                   </select>
-                  <small>{assignment ? `ASSIGN REV ${assignment.version}` : "未割当"}</small>
+                  <small>{assignment ? `ASSIGN REV ${assignment.version}` : "卓未定"}</small>
                 </label>
               );
             })}

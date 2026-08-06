@@ -22,7 +22,7 @@ const commandButtons: Array<{ kind: CommandKind; label: string; icon: typeof Clo
   { kind: "check_in", label: "チェックイン", icon: ShieldCheck },
   { kind: "arrival_time", label: "到着時刻", icon: Clock3 },
   { kind: "service_status", label: "接客状態", icon: BellRing },
-  { kind: "assignment", label: "席割当", icon: Armchair },
+  { kind: "assignment", label: "卓を決める", icon: Armchair },
   { kind: "seat_extension", label: "利用延長", icon: TimerReset },
   { kind: "note", label: "メモ", icon: NotebookPen },
 ];
@@ -109,7 +109,7 @@ export function Inspector({
           <div className={styles.focusSummary} data-tone={meta.tone} data-cue={meta.cue}>
             <StatusIcon size={18} aria-hidden />
             <div><strong>{meta.label}</strong><span>{reservation.startLabel}-{reservation.endLabel} / {reservation.guestCount}名</span></div>
-            <span className={styles.focusTable}>{reservation.tableCodes.join(" + ") || "未割当"}</span>
+            <span className={styles.focusTable}>{reservation.tableCodes.join(" + ") || "卓未定"}</span>
           </div>
 
           {quickAction ? (
@@ -219,7 +219,7 @@ export function Inspector({
               <dl className={styles.detailList}>
                 <div data-rank="lead"><dt>時間</dt><dd className="tabular-nums">{reservation.startLabel}–{reservation.endLabel}</dd></div>
                 <div data-rank="lead"><dt>人数</dt><dd className="tabular-nums">{reservation.guestCount}名</dd></div>
-                <div data-rank="lead"><dt>席</dt><dd className="tabular-nums">{reservation.tableCodes.join(" + ") || "未割当"}</dd></div>
+                <div data-rank="lead"><dt>席</dt><dd className="tabular-nums">{reservation.tableCodes.join(" + ") || "卓未定"}</dd></div>
                 <div data-band><dt>ゲスト</dt><dd>{reservation.guestLabel}</dd></div>
                 <div><dt>予約番号</dt><dd className="tabular-nums">{reservation.publicCode}</dd></div>
                 <div><dt>経路</dt><dd>{reservation.sourceLabel}</dd></div>

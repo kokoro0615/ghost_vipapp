@@ -304,7 +304,7 @@ async function auditViewport(context, viewport) {
     ["チェックイン", "チェックイン", "command-check-in"],
     ["到着時刻", "到着時刻を記録", "command-arrival-time"],
     ["接客状態", "接客状態を変更", "command-service-status"],
-    ["席割当", "卓割当を変更", "command-assignment"],
+    ["卓を決める", "卓を決める", "command-assignment"],
     ["メモ", "スタッフメモ", "command-note"],
   ]) {
     await goToWorkspace(page, "list");
@@ -413,7 +413,7 @@ async function auditViewport(context, viewport) {
   for (const [view, heading] of [
     ["list", "来店台帳"],
     ["floor", "VIPフロア"],
-    ["chart", "席の時間軸"],
+    ["chart", "席のチャート"],
   ]) {
     await goToWorkspace(emptyViewsPage, view);
     await emptyViewsPage.getByRole("heading", { name: heading }).waitFor();
@@ -484,7 +484,7 @@ async function auditViewport(context, viewport) {
   assert.equal(await demoWalkInDialog.isVisible(), true, "invalid input must preserve the dialog");
   await demoWalkInDialog.locator('input[name="guestLabel"]').fill("デモWalk-inテスト");
 	  await demoWalkInDialog.locator('textarea[name="operatorNote"]').fill("デモ：入口で到着確認済み");
-	  await demoWalkInDialog.getByRole("radio", { name: /デモスタッフA/u }).check();
+	  await demoWalkInDialog.getByLabel("このお客様の担当").selectOption({ label: "デモスタッフA" });
 	  await demoWalkInDialog.getByRole("button", { name: "競合確認して保存" }).click();
   await demoWalkInDialog.waitFor({ state: "hidden" });
   await goToDemoWorkspace(demoWalkInPage, "list", "2026-07-31");

@@ -103,13 +103,35 @@ Measured before → after (dense 14-reservation board):
     browser's tap flash was removed on purpose (`DESIGN.md` §6.1).
 
 12. **An alarm that cannot be answered is noise, and an alarm that surrounds the
-    content is decoration.** The timeline is the one place that may raise one,
-    and it raises a *light standing on the minute that is running out* — head
-    for arrivals, tail for releases — never a ring around the band. Three tiers
+    content is decoration.** The chart is the one place that may raise one, and
+    it raises a *light standing on the minute that is running out* — head for
+    arrivals, tail for releases — never a ring around the band. Three tiers
     say how soon rather than merely that something is wrong; no tier ever goes
     dark, so the state is readable in every frame; and the motion stops the
     moment the floor answers it, leaving the light, the state and the countdown
     exactly where they were (`DESIGN.md` §7.0b).
+
+13. **An alarm must be legible in the shape it takes, not only in its colour,
+    and it must be where the eye can reach it.** A signal drawn in the same
+    geometry as the surface it sits on is camouflage — a vertical line on a
+    chart of vertical rules read as a gridline. And a signal that can scroll off
+    screen while its row stays on screen has not been raised at all. So the
+    exception is *worded* in the sticky lane label, which never scrolls, and
+    *pinned* on the track with a wedge, which no rule can imitate. The worded
+    plate never animates; the text-free pin carries the pulse (`DESIGN.md`
+    §7.0c).
+
+14. **A roster is a list, not a layout.** Anything that can grow past about five
+    entries — promoters, staff, plans — is one control with a native picker, not
+    one rendered control per entry. Eleven promoters as radio rows were 584px
+    inside an 810px screen and pushed the save receipt off the bottom of the
+    dialog (`DESIGN.md` §5.7d).
+
+15. **The floor's words, not the schema's.** `席割当`, `卓割当` and `未割当` are
+    column names wearing a label's clothes. The surface says `卓を決める`,
+    `使う卓`, `卓未定`, and the time view is `チャート`. When a label comes
+    straight from the data model, assume it is wrong until someone on the floor
+    has said it out loud.
 
 ### The 2026-08-02 timeline pass — what the band was not saying
 
@@ -319,7 +341,7 @@ keep a legible label.
 │ GHOST OSAKA · VIP MANAGER │ 営業日 │ 営業枠 │ counters │ sync │ operator │
 ├──────────────────────────────────────────────┼─────────────────┤
 │ CONTROL BAR 56px                             │ INSPECTOR       │
-│ [新規受付] [一覧|フロア|時間軸] search filter │ or QUEUE        │
+│ [新規受付] [一覧|フロア|チャート] search filter │ or QUEUE      │
 ├──────────────────────────────────────────────┤ 324–388px       │
 │                                              │                 │
 │         THE ONE FOCAL OBJECT                 │ identity        │
@@ -365,7 +387,7 @@ model — bottom nav appearing, toolbar emptying — instead of moving one panel
 ### ≤767px — phone
 
 Single column. The inspector becomes a full sheet, the counters become a 52px
-filter strip, and a five-item bottom nav carries 受付 / 一覧 / フロア / 時間軸 /
+filter strip, and a five-item bottom nav carries 受付 / 一覧 / フロア / チャート /
 メニュー.
 
 The `1023px` threshold is shared by the workspace (`matchMedia`) and the QA
@@ -457,6 +479,29 @@ a 56px floor. When the viewport is taller, the rows share the available height
 equally; when it is shorter, they retain the floor and the chart scrolls. This
 keeps `VIP-8` attached to the exception ledger instead of leaving a dead band
 below the final table.
+
+**The lane label carries the alarm** (2026-08-06). The track is 1020–1560px
+wide and the venue iPad shows about 960 of it, so anything drawn at a booking's
+own minute can scroll off screen while its row is still in front of the
+operator. The lane label cannot: it is sticky. It states the worst live
+exception on that lane in words — `未着100分`, `延長確認 15分`, `解放超過30分` —
+and capacity stands down while it does. The plate never animates. The pulse
+belongs to the pin on the track, which is text-free.
+
+Why the previous alarm failed: it was a 2px vertical line, and the track's
+background *is* vertical rules. One pixel of width and a hue is not a
+difference the floor can read at a glance. The replacement is a wedge, a shape
+`repeating-linear-gradient` cannot produce.
+
+### Ledger rows
+
+`--h-row` is 52px and the row must actually be 52px. Two things had quietly
+overridden it: `.rowOpen` re-declared the 44px touch floor as its own
+`min-height` on top of 6px cell padding (57px rows), and the selected row shared
+a declaration block with the empty-state cell, inheriting `height: 140px`,
+`--ink-3` and centred text — so the one row under inspection was 2.6× the
+others, the palest in the ledger, and the only one out of column. Compact is
+53px, comfortable 64px, and selection is the champagne spine.
 
 ---
 

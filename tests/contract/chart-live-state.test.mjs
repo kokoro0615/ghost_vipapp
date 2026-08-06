@@ -150,8 +150,18 @@ test("the alarm is a light on the track, never a second frame around the label",
   );
   assert.match(source, /data-edge=\{edge\}/u);
   /* And its spill is aimed away from the band at both ends. */
-  assert.match(chartSection, /\.timelineDeadline\[data-edge="head"\]::before \{\s*right: 2px;/u);
-  assert.match(chartSection, /\.timelineDeadline\[data-edge="tail"\]::before \{\s*left: 2px;/u);
+  assert.match(chartSection, /\.timelineDeadline\[data-edge="head"\]::before \{\s*right: var\(--signal-stem\);/u);
+  assert.match(chartSection, /\.timelineDeadline\[data-edge="tail"\]::before \{\s*left: var\(--signal-stem\);/u);
+
+  /* The stem alone cannot be the alarm on this chart: the track's background is
+   * vertical rules, so a 2px vertical line differed from the grid by one pixel
+   * and a hue and read as a slightly darker gridline. The pin is a wedge — a
+   * shape a repeating-linear-gradient cannot produce — hanging off the top of
+   * the lane and pointing at the minute, and it carries no text. */
+  assert.match(chartSection, /\.timelineDeadline::after \{[^}]*clip-path: polygon\(0 0, 100% 0, 50% 100%\);/u);
+  assert.match(chartSection, /\.timelineDeadline::after \{[^}]*width: var\(--signal-pin\);/u);
+  assert.match(chartSection, /\.timelineDeadline \{[\s\S]*?--signal-stem: 3px;/u);
+  assert.match(chartSection, /\.timelineDeadline\[data-signal="high"\] \{[^}]*--signal-pin: 18px;/u);
 
   for (const [tier, duration] of [["low", "2.4s"], ["medium", "1.8s"], ["high", "900ms"]]) {
     assert.match(
@@ -199,6 +209,41 @@ test("the alarm is a light on the track, never a second frame around the label",
   const reduced = chartSection.slice(chartSection.lastIndexOf("@media (prefers-reduced-motion: reduce)"));
   for (const tier of ["low", "medium", "high"]) {
     assert.match(reduced, new RegExp(`\\.timelineDeadline\\[data-signal="${tier}"\\] \\{ opacity:`, "u"));
+  }
+});
+
+test("the lane states its own exception in the column that never scrolls away", async () => {
+  const styles = await readFile(
+    new URL("../../src/components/admin/vip-floor-v2/VipFloorWorkspace.module.css", import.meta.url),
+    "utf8",
+  );
+  const source = await readFile(
+    new URL("../../src/components/admin/vip-floor-v2/chart/ChartView.tsx", import.meta.url),
+    "utf8",
+  );
+
+  /* The track is up to 1560px wide and the venue iPad shows about 960 of it, so
+   * a light drawn at a booking's own minute can be scrolled off screen while
+   * the row it belongs to is still in front of the operator. The lane label is
+   * sticky, so the worded exception lives there. */
+  assert.match(source, /className=\{styles\.timelineLaneAlarm\}/u);
+  assert.match(source, /signalRank\(second\.signal\) - signalRank\(first\.signal\)/u,
+    "the lane must show the worst exception on it");
+  assert.match(source, /Number\(first\.acknowledged\) - Number\(second\.acknowledged\)/u,
+    "an unanswered exception outranks a handled one at the same tier");
+  /* Capacity steps aside rather than the lane growing a third line. */
+  assert.match(source, /\) : \(\s*<span>\{table\.capacityMax\}名<\/span>\s*\)/u);
+
+  /* Three tiers, drawn with three strengths, so the ladder survives greyscale
+   * and the motion being switched off. */
+  assert.match(styles, /\.timelineLaneAlarm\[data-signal="low"\] \{ background: var\(--accent-wash\)/u);
+  assert.match(styles, /\.timelineLaneAlarm\[data-signal="medium"\] \{[^}]*background: var\(--warn-wash\)/u);
+  assert.match(styles, /\.timelineLaneAlarm\[data-signal="high"\] \{ background: var\(--alert\); color: var\(--surface\)/u);
+  /* The plate carries text, so it must never be what animates (§7.1). */
+  const plateBlocks = [...styles.matchAll(/\.timelineLaneAlarm[^{]*\{([^}]*)\}/gu)];
+  assert.ok(plateBlocks.length >= 4, "the plate and its three tiers must all be authored");
+  for (const block of plateBlocks) {
+    assert.doesNotMatch(block[1], /animation/u, "the worded plate never animates");
   }
 });
 

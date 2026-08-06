@@ -87,7 +87,7 @@ export default function ReservationListView({
                   <td className={styles.seatCell}>
                     {reservation.tableCodes.length
                       ? reservation.tableCodes.join(" + ")
-                      : <span className={styles.exceptionText}>未割当</span>}
+                      : <span className={styles.exceptionText}>卓未定</span>}
                   </td>
                   <td className={styles.mutedText}>{reservation.sourceLabel}</td>
                 </tr>

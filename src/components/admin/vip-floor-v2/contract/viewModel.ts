@@ -48,7 +48,7 @@ export function toUiReservations(board: VipFloorBoardV2): UiReservation[] {
         endLabel: formatTime(reservation.scheduledEndAt),
         guestCount: reservation.guestCount.total,
         tableIds: reservation.tableIds,
-        tableCodes: reservation.tableIds.map((id) => tableCodeById.get(id) ?? "未割当"),
+        tableCodes: reservation.tableIds.map((id) => tableCodeById.get(id) ?? "卓未定"),
         sourceChannel: reservation.sourceChannel,
         sourceLabel: reservation.sourceChannel === "walk_in"
           ? "店頭"
@@ -81,7 +81,7 @@ export function buildQueueGroups(reservations: UiReservation[]): QueueGroup[] {
 
   return [
     { key: "critical", label: "至急対応", severity: "critical", reservationIds: critical.map((item) => item.id) },
-    { key: "unassigned", label: "未割当", severity: "warning", reservationIds: unassigned.map((item) => item.id) },
+    { key: "unassigned", label: "卓未定", severity: "warning", reservationIds: unassigned.map((item) => item.id) },
     { key: "review", label: "確認待ち", severity: "warning", reservationIds: review.map((item) => item.id) },
     { key: "arrivals", label: "到着予定", severity: "routine", reservationIds: arrivals.map((item) => item.id) },
   ];

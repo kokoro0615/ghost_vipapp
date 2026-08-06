@@ -7,8 +7,6 @@ import {
   CalendarPlus,
   Check,
   Footprints,
-  Store,
-  UserRoundCheck,
   X,
 } from "lucide-react";
 
@@ -727,50 +725,41 @@ export function OperationCenter({
 	                    </label>
 	                  </div>
 
-	                  <aside className={styles.walkInAttribution} aria-labelledby="walk-in-attribution-title">
-	                    <header>
-	                      <h3 id="walk-in-attribution-title">集客担当</h3>
-	                    </header>
-	                    <fieldset>
-	                      <legend>このお客様の担当</legend>
-	                      <div className={styles.walkInAttributionOptions}>
-	                        <label data-selected={!walkInBookingStaffMemberId || undefined}>
-	                          <input
-	                            type="radio"
-	                            name="bookingStaffMemberId"
-	                            value=""
-	                            checked={!walkInBookingStaffMemberId}
-	                            onChange={() => setWalkInBookingStaffMemberId("")}
-	                          />
-	                          <Store size={16} aria-hidden />
-	                          <span><strong>店舗へ直接来店</strong><small>プロモーター・担当者なし</small></span>
-	                        </label>
-	                        {activeStaffMembers.map((member) => (
-	                          <label key={member.id} data-selected={walkInBookingStaffMemberId === member.id || undefined}>
-	                            <input
-	                              type="radio"
-	                              name="bookingStaffMemberId"
-	                              value={member.id}
-	                              checked={walkInBookingStaffMemberId === member.id}
-	                              onChange={() => setWalkInBookingStaffMemberId(member.id)}
-	                            />
-	                            <UserRoundCheck size={16} aria-hidden />
-	                            <span><strong>{member.displayName}</strong><small>プロモーター／集客担当</small></span>
-	                          </label>
-	                        ))}
-	                      </div>
-	                    </fieldset>
-	                    <dl className={styles.walkInReceipt} aria-label="Walk-in入力内容">
-	                      <div><dt>経路</dt><dd>{selectedWalkInStaff ? "担当者経由" : "直接来店"}</dd></div>
-	                      <div><dt>担当</dt><dd>{selectedWalkInStaff?.displayName ?? "店舗"}</dd></div>
-	                      <div><dt>人数</dt><dd className="tabular-nums">{walkInGuestCount}名</dd></div>
-	                      <div><dt>配席</dt><dd>{selectedWalkInTables.map((table) => table.displayCode).join(" / ") || "未選択"}</dd></div>
-	                      <div><dt>内部プラン</dt><dd>自動判定</dd></div>
-	                    </dl>
-	                    {activeStaffMembers.length === 0 ? (
-	                      <p>担当者を追加する場合は、メニューの「スタッフ担当卓」から登録できます。</p>
-	                    ) : null}
-	                  </aside>
+                  <aside className={styles.walkInAttribution} aria-labelledby="walk-in-attribution-title">
+                    <header>
+                      <h3 id="walk-in-attribution-title">集客担当</h3>
+                    </header>
+                    {/* One control, not one row per promoter. The roster is heading
+                        for ten-plus names, and as a radio list that was already
+                        584px of options at eleven — taller than the iPad itself —
+                        which pushed the receipt entirely below the fold and printed
+                        the same subtitle eleven times (§5.7c). A select states the
+                        current choice in one line and hands the list to the native
+                        picker, which iPadOS renders as a full-height wheel. */}
+                    <label className={styles.walkInStaffField}>
+                      このお客様の担当
+                      <select
+                        name="bookingStaffMemberId"
+                        value={walkInBookingStaffMemberId}
+                        onChange={(event) => setWalkInBookingStaffMemberId(event.target.value)}
+                      >
+                        <option value="">店舗へ直接来店（担当なし）</option>
+                        {activeStaffMembers.map((member) => (
+                          <option key={member.id} value={member.id}>{member.displayName}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <dl className={styles.walkInReceipt} aria-label="Walk-in入力内容">
+                      <div><dt>経路</dt><dd>{selectedWalkInStaff ? "担当者経由" : "直接来店"}</dd></div>
+                      <div><dt>担当</dt><dd>{selectedWalkInStaff?.displayName ?? "店舗"}</dd></div>
+                      <div><dt>人数</dt><dd className="tabular-nums">{walkInGuestCount}名</dd></div>
+                      <div><dt>配席</dt><dd>{selectedWalkInTables.map((table) => table.displayCode).join(" / ") || "未選択"}</dd></div>
+                      <div><dt>内部プラン</dt><dd>自動判定</dd></div>
+                    </dl>
+                    {activeStaffMembers.length === 0 ? (
+                      <p>プロモーター／集客担当は、メニューの「スタッフ担当卓」から登録できます。</p>
+                    ) : null}
+                  </aside>
 	                </div>
 	              ) : (
 	                <>

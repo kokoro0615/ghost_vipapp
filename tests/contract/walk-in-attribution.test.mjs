@@ -17,7 +17,23 @@ test("Walk-in attribution is selectable, persisted, and visible after creation",
   assert.match(types, /bookingStaffMemberId: string \| null/u);
   assert.match(operationCenter, /集客担当/u);
   assert.match(operationCenter, /店舗へ直接来店/u);
-  assert.match(operationCenter, /プロモーター／集客担当/u);
+  /* One control for the whole roster. As radio rows, eleven promoters were
+   * 584px of options inside an 810px screen — the receipt below them never
+   * appeared, and the same subtitle printed once per row (§5.7c). The roster is
+   * heading for ten-plus names, so the list belongs to the native picker. */
+  assert.match(
+    operationCenter,
+    /<select\s+name="bookingStaffMemberId"[\s\S]{0,400}?activeStaffMembers\.map/u,
+    "the walk-in promoter roster must be one select, not one row per promoter",
+  );
+  assert.doesNotMatch(operationCenter, /type="radio"\s*\n\s*name="bookingStaffMemberId"/u);
+  /* The subtitle survives once, as the empty-roster hint. Printed per option it
+   * said nothing eleven times over — the interface narrating itself (§5.7c). */
+  assert.equal(
+    operationCenter.match(/プロモーター／集客担当/gu)?.length,
+    1,
+    "the promoter subtitle belongs to the empty-roster hint, not to every row",
+  );
   assert.doesNotMatch(operationCenter, /name="offeringId"/u);
   assert.match(operationCenter, /offeringId: offering\.id/u);
   assert.match(operationCenter, /bookingStaffMemberId: walkInBookingStaffMemberId \|\| null/u);

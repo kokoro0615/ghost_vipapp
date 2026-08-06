@@ -12,6 +12,7 @@ import styles from "../VipFloorWorkspace.module.css";
 import {
   getClosingWindowPercent,
   getTimelinePhase,
+  signalRank,
   TIMELINE_PHASE_META,
   TIMELINE_PHASE_ORDER,
 } from "./timelineState";
@@ -179,14 +180,14 @@ export default function ChartView({ board, reservations, selectedReservationId, 
     >
       <p className="sr-only" role="status" aria-atomic="true">{phaseAnnouncement}</p>
       <div className={styles.viewStrip}>
-        <h1 id="chart-view-title">席の時間軸</h1>
+        <h1 id="chart-view-title">席のチャート</h1>
         <span className="tabular-nums">{board.tables.length}席 / {reservations.length}件</span>
         {conflicts.length > 0 ? <span className={styles.exceptionText}>競合 {conflicts.length}</span> : null}
         <span className={styles.stripSpacer} />
-        <div className={styles.zoomControl} role="group" aria-label="時間軸ズーム">
-          <button type="button" onClick={() => onZoom(zoom === 60 ? 30 : 15)} aria-label="時間軸を拡大"><Plus size={16} /></button>
+        <div className={styles.zoomControl} role="group" aria-label="チャートの表示幅">
+          <button type="button" onClick={() => onZoom(zoom === 60 ? 30 : 15)} aria-label="チャートを拡大"><Plus size={16} /></button>
           <span className="tabular-nums">{zoom}m</span>
-          <button type="button" onClick={() => onZoom(zoom === 15 ? 30 : 60)} aria-label="時間軸を縮小"><Minus size={16} /></button>
+          <button type="button" onClick={() => onZoom(zoom === 15 ? 30 : 60)} aria-label="チャートを縮小"><Minus size={16} /></button>
         </div>
       </div>
 
@@ -209,7 +210,7 @@ export default function ChartView({ board, reservations, selectedReservationId, 
         ))}
       </div>
 
-      <div className={styles.timelineScroller} tabIndex={0} aria-label="VIP席の時間軸。左右にスクロールできます。" data-zoom={zoom}>
+      <div className={styles.timelineScroller} tabIndex={0} aria-label="VIP席のチャート。左右にスクロールできます。" data-zoom={zoom}>
         <div
           className={styles.timelineGrid}
           style={{
@@ -231,11 +232,39 @@ export default function ChartView({ board, reservations, selectedReservationId, 
           </div>
           {board.tables.map((table) => {
             const items = reservations.filter((reservation) => reservation.tableIds.includes(table.id));
+            /* The worst live exception on this lane, worded, for the lane label.
+             * A lane can carry several bookings; the operator needs the one that
+             * is running out, and an unanswered exception outranks a handled one
+             * at the same tier. */
+            const laneAlarm = items
+              .flatMap((reservation) => {
+                const band = bandByReservation.get(reservation.id);
+                return band && band.phase.signal !== "none" ? [band.phase] : [];
+              })
+              .sort((first, second) =>
+                signalRank(second.signal) - signalRank(first.signal)
+                || Number(first.acknowledged) - Number(second.acknowledged))[0]
+              ?? null;
             return (
               <div className={styles.timelineRow} key={table.id}>
                 <div className={styles.timelineTableLabel}>
                   <strong>{table.displayCode}</strong>
-                  <span>{table.capacityMax}名</span>
+                  {/* The lane states its own exception, in words, in the one
+                      column that never scrolls away. Capacity is static context
+                      and steps aside while something is running out — the band
+                      already carries this booking's covers. */}
+                  {laneAlarm ? (
+                    <span
+                      className={styles.timelineLaneAlarm}
+                      data-phase={laneAlarm.key}
+                      data-signal={laneAlarm.signal}
+                      data-acknowledged={laneAlarm.acknowledged || undefined}
+                    >
+                      {laneAlarm.label}
+                    </span>
+                  ) : (
+                    <span>{table.capacityMax}名</span>
+                  )}
                   {table.operationalLocked ? <small>ロック</small> : null}
                 </div>
                 <div className={styles.timelineTrack}>
@@ -348,11 +377,11 @@ export default function ChartView({ board, reservations, selectedReservationId, 
 
       <section
         className={styles.chartExceptions}
-        aria-label="時間軸の要対応"
+        aria-label="チャートの要対応"
         data-idle={unassigned.length + conflicts.length + delayed.length === 0 || undefined}
       >
         {([
-          ["未割当", unassigned, "席を割当"],
+          ["卓未定", unassigned, "卓を決める"],
           ["処理競合", conflicts, "競合"],
           ["到着遅延", delayed, "遅延"],
         ] as const).map(([label, items, cue]) => (

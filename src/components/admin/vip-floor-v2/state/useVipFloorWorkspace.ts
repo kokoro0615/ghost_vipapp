@@ -793,7 +793,7 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
         check_in: "チェックイン",
         arrival_time: "到着時刻",
         seat_extension: "利用延長",
-        assignment: "卓割当",
+        assignment: "卓の変更",
         note: "スタッフメモ",
         service_status: "接客状態",
         walk_in_cancel: "Walk-in取消",

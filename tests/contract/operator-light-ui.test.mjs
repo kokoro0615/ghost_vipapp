@@ -185,7 +185,7 @@ test("desktop keeps summary, work views, queue and inspector without stacking ch
   assert.match(workspaceStyles, /\.primaryNav,\s*\.mobileSummary,\s*\.mobileSheet,\s*\.mobileQueue,\s*\.summaryRefresh\s*\{\s*display:\s*none;/u);
   assert.match(workspace, /本日のVIP予約サマリー/u);
   assert.match(workspace, /本日の稼働状況/u);
-  for (const label of ["予約", "次の来店", "要対応", "未割当"]) {
+  for (const label of ["予約", "次の来店", "要対応", "卓未定"]) {
     assert.match(workspace, new RegExp(`label: "${label}"`, "u"));
   }
   for (const view of ["List", "Floor", "Chart"]) {

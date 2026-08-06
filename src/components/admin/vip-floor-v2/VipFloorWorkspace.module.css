@@ -965,22 +965,38 @@
   white-space: nowrap;
 }
 .reservationTable th svg { display: inline; vertical-align: -2px; }
+/* `--h-row` is the declared ledger row (52px, chosen for the touch floor). The
+   row has to actually be that: `.rowOpen` used to re-declare the 44px floor as
+   its own min-height, and with 6px of cell padding on top of it every row came
+   out 57px — the token quietly overridden by a control that is not the target.
+   The row itself is the target (`.rowOpen::after` covers it), so the floor
+   belongs to the row and the cell keeps its padding tight. */
 .reservationTable td {
   height: var(--h-row);
-  padding: var(--s-3) var(--s-5);
+  padding: var(--s-2) var(--s-5);
   border-bottom: 1px solid var(--rule);
   vertical-align: middle;
   white-space: nowrap;
 }
-.listView[data-density="comfortable"] .reservationTable td { height: 64px; }
+.listView[data-density="comfortable"] .reservationTable td { height: 64px; padding: var(--s-3) var(--s-5); }
 .reservationTable tbody tr { position: relative; transition: background var(--dur-fast) var(--ease-ui); }
 .reservationTable tbody tr:nth-child(even) { background: var(--surface-quiet); }
 .reservationTable tr[data-attention] { background: var(--alert-wash); }
-.reservationTable tr[data-selected],
+/* Selection is the champagne spine every ledger entry on this surface takes,
+   matching `.queueItem` and `.checkGrid label`. It used to share a declaration
+   block with the empty-state cell, so the row the operator had just opened
+   inherited that cell's `height: 140px`, its muted `--ink-3` and its centred
+   text: the one row under inspection became 2.6× the others, the palest text in
+   the ledger, and the only row whose columns did not line up. */
+.reservationTable tr[data-selected] { background: var(--accent-wash); box-shadow: inset 0 -2px var(--accent); }
 .emptyTableRow td { height: 140px; color: var(--ink-3); text-align: center; white-space: normal; }
 
 /* Time is the hero of every row, and it is the row's single control. */
 .timeCell { padding-left: var(--s-6) !important; }
+/* The row's control keeps the 44px floor in its own box — the audit measures
+   the control, not the overlay that stretches its hit area — and the cell keeps
+   its padding tight, so the row lands on the declared `--h-row` instead of the
+   57px the old 6px padding pushed it to. */
 .rowOpen { display: grid; min-height: var(--h-control); align-content: center; gap: 1px; padding: 0; border: 0; background: none; text-align: left; }
 .rowOpen::after { position: absolute; inset: 0; content: ""; }
 .rowOpen strong {
@@ -1564,6 +1580,50 @@
 .timelineTableLabel strong { color: var(--ink); font-family: var(--font-figure); font-size: var(--t-mini); font-weight: var(--weight-strong); }
 .timelineTableLabel span { color: var(--ink-3); font-size: var(--t-micro); }
 .timelineTableLabel small { color: var(--alert); font-size: var(--t-micro); }
+/* ── the alarm · part one, the lane says what is wrong ────────────────────
+ *
+ * The track is 1020–1560px wide and the iPad shows about 960 of it, so anything
+ * drawn at a booking's own minute can be scrolled off the screen while the row
+ * it belongs to is still in front of the operator. The lane label cannot: it is
+ * sticky, it is where the eye starts every row, and until now it carried no
+ * state at all.
+ *
+ * So the exception is stated here, in words, as a plate — and the plate never
+ * animates, so its text keeps one fixed contrast pair all night (§7.1). The
+ * ladder is carried by how hard the plate is drawn, which survives greyscale,
+ * peripheral vision and the motion being switched off:
+ *
+ *   low    → tinted, coloured text   → the guest is due
+ *   medium → tinted, ruled           → the table is due back
+ *   high   → solid, reversed         → the clock has already run out
+ */
+.timelineLaneAlarm {
+  display: block;
+  overflow: hidden;
+  padding: 1px var(--s-2);
+  border-radius: var(--r-chip);
+  background: var(--surface-sunken);
+  color: var(--ink-2) !important;
+  font-family: var(--font-figure);
+  font-size: var(--t-micro);
+  font-weight: var(--weight-strong);
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.timelineLaneAlarm[data-signal="low"] { background: var(--accent-wash); color: var(--accent-ink) !important; }
+.timelineLaneAlarm[data-signal="medium"] {
+  border-top: 2px solid var(--warn);
+  background: var(--warn-wash);
+  color: var(--warn) !important;
+}
+.timelineLaneAlarm[data-signal="high"] { background: var(--alert); color: var(--surface) !important; }
+/* Handled keeps the state and drops the volume by one step, so a lane the floor
+   has already answered stops competing with one it has not. */
+.timelineLaneAlarm[data-acknowledged][data-signal="high"] {
+  background: var(--alert-wash);
+  color: var(--alert) !important;
+}
 /* Three layers, topmost first: the hour rules, the half-hour rules, and a wash
  * over the part of the night that has already happened. The grid is derived
  * from the same interval count as the ruler, so a line always lands on a label
@@ -1762,8 +1822,10 @@
   /* Never draw an invisible light: a phase that reaches this element without a
    * colour still marks its minute. */
   --band-frame: var(--rule-strong);
-  --signal-rest: 0.3;
+  --signal-rest: 0.34;
   --signal-spill: 14px;
+  --signal-stem: 3px;
+  --signal-pin: 14px;
   position: absolute;
   /* Level with a selected band, which lifts to 3, so a band can never clip the
    * deadline it is counting to. The now-line is also 3 and is painted after
@@ -1771,8 +1833,8 @@
   z-index: 3;
   top: 0;
   bottom: 0;
-  width: 2px;
-  margin-left: -1px;
+  width: var(--signal-stem);
+  margin-left: calc(var(--signal-stem) / -2);
   background: var(--band-frame);
   opacity: var(--signal-rest);
   pointer-events: none;
@@ -1789,17 +1851,46 @@
   content: "";
 }
 .timelineDeadline[data-edge="head"]::before {
-  right: 2px;
+  right: var(--signal-stem);
   background: linear-gradient(to left, color-mix(in oklch, var(--band-frame) 30%, transparent), transparent);
 }
 .timelineDeadline[data-edge="tail"]::before {
-  left: 2px;
+  left: var(--signal-stem);
   background: linear-gradient(to right, color-mix(in oklch, var(--band-frame) 30%, transparent), transparent);
 }
-/* The top of the ladder is also the widest stem and the longest spill, so the
- * tier survives with the motion switched off and from the far side of a dark
- * room, where hue goes first. */
-.timelineDeadline[data-signal="high"] { --signal-rest: 0.26; --signal-spill: 20px; width: 3px; }
+/* ── the alarm · part two, the pin that says which minute ─────────────────
+ *
+ * The stem alone could not be an alarm on this chart, and the reason is
+ * structural rather than aesthetic: the track's own background is vertical
+ * rules — one every half hour at `--rule`, one every hour at `--rule-strong` —
+ * so a 2px vertical line differed from the grid by one pixel of width and a
+ * hue. Measured side by side it read as a slightly darker gridline, which is
+ * why the floor could not tell it was being warned.
+ *
+ * A pin cannot be mistaken for a rule: it is a solid wedge hanging off the top
+ * of the lane and pointing down at the minute, the shape a caliper makes. It
+ * carries no text, so it is free to pulse, and it sits against the tick row at
+ * the top of the lane rather than anywhere near the band's label. */
+.timelineDeadline::after {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: var(--signal-pin);
+  height: calc(var(--signal-pin) * 0.62);
+  background: var(--band-frame);
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+  content: "";
+  transform: translateX(-50%);
+}
+/* The top of the ladder is the widest stem, the biggest pin and the longest
+ * spill, so the tier survives with the motion switched off and from the far
+ * side of a dark room, where hue goes first. */
+.timelineDeadline[data-signal="high"] {
+  --signal-rest: 0.3;
+  --signal-spill: 20px;
+  --signal-stem: 4px;
+  --signal-pin: 18px;
+}
 
 /* Three rhythms, loudest last, in the ladder clinical alarm systems use
  * (IEC 60601-1-8): priority reads as waveform and amplitude, not just speed.
@@ -1838,7 +1929,7 @@
 }
 /* Handled: the light stops, the state stays. A signal that keeps moving after
  * the floor has dealt with it is how operators learn to ignore signals. */
-.timelineDeadline[data-acknowledged] { animation: none; opacity: 0.22; }
+.timelineDeadline[data-acknowledged] { animation: none; opacity: 0.42; }
 .timelineView[data-motion="paused"] .timelineDeadline { animation-play-state: paused; }
 @media (prefers-reduced-motion: reduce) {
   /* Same three tiers, authored still: how strongly the light is drawn says how
@@ -1847,7 +1938,7 @@
   .timelineDeadline[data-signal="low"] { opacity: 0.5; }
   .timelineDeadline[data-signal="medium"] { opacity: 0.75; }
   .timelineDeadline[data-signal="high"] { opacity: 1; }
-  .timelineDeadline[data-acknowledged] { opacity: 0.22; }
+  .timelineDeadline[data-acknowledged] { opacity: 0.42; }
 }
 /* What a narrowing band gives up, in reverse order of what the floor needs:
  * the identifier first — a tap opens the inspector for that — then the status
@@ -2392,25 +2483,11 @@
   color: var(--accent-ink);
 }
 .walkInAttribution > header h3 { margin: 0; color: var(--ink); font-size: var(--t-body); font-weight: var(--weight-strong); }
-.walkInAttribution > fieldset { gap: var(--s-3); padding: var(--s-5); }
-.walkInAttribution > fieldset > legend { margin-bottom: var(--s-3); color: var(--ink-3); font-size: var(--t-micro); }
-.walkInAttributionOptions { display: grid; gap: 1px; overflow: hidden; border: 1px solid var(--rule); border-radius: var(--r-control); background: var(--rule); }
-.walkInAttributionOptions label {
-  display: grid !important;
-  min-height: calc(var(--h-control) + var(--s-4));
-  grid-template-columns: auto auto minmax(0, 1fr);
-  align-items: center;
-  gap: var(--s-3);
-  padding: var(--s-3) var(--s-4);
-  background: var(--surface);
-  color: var(--ink-2) !important;
-  letter-spacing: normal !important;
-}
-.walkInAttributionOptions label[data-selected] { box-shadow: inset 0 -2px var(--accent); color: var(--ink) !important; }
-.walkInAttributionOptions input { width: 24px; min-width: 24px; height: 24px; min-height: 24px; margin: 0; accent-color: var(--action); }
-.walkInAttributionOptions label > span { display: grid; min-width: 0; gap: var(--s-1); }
-.walkInAttributionOptions strong { overflow: hidden; color: var(--ink); font-size: var(--t-mini); text-overflow: ellipsis; white-space: nowrap; }
-.walkInAttributionOptions small { color: var(--ink-3); font-size: var(--t-micro); }
+/* One line, whatever the roster size. Eleven promoters rendered as radio rows
+   was 584px of options inside an 810px screen, so the receipt below it — the
+   only place the operator can check what is about to be saved — never appeared
+   at all. The select keeps the choice visible and hands the list to iPadOS. */
+.walkInStaffField { padding: var(--s-5); }
 .walkInReceipt { margin: 0; border-top: 1px solid var(--rule-strong); }
 .walkInReceipt > div {
   display: grid;
@@ -3089,7 +3166,7 @@
 
 /* ── The timeline fits the night ───────────────────────────────────────────
  *
- * The floor is run from the 時間軸, so the whole operating window — 22:00 to
+ * The floor is run from the chart, so the whole operating window — 22:00 to
  * 翌05:00, seven hours — has to be on screen at once. It was not: the grid
  * carries a hard `min-width` (1020px at 30m, 860px even at 60m) against roughly
  * 780pt of usable width on the venue iPad in landscape, so the night ran off the
@@ -3213,7 +3290,6 @@
   .formColumns, .customerHistory, .customerLinkControl div { grid-template-columns: minmax(0, 1fr); }
   .walkInDesk { grid-template-columns: minmax(0, 1fr); overflow: visible; }
   .walkInAttribution { order: -1; border-bottom: 1px solid var(--rule-strong); border-left: 0; }
-  .walkInAttributionOptions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .walkInReceipt { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .walkInReceipt > div { grid-template-columns: minmax(0, 1fr); gap: var(--s-1); }
   .walkInReceipt dd { text-align: left; }
@@ -3406,7 +3482,6 @@
     margin-bottom: calc(var(--s-4) * -1);
     margin-left: calc(var(--s-4) * -1);
   }
-  .walkInAttributionOptions { grid-template-columns: minmax(0, 1fr); }
   .walkInSection { padding: var(--s-5); }
 }
 

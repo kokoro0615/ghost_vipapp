@@ -485,6 +485,45 @@ explains the interface competes with copy that reports the floor.
 - **A title is printed once.** Where a `fieldset` inside an already-titled
   dialog needs a group name, the `legend` is `sr-only`.
 
+### 5.7d The 2026-08-06 density and vocabulary pass
+
+Three Owner findings, all of them measurable, all of them from the venue rather
+than from a style opinion.
+
+**A roster is a list, not a layout.** Walk-in attribution rendered one radio row
+per promoter. At the eleven the venue is heading for that was **584px of options
+inside an 810px screen**, and the receipt underneath — the only place an
+operator can check what is about to be saved — sat at y=910, permanently below
+the fold. Each row also repeated `プロモーター／集客担当`, eleven times, which is
+§5.7c exactly. It is now one `<select>`: the aside went 903px → 554px and the
+receipt is fully visible. The subtitle survives once, as the empty-roster hint.
+Rule: **any roster that can grow past about five entries belongs in a select**,
+not in a rendered list of controls.
+
+**A selector list is not a place to share a height.** The ledger's selected row
+shared a declaration block with the empty-state cell:
+
+```css
+.reservationTable tr[data-selected],
+.emptyTableRow td { height: 140px; color: var(--ink-3); text-align: center; }
+```
+
+So the row the operator had just opened inherited the empty state's 140px, its
+muted `--ink-3` and its centred text — **2.6× the other rows, the palest text in
+the ledger, and the only row whose columns did not line up**. Selection now
+takes the champagne spine every other ledger entry on this surface takes. While
+fixing it: `--h-row` is 52px by decision, but `.rowOpen` re-declared the 44px
+touch floor as its own `min-height` and 6px of cell padding sat on top, so every
+row came out 57px — a declared token quietly overridden. The floor stays on the
+control (the audit measures the control, not the overlay that stretches its hit
+area) and the padding drops to 4px, which lands the row on 53px. Compact and
+comfortable are now 53 and 64, a difference the toggle can be seen to make.
+
+**The floor's words, not the schema's.** `席割当` / `卓割当` / `未割当` are the
+data model talking. The surface now says `卓を決める`, `使う卓`, `卓未定`, and
+the chart is `チャート` rather than `時間軸`. When a label comes from a column
+name, assume it is wrong until someone on the floor has said it out loud.
+
 ### 5.8 Destructive and financially adjacent actions
 
 Explicit confirmation step · least-destructive initial focus ·
@@ -506,7 +545,7 @@ portrait (810pt) took both. They are now separate.
 |---|---|---|
 | Desk / **iPad landscape (1080pt)** | ≥1024px | Two columns — focal object + persistent inspector (`--inspector-w: clamp(324px, 24vw, 388px)`, `48px` collapsed). Never three. |
 | **iPad portrait (810pt)** | 768–1023px | One column at full width. The inspector and the queue **overlay from the trailing edge** (`min(420px, 54vw)`), the way a supplementary column behaves on iPadOS when a split view collapses. Dialogs stay dialogs. **The operator toolbar is kept**: view switcher, create, menu, masthead counters. |
-| Phone | ≤767px | The phone shell: five-item bottom nav (受付 / 一覧 / フロア / 時間軸 / メニュー), 52px counter strip, full-bleed sheets and dialogs, toolbar stripped of its view switcher. |
+| Phone | ≤767px | The phone shell: five-item bottom nav (受付 / 一覧 / フロア / チャート / メニュー), 52px counter strip, full-bleed sheets and dialogs, toolbar stripped of its view switcher. |
 
 - **Breakpoint of record: 1023px**, shared by `VipFloorWorkspace.tsx`
   (`window.matchMedia("(max-width: 1023px)")`, three call sites) and the QA
@@ -656,6 +695,50 @@ off is unreadable in half its frames, forces the still version to be a different
 design from the moving one, and reads as a fault rather than as a state. It is
 also what separates a beacon from a smoke detector: the top tier strikes hard
 and decays, where the `steps(1, end)` square wave it replaced simply toggled.
+
+### 7.0c Where the alarm is stated, as of 2026-08-06 (second pass)
+
+Owner feedback, on the design shipped earlier the same day: *「帯点滅アラートの
+デザインが見栄えが悪く、現場の人からしたらわかりにくい」*. It was right, and the
+reason was structural rather than stylistic.
+
+**A vertical line cannot be an alarm on a chart made of vertical lines.** The
+track's background *is* rules — `--rule` every half hour, `--rule-strong` every
+hour — and the alarm was a 2px stem. Measured side by side it differed from the
+grid by one pixel of width and a hue, so the floor read it as a slightly darker
+gridline. Worse, the track is 1020–1560px wide and the venue iPad shows about
+960 of it: a light drawn at a booking's own minute **can be scrolled off screen
+while the row it belongs to is still in front of the operator**.
+
+So the alarm is now stated twice, by two objects with one job each.
+
+| Object | Answers | Behaviour |
+|---|---|---|
+| `.timelineLaneAlarm` — a worded plate in the sticky lane label | *which table, what, how many minutes* | never animates |
+| `.timelineDeadline` — stem **plus pin** on the track | *which minute is running out* | carries the whole pulse |
+
+**The plate lives where the eye already is.** The lane label is sticky, it is
+where every row starts, and until now it carried no state at all. The plate
+shows the worst live exception on that lane — tier first, and an unanswered
+exception ahead of a handled one at the same tier. Capacity steps aside for it
+rather than the lane growing a third line: the band already carries this
+booking's covers, and capacity is not what anyone needs while a clock is
+running out.
+
+**The plate's ladder is drawn strength, not motion**, so it survives greyscale,
+peripheral vision and reduced motion identically: `low` tinted with coloured
+text, `medium` tinted with a 2px rule, `high` solid with reversed text. Handled
+`high` drops one step to the tint — the state stays, the volume does not. And
+because the plate carries text it is the one element here that **must never**
+animate (§7.1); the guard asserts that no `.timelineLaneAlarm` rule contains an
+`animation`.
+
+**The pin is the shape a rule cannot make.** A solid wedge hangs off the top of
+the lane and points down at the minute, against the tick row and far from any
+label. It is text-free, so it is free to pulse, and it scales with the tier
+(14px, 18px at `high`) alongside the stem (3px, 4px). Handled deadlines rest at
+0.42 rather than 0.22: the minute is still worth marking after someone has
+answered for it, just not worth shouting about.
 
 **The light stands on the minute, not around the label.** Until 2026-08-06 the
 alarm was a second full-perimeter ring pinned to the inside of the band's own
@@ -883,6 +966,18 @@ Each verified to fail when violated before being kept.
 | **Records rest on their own slots** (same test) | A record loses its base `transform`, so the four dots collapse onto slot 0 whenever the animation is not running |
 | **Reduced motion is a still** (same test) | The `reduce` block stops marking the head record statically, or reintroduces a looping fallback that the global 1ms clamp would silently kill |
 | **Boot is audited** (`scripts/light-ui-qa-manifest.mjs`) | `boot` leaves the required QA states, so the screen would stop being rendered at every viewport |
+
+### 8.1e Guards added 2026-08-06 (second pass)
+
+Each verified to fail when violated before being kept.
+
+| Guard | Fails when |
+|---|---|
+| **The lane states its own exception** (`tests/contract/chart-live-state.test.mjs`) | `.timelineLaneAlarm` leaves the lane label, the lane stops ranking by tier, an unanswered exception stops outranking a handled one at the same tier, or capacity stops standing down for the plate |
+| **The worded plate never animates** (same test) | Any `.timelineLaneAlarm` rule gains an `animation`, which would make its text contrast a function of the animation phase (§7.1) |
+| **The plate keeps three drawn strengths** (same test) | A tier loses its tint/rule/solid treatment, so the ladder would live in hue alone |
+| **The alarm is a shape, not a rule** (same test) | `.timelineDeadline::after` loses its wedge `clip-path`, or the stem/pin stop scaling with the tier — the state that made the alarm read as a gridline |
+| **One control per roster** (`tests/contract/walk-in-attribution.test.mjs`) | Walk-in attribution goes back to one control per promoter, or the promoter subtitle is printed more than once |
 
 ### 8.1c Guards added 2026-08-02
 

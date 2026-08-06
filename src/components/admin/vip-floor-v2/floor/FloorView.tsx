@@ -72,7 +72,7 @@ export default function FloorView({
       <div className={styles.viewStrip}>
         <h1 id="floor-view-title">VIPフロア</h1>
         <span className="tabular-nums">稼働 {occupied}/{board.tables.length}</span>
-        {unassignedCount > 0 ? <span className={styles.exceptionText}>未割当 {unassignedCount}</span> : null}
+        {unassignedCount > 0 ? <span className={styles.exceptionText}>卓未定 {unassignedCount}</span> : null}
         <span className={styles.stripSpacer} />
         <button
           type="button"
@@ -80,7 +80,7 @@ export default function FloorView({
           onClick={onOpenAssignment}
           disabled={!selectedReservationId}
         >
-          <MoveRight aria-hidden size={16} /> 席割当先を選択
+          <MoveRight aria-hidden size={16} /> 移動先の卓を選ぶ
         </button>
       </div>
 
@@ -229,7 +229,7 @@ export default function FloorView({
       <div className={styles.floorContextAction}>
         <span>{selectedTable ? `${selectedTable.displayCode} を選択中` : "VIP席を選択してください"}</span>
         <button type="button" className={styles.primaryButton} onClick={onOpenAssignment} disabled={!selectedReservationId}>
-          <MoveRight aria-hidden size={16} />割当を確認
+          <MoveRight aria-hidden size={16} />卓を確認
         </button>
       </div>
     </section>

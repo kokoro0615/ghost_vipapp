@@ -20,7 +20,7 @@ const commandLabels: Record<CommandKind, string> = {
   service_status: "接客状態を変更",
   check_in: "チェックイン",
   arrival_time: "到着時刻を記録",
-  assignment: "卓割当を変更",
+  assignment: "卓を決める",
   seat_extension: "利用時間を延長",
   note: "スタッフメモ",
   walk_in_cancel: "Walk-inを取り消す",
@@ -92,8 +92,8 @@ export function CommandCenter({
     && !isStandardServiceTransition(source?.serviceStatus, serviceTargetStatus);
   const impact = useMemo(() => {
     if (kind === "assignment") return demoMode.enabled
-      ? "browser-local合成台帳の卓割当を置き換え、この端末の各viewへ反映します。"
-      : "GHOST予約台帳の卓割当を置き換え、全端末の表示へ反映します。";
+      ? "browser-local合成台帳の使用卓を置き換え、この端末の各viewへ反映します。"
+      : "GHOST予約台帳の使用卓を置き換え、全端末の表示へ反映します。";
     if (kind === "check_in") return demoMode.enabled
       ? "合成来店を確定し、着席開始と利用期限をbrowser-local台帳へ記録します。"
       : "来店を確定し、着席開始と利用期限をGHOST予約台帳へ記録します。";
@@ -101,8 +101,8 @@ export function CommandCenter({
     if (kind === "seat_extension") return "現在の利用期限を15分単位、最大120分まで延長します。";
     if (kind === "note") return "500文字以内の現場共有メモを監査付きで保存します。";
     if (kind === "walk_in_cancel") return demoMode.enabled
-      ? "合成Walk-inを取消済みにし、割当席をbrowser-local台帳で解放します。元記録と監査履歴は残ります。"
-      : "Walk-inを取消済みにし、割当席を解放します。元記録と監査履歴は残り、返金・顧客通知は実行しません。";
+      ? "合成Walk-inを取消済みにし、使用中の卓をbrowser-local台帳で解放します。元記録と監査履歴は残ります。"
+      : "Walk-inを取消済みにし、使用中の卓を解放します。元記録と監査履歴は残り、返金・顧客通知は実行しません。";
     return "接客状態を更新し、Floor・Chart・Listへ反映します。";
   }, [demoMode.enabled, kind]);
 
@@ -377,7 +377,7 @@ export function CommandCenter({
 
             {kind === "assignment" ? (
               <div className={styles.assignmentOptions} role="group" aria-labelledby="assignment-options-label">
-                <span id="assignment-options-label">割当卓（複数選択可）</span>
+                <span id="assignment-options-label">使う卓（複数選択可）</span>
                 {board.tables.map((table) => (
                   <label key={table.id}>
                     <input
@@ -397,9 +397,9 @@ export function CommandCenter({
                   </label>
                 ))}
                 {assignmentCapacityShort ? (
-                  <section className={styles.capacityOverrideRail} aria-label="卓割当 Owner定員超過確認">
+                  <section className={styles.capacityOverrideRail} aria-label="卓の指定 Owner定員超過確認">
                     <strong>定員超過 — {assignmentCapacity}名枠に{reservation.guestCount}名</strong>
-                    <p>卓追加ができない場合だけ、理由を記録してOwner権限で割当を続行します。</p>
+                    <p>卓追加ができない場合だけ、理由を記録してOwner権限で続行します。</p>
                     <label className={styles.choiceRow}>
                       <input
                         type="checkbox"
