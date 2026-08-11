@@ -514,6 +514,36 @@ function deploymentAliases(deployment) {
   }).filter(Boolean);
 }
 
+function deploymentAutomaticAliases(deployment) {
+  return [deployment?.automaticAliases]
+    .flat(2)
+    .filter((value) => value !== null && value !== undefined)
+    .map((value) => {
+      if (typeof value === "string") return value.replace(/^https?:\/\//u, "").replace(/\/$/u, "");
+      return String(value?.alias ?? value?.domain ?? value?.name ?? "");
+    })
+    .filter(Boolean);
+}
+
+function assertStagedCandidate(candidate, errorSuffix = "") {
+  if (candidate?.readySubstate !== "STAGED") {
+    throw new Error(`candidate_not_staged${errorSuffix}:${candidate?.readySubstate ?? "missing"}`);
+  }
+  const aliases = [...new Set(deploymentAliases(candidate))].sort();
+  const automaticAliases = [...new Set(deploymentAutomaticAliases(candidate))].sort();
+  const automaticAliasesAreSafe = automaticAliases.every((hostname) => (
+    hostname !== RELEASE_CONFIG.productionHostname
+    && /^[a-z0-9-]+(?:\.[a-z0-9-]+)*\.vercel\.app$/u.test(hostname)
+  ));
+  if (
+    !automaticAliasesAreSafe
+    || aliases.length !== automaticAliases.length
+    || aliases.some((hostname, index) => hostname !== automaticAliases[index])
+  ) {
+    throw new Error(`candidate_is_not_aliasless${errorSuffix}`);
+  }
+}
+
 function createWebsiteCompatibilityBinding({ deploymentId, commit, ref }) {
   const source = "cli";
   const capabilities = Object.entries(WEBSITE_INERT_CAPABILITIES)
@@ -747,9 +777,7 @@ function assertSafeFailedCandidate(candidate, protectedDeploymentIds) {
   if (candidate?.target !== "production") {
     throw new Error(`deployment_target_not_production:${candidate?.target}`);
   }
-  if (deploymentAliasEntries(candidate).length !== 0) {
-    throw new Error("candidate_is_not_aliasless");
-  }
+  assertStagedCandidate(candidate);
   if (protectedDeploymentIds.has(deploymentId)) {
     throw new Error("candidate_matches_protected_deployment");
   }
@@ -762,7 +790,19 @@ function deploymentAbsentError(error) {
     || /vercel_api_(?:404|410)/u.test(error?.message ?? "");
 }
 
-async function cleanupFailedCandidate({ deploymentId, auth, protectedDeploymentIds }, runtime) {
+async function cleanupFailedCandidate({
+  deploymentId,
+  auth,
+  protectedDeploymentIds,
+  fixedDeploymentId,
+}, runtime) {
+  const fixedReadback = await runtime.resolveProductionDeploymentId(
+    RELEASE_CONFIG.productionHostname,
+    auth,
+  );
+  if (fixedReadback !== fixedDeploymentId) {
+    throw new Error("candidate_cleanup_fixed_production_changed");
+  }
   const exactCandidate = await runtime.getVercelDeployment(deploymentId, auth);
   const exactId = assertSafeFailedCandidate(exactCandidate, protectedDeploymentIds);
   if (exactId !== deploymentId) throw new Error("candidate_cleanup_exact_id_mismatch");
@@ -871,6 +911,7 @@ export async function bootstrapRollback(
         deploymentId: rollbackDeployment,
         auth: preflight.auth,
         protectedDeploymentIds,
+        fixedDeploymentId: fixedDeploymentBeforeBootstrap,
       }, runtime);
     }
     throw error;
@@ -1025,12 +1066,20 @@ export async function createCandidate(
     if (readWebsiteCompatibilityBinding(finalCandidate).digest !== websiteBinding.digest) {
       throw new Error("candidate_website_binding_changed_after_attestation");
     }
+    const fixedAfterCandidate = await runtime.resolveProductionDeploymentId(
+      RELEASE_CONFIG.productionHostname,
+      preflight.auth,
+    );
+    if (fixedAfterCandidate !== fixedDeploymentBeforeCandidate) {
+      throw new Error("candidate_moved_fixed_production_alias");
+    }
   } catch (error) {
     if (cleanupEligible) {
       await cleanupFailedCandidate({
         deploymentId: candidateId,
         auth: preflight.auth,
         protectedDeploymentIds,
+        fixedDeploymentId: fixedDeploymentBeforeCandidate,
       }, runtime);
     }
     throw error;
@@ -1132,9 +1181,7 @@ export async function promoteCandidate(
   if (readWebsiteCompatibilityBinding(candidate).digest !== websiteBinding.digest) {
     throw new Error("candidate_website_binding_changed");
   }
-  if (deploymentAliasEntries(candidate).length !== 0) {
-    throw new Error("candidate_is_not_aliasless");
-  }
+  assertStagedCandidate(candidate);
   const sourceAttestation = await runtime.attestDeploymentSource({
     deploymentId,
     repoRoot,
@@ -1171,9 +1218,7 @@ export async function promoteCandidate(
     if (readRollbackBinding(lockedCandidate).digest !== rollbackBinding.digest) {
       throw new Error("candidate_rollback_binding_changed_under_promotion_lease");
     }
-    if (deploymentAliasEntries(lockedCandidate).length !== 0) {
-      throw new Error("candidate_is_not_aliasless_under_promotion_lease");
-    }
+    assertStagedCandidate(lockedCandidate, "_under_promotion_lease");
     assertReadyDeploymentIdentity(
       await runtime.getVercelDeployment(rollbackDeployment, lockedPreflight.auth),
       rollbackDeployment,

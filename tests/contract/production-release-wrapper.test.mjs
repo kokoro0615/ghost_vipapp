@@ -95,6 +95,8 @@ function websiteReadiness(overrides = {}) {
 
 function releaseDeployment(id, {
   alias = [],
+  automaticAliases = [],
+  readySubstate = alias.includes(RELEASE_CONFIG.productionHostname) ? "PROMOTED" : "STAGED",
   commit = releaseCommit,
   fixedDeploymentId = "dpl_VipRollback",
   rollbackDeploymentId = "dpl_VipRollback",
@@ -115,9 +117,11 @@ function releaseDeployment(id, {
     projectId: RELEASE_CONFIG.projectId,
     ownerId: RELEASE_CONFIG.teamId,
     readyState: "READY",
+    readySubstate,
     target: "production",
     source: "cli",
     alias,
+    automaticAliases,
     meta: {
       gitCommitSha: commit,
       gitCommitRef: RELEASE_CONFIG.releaseBranch,
@@ -845,6 +849,58 @@ test("candidate refuses every pre-existing alias, not only the fixed Production 
     createCandidate({ repoRoot: "/fixture/repo" }, runtime),
     /candidate_is_not_aliasless/u,
   );
+});
+
+test("candidate accepts only provider-declared automatic aliases on a staged Production deployment", async () => {
+  const automaticAliases = [
+    "ghost-vipapp-projects-b6224582.vercel.app",
+    "ghost-vipapp-kokoro0634-projects-b6224582.vercel.app",
+  ];
+  let fixedReads = 0;
+  const base = baseReleaseRuntime();
+  const runtime = baseReleaseRuntime({
+    async resolveProductionDeploymentId(hostname) {
+      if (hostname === RELEASE_CONFIG.productionHostname) fixedReads += 1;
+      return base.resolveProductionDeploymentId(hostname);
+    },
+    async getVercelDeployment(value) {
+      if (value === "ghost-vipapp-candidate.vercel.app" || value === "dpl_VipCandidate") {
+        return releaseDeployment("dpl_VipCandidate", {
+          alias: automaticAliases,
+          automaticAliases,
+          readySubstate: "STAGED",
+        });
+      }
+      return base.getVercelDeployment(value);
+    },
+  });
+
+  const result = await createCandidate({ repoRoot: "/fixture/repo" }, runtime);
+  assert.equal(result.deploymentId, "dpl_VipCandidate");
+  assert.equal(fixedReads, 2, "the fixed customer hostname must be unchanged after staging");
+
+  for (const candidate of [
+    releaseDeployment("dpl_VipCandidate", {
+      alias: automaticAliases,
+      automaticAliases,
+      readySubstate: "PROMOTED",
+    }),
+    releaseDeployment("dpl_VipCandidate", {
+      alias: [...automaticAliases, "unexpected.example"],
+      automaticAliases,
+      readySubstate: "STAGED",
+    }),
+  ]) {
+    await assert.rejects(
+      createCandidate({ repoRoot: "/fixture/repo" }, baseReleaseRuntime({
+        async getVercelDeployment(value) {
+          if (value === "ghost-vipapp-candidate.vercel.app") return candidate;
+          return base.getVercelDeployment(value);
+        },
+      })),
+      /candidate_(?:not_staged|is_not_aliasless)/u,
+    );
+  }
 });
 
 test("candidate source failure deletes only the exact safe deployment and confirms absence", async () => {
