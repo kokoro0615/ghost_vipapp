@@ -86,6 +86,7 @@ function vipCiEnvironment(source = process.env) {
     "GHOST_VIP_WEBKIT_EXECUTABLE",
     "CHROME_PATH",
     "GHOST_VIP_QA_ARTIFACT_DIR",
+    "GHOST_VIPAPP_E2E_ENV_FILE",
   ]) copyAbsoluteChildPath(output, source, key);
   for (const key of ["A11Y_PORT", "MAINTENANCE_QA_PORT"]) copyChildPort(output, source, key);
   return output;
@@ -1160,7 +1161,9 @@ export async function promoteCandidate(
     cwd: repoRoot,
     env: vipCiEnvironment(),
   });
-  await runtime.run("npm", ["run", "e2e:staging:release"], {
+  await runtime.run("npm", [
+    "run", "e2e:staging:inert", "--", "--deployment-id", deploymentId,
+  ], {
     cwd: repoRoot,
     env: vipCiEnvironment(),
   });

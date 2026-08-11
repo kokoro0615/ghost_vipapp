@@ -226,7 +226,13 @@ function getDemoSession(request: Request) {
 async function deleteOwnerSession(request: Request) {
   const token = readAdminToken(request);
   const response = token ? await ghostAdminFetch("/api/admin/session", { method: "DELETE" }, token) : null;
-  const local = NextResponse.json(response ? await copyJson(response) : { ok: true }, { status: response?.ok ? 200 : response?.status ?? 200 });
+  const local = NextResponse.json(
+    response ? await copyJson(response) : { ok: true },
+    {
+      status: response?.ok ? 200 : response?.status ?? 200,
+      headers: { "cache-control": "private, no-store" },
+    },
+  );
   clearAdminToken(local);
   clearDemoSessionCookie(local);
   clearOwnerSessionCookie(local);

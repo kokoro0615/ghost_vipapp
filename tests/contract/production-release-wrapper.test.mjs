@@ -1142,14 +1142,18 @@ test("VIP bootstrap anchor is durably sealed through candidate and promotion whi
 test("promotion runs every Gate, re-attests the exact candidate, and reads fixed plus rollback state", async (t) => {
   const previousSecret = process.env.GHOST_SECRET;
   const previousWebkit = process.env.GHOST_VIP_WEBKIT_EXECUTABLE;
+  const previousE2eEnv = process.env.GHOST_VIPAPP_E2E_ENV_FILE;
   t.after(() => {
     if (previousSecret === undefined) delete process.env.GHOST_SECRET;
     else process.env.GHOST_SECRET = previousSecret;
     if (previousWebkit === undefined) delete process.env.GHOST_VIP_WEBKIT_EXECUTABLE;
     else process.env.GHOST_VIP_WEBKIT_EXECUTABLE = previousWebkit;
+    if (previousE2eEnv === undefined) delete process.env.GHOST_VIPAPP_E2E_ENV_FILE;
+    else process.env.GHOST_VIPAPP_E2E_ENV_FILE = previousE2eEnv;
   });
   process.env.GHOST_SECRET = "must-not-reach-child";
   process.env.GHOST_VIP_WEBKIT_EXECUTABLE = "/opt/ghost/webkit";
+  process.env.GHOST_VIPAPP_E2E_ENV_FILE = "/secure/vip-release.env";
   const commit = "e".repeat(40);
   const candidateDeployment = "dpl_VerifiedCandidate";
   const rollbackDeployment = "dpl_RollbackAnchor";
@@ -1254,7 +1258,7 @@ test("promotion runs every Gate, re-attests the exact candidate, and reads fixed
 
   assert.deepEqual(commands.map(({ command, args }) => [command, ...args]), [
     ["npm", "run", "ci"],
-    ["npm", "run", "e2e:staging:release"],
+    ["npm", "run", "e2e:staging:inert", "--", "--deployment-id", candidateDeployment],
     [
       "npx",
       "--no-install",
@@ -1277,7 +1281,10 @@ test("promotion runs every Gate, re-attests the exact candidate, and reads fixed
   for (const command of commands) assert.equal(command.options.env.GHOST_SECRET, undefined);
   assert.equal(commands[0].options.env.GHOST_VIP_WEBKIT_EXECUTABLE, "/opt/ghost/webkit");
   assert.equal(commands[1].options.env.GHOST_VIP_WEBKIT_EXECUTABLE, "/opt/ghost/webkit");
+  assert.equal(commands[0].options.env.GHOST_VIPAPP_E2E_ENV_FILE, "/secure/vip-release.env");
+  assert.equal(commands[1].options.env.GHOST_VIPAPP_E2E_ENV_FILE, "/secure/vip-release.env");
   assert.equal(commands[2].options.env.GHOST_VIP_WEBKIT_EXECUTABLE, undefined);
+  assert.equal(commands[2].options.env.GHOST_VIPAPP_E2E_ENV_FILE, undefined);
 });
 
 test("promotion fails closed when the provider-scoped promotion lease is already held", async () => {
@@ -1312,7 +1319,7 @@ test("promotion fails closed when the provider-scoped promotion lease is already
   );
   assert.deepEqual(commands, [
     ["npm", "run", "ci"],
-    ["npm", "run", "e2e:staging:release"],
+    ["npm", "run", "e2e:staging:inert", "--", "--deployment-id", "dpl_VipCandidate"],
   ]);
 });
 
@@ -1399,7 +1406,7 @@ test("promotion rechecks the fixed alias under its lease and refuses an interven
   );
   assert.deepEqual(commands, [
     ["npm", "run", "ci"],
-    ["npm", "run", "e2e:staging:release"],
+    ["npm", "run", "e2e:staging:inert", "--", "--deployment-id", "dpl_VipCandidate"],
   ]);
   assert.equal(leaseReleased, true);
 });
@@ -1441,7 +1448,7 @@ test("promotion reruns source and sole-writer preflight under its lease", async 
     );
     assert.deepEqual(commands, [
       ["npm", "run", "ci"],
-      ["npm", "run", "e2e:staging:release"],
+      ["npm", "run", "e2e:staging:inert", "--", "--deployment-id", "dpl_VipCandidate"],
     ]);
     assert.equal(leaseReleased, true);
   }
@@ -1486,7 +1493,7 @@ test("promotion rechecks aliasless candidate and READY rollback under its lease"
     );
     assert.deepEqual(commands, [
       ["npm", "run", "ci"],
-      ["npm", "run", "e2e:staging:release"],
+      ["npm", "run", "e2e:staging:inert", "--", "--deployment-id", "dpl_VipCandidate"],
     ]);
     assert.equal(leaseReleased, true);
   }
@@ -1532,7 +1539,7 @@ test("promotion re-attests the sealed Website inert proof under the lease and re
     assert.equal(proofReads, 3);
     assert.deepEqual(commands, [
       ["npm", "run", "ci"],
-      ["npm", "run", "e2e:staging:release"],
+      ["npm", "run", "e2e:staging:inert", "--", "--deployment-id", "dpl_VipCandidate"],
     ]);
     assert.equal(leaseReleased, true);
   }

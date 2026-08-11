@@ -243,6 +243,7 @@ test("session route logout clears every access cookie and only explicit credenti
   }));
   const logoutCookies = new Map(logout.cookieMutations.map((cookie) => [cookie.name, cookie]));
   assert.equal(logout.status, 200);
+  assert.equal(logout.headers.get("cache-control"), "private, no-store");
   assert.equal(logoutCookies.get(access.OWNER_SESSION_COOKIE).options.maxAge, 0);
   assert.equal(logoutCookies.get(access.DEMO_SESSION_COOKIE).options.maxAge, 0);
   assert.equal(logoutCookies.get(access.BASIC_ACCESS_COOKIE).options.maxAge, 0);
