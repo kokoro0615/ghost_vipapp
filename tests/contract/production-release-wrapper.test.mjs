@@ -143,9 +143,9 @@ function releaseDeployment(id, {
 }
 
 function releaseProjectApiFixture(pathname) {
-  if (pathname.endsWith("/env/env_BackendOrigin?decrypt=true")) {
+  if (pathname.endsWith("/env/BKtBJxyfcHyfVZly?decrypt=true")) {
     return {
-      id: "env_BackendOrigin",
+      id: "BKtBJxyfcHyfVZly",
       key: "GHOST_ADMIN_API_ORIGIN",
       value: RELEASE_CONFIG.backendOrigin,
       target: ["production"],
@@ -164,7 +164,7 @@ function releaseProjectApiFixture(pathname) {
   if (pathname === `/v10/projects/${RELEASE_CONFIG.projectId}/env`) {
     return {
       envs: [{
-        id: "env_BackendOrigin",
+        id: "BKtBJxyfcHyfVZly",
         key: "GHOST_ADMIN_API_ORIGIN",
         target: ["production"],
         gitBranch: null,
@@ -484,9 +484,9 @@ test("release preflight pins the canonical Git line, Vercel identity, and fixed 
     },
     async vercelApi(pathname) {
       vercelReadPaths.push(pathname);
-      if (pathname.endsWith("/env/env_BackendOrigin?decrypt=true")) {
+      if (pathname.endsWith("/env/BKtBJxyfcHyfVZly?decrypt=true")) {
         return {
-          id: "env_BackendOrigin",
+          id: "BKtBJxyfcHyfVZly",
           key: "GHOST_ADMIN_API_ORIGIN",
           value: RELEASE_CONFIG.backendOrigin,
           target: ["production"],
@@ -505,7 +505,7 @@ test("release preflight pins the canonical Git line, Vercel identity, and fixed 
       if (pathname.startsWith("/v10/projects/")) {
         return {
           envs: [{ id: "env_UnrelatedSecret", key: "DATABASE_PASSWORD" }, {
-            id: "env_BackendOrigin",
+            id: "BKtBJxyfcHyfVZly",
             key: "GHOST_ADMIN_API_ORIGIN",
             target: ["production"],
             gitBranch: null,
@@ -526,7 +526,7 @@ test("release preflight pins the canonical Git line, Vercel identity, and fixed 
   assert.ok(gitCalls.some((args) => args[0] === "ls-remote"), "live remote ref must be checked");
   assert.ok(vercelReadPaths.every((pathname) => !pathname.endsWith("/env?decrypt=true")));
   assert.deepEqual(vercelReadPaths.filter((pathname) => pathname.includes("?decrypt=true")), [
-    `/v9/projects/${RELEASE_CONFIG.projectId}/env/env_BackendOrigin?decrypt=true`,
+    `/v9/projects/${RELEASE_CONFIG.projectId}/env/BKtBJxyfcHyfVZly?decrypt=true`,
   ]);
 });
 

@@ -234,7 +234,10 @@ function productionBackendEnvironmentRows(value) {
 }
 
 async function readExactProductionEnvironment(row, auth, runtime) {
-  if (typeof row?.id !== "string" || !/^env_[A-Za-z0-9]+$/u.test(row.id)) {
+  if (
+    typeof row?.id !== "string"
+    || !/^(?:env_[A-Za-z0-9]{1,64}|[A-Za-z0-9]{16,64})$/u.test(row.id)
+  ) {
     throw new Error(`production_environment_id_invalid:${row?.key ?? "missing"}`);
   }
   const exact = await runtime.vercelApi(
