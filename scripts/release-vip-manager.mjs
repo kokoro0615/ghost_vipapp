@@ -810,9 +810,6 @@ export async function bootstrapRollback(
     preflight.auth,
   );
   assertReadyDeploymentIdentity(fixedBefore, fixedDeploymentBeforeBootstrap);
-  if (!deploymentAliases(fixedBefore).includes(RELEASE_CONFIG.productionHostname)) {
-    throw new Error("bootstrap_fixed_production_alias_missing");
-  }
 
   const staged = runtime.materializeCommitUploadRoot({ repoRoot, commit: bootstrapCommit });
   let rollbackHostname;
@@ -1211,9 +1208,6 @@ export async function promoteCandidate(
     }
     const fixed = await runtime.getVercelDeployment(fixedDeployment, finalPreflight.auth);
     const fixedAttestation = readDeploymentAttestation(fixed, expected);
-    if (!deploymentAliases(fixed).includes(RELEASE_CONFIG.productionHostname)) {
-      throw new Error("fixed_production_alias_readback_missing");
-    }
     const rollbackReadback = await runtime.getVercelDeployment(
       rollbackDeployment,
       finalPreflight.auth,

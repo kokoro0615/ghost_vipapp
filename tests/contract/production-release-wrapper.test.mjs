@@ -578,7 +578,7 @@ test("Website compatibility proof attests exact fixed CLI source and canonical i
   );
 });
 
-test("VIP bootstrap replaces null-meta fixed history with an aliasless byte-attested rollback anchor", async () => {
+test("VIP bootstrap trusts exact custom-host resolution when deployment aliases omit it", async () => {
   const baselineCommit = "17a900051edfb892ddb4a22f7eb3da3ed5e41565";
   let materializedCommit = null;
   let fixedReads = 0;
@@ -604,7 +604,7 @@ test("VIP bootstrap replaces null-meta fixed history with an aliasless byte-atte
           ownerId: RELEASE_CONFIG.teamId,
           readyState: "READY",
           target: "production",
-          alias: [RELEASE_CONFIG.productionHostname],
+          alias: ["ghost-vipapp-team.vercel.app"],
           source: null,
           meta: { gitCommitSha: null, gitCommitRef: null, source: null },
         };
