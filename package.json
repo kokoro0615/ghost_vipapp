@@ -20,6 +20,7 @@
     "test:maintenance": "node scripts/maintenance-anchor-runtime.mjs",
     "verify:backup-restore": "node scripts/verify-backup-restore-manifest.mjs",
     "verify:deployment-release": "node scripts/verify-deployment-release-manifest.mjs",
+    "release:vip-manager": "node scripts/release-vip-manager.mjs",
     "ci": "npm run lint && npm run typecheck && npm run test && npm run build && npm run test:maintenance && npm run test:a11y"
   },
   "engines": {
