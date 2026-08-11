@@ -18,6 +18,7 @@ import {
   RefreshCw,
   Search,
   ShieldCheck,
+  TicketCheck,
   WifiOff,
   X,
   RotateCcw,
@@ -34,6 +35,7 @@ import { ObservabilityPanel } from "./observability/ObservabilityPanel";
 import { ExceptionRail } from "./shell/ExceptionRail";
 import { useVipFloorWorkspace } from "./state/useVipFloorWorkspace";
 import { StaffPanel } from "./staff/StaffPanel";
+import { TicketOperationsPanel } from "./ticket-operations/TicketOperationsPanel";
 import VipBootScreen from "./VipBootScreen";
 import { WaitlistPanel } from "./waitlist/WaitlistPanel";
 import { DemoCue, DemoModeProvider } from "./demo/DemoMode";
@@ -44,6 +46,7 @@ import { canExecuteVipCommand } from "@/lib/adminPermissions";
 import type { OperationOptions } from "./contract/uiTypes";
 import type { WaitlistEntry } from "./contract/uiTypes";
 import type { StaffWorkspaceData } from "./contract/uiTypes";
+import type { TicketOperationsCapabilities } from "@/lib/ticketOperationsContract";
 
 const ChartView = dynamic(() => import("./chart/ChartView"), {
   loading: () => <WorkspaceSkeleton label="Chartを準備中" />,
@@ -135,7 +138,13 @@ function trapKeyboardFocus(event: KeyboardEvent<HTMLElement>, onClose: () => voi
   }
 }
 
-export default function VipFloorWorkspace() {
+type VipFloorWorkspaceProps = {
+  ticketOperationsCapabilities: TicketOperationsCapabilities;
+};
+
+export default function VipFloorWorkspace({
+  ticketOperationsCapabilities,
+}: VipFloorWorkspaceProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const initialBusinessDate = DATE_PATTERN.test(searchParams.get("date") ?? "")
@@ -181,6 +190,7 @@ export default function VipFloorWorkspace() {
   const [staffFilter, setStaffFilter] = useState("");
   const [customerOpen, setCustomerOpen] = useState(false);
   const [observabilityOpen, setObservabilityOpen] = useState(false);
+  const [ticketOperationsOpen, setTicketOperationsOpen] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
   const [queueOpen, setQueueOpen] = useState(false);
   const [turnoverContext, setTurnoverContext] = useState<TurnoverContext | null>(null);
@@ -189,6 +199,7 @@ export default function VipFloorWorkspace() {
   const [unlockFailed, setUnlockFailed] = useState(false);
   const menuRef = useRef<HTMLElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const desktopMenuButtonRef = useRef<HTMLButtonElement>(null);
   const mobileSheetRef = useRef<HTMLDivElement>(null);
   const inspectorTab = parseInspectorTab(searchParams.get("detail"));
   const deferredQuery = useDeferredValue(state.query);
@@ -225,6 +236,10 @@ export default function VipFloorWorkspace() {
   const isOwner = auth.status === "authenticated"
     && (auth.session.role === "owner" || auth.session.role === "owner-compatible-demo");
   const canMutate = isOwner;
+  const ticketOperationsAvailable = isOwner && (
+    ticketOperationsCapabilities.managerOperationsEnabled
+    || ticketOperationsCapabilities.refundReviewEnabled
+  );
   const canCommand = (kind: CommandKind) => canMutate
     && auth.status === "authenticated"
     && !!auth.session?.role
@@ -488,6 +503,21 @@ export default function VipFloorWorkspace() {
     } else {
       applyStatusFilter("attention");
     }
+  }
+
+  function openTicketOperations() {
+    if (!isOwner || !ticketOperationsAvailable) return;
+    setMenuOpen(false);
+    setTicketOperationsOpen(true);
+  }
+
+  function closeTicketOperations() {
+    setTicketOperationsOpen(false);
+    window.requestAnimationFrame(() => {
+      const trigger = [desktopMenuButtonRef.current, menuButtonRef.current]
+        .find((element) => element && element.getClientRects().length > 0);
+      trigger?.focus();
+    });
   }
 
   if (auth.status !== "authenticated") {
@@ -924,6 +954,7 @@ export default function VipFloorWorkspace() {
             </label>
           ) : null}
           <button
+            ref={desktopMenuButtonRef}
             type="button"
             className={`${styles.paneButton} ${styles.desktopMenu}`}
             aria-label="メニュー"
@@ -1077,6 +1108,11 @@ export default function VipFloorWorkspace() {
             <button type="button" onClick={() => void openStaff()}>
               <ShieldCheck size={18} aria-hidden /><span>担当卓</span>
             </button>
+            {ticketOperationsAvailable ? (
+              <button type="button" onClick={openTicketOperations}>
+                <TicketCheck size={18} aria-hidden /><span>チケット対応</span>
+              </button>
+            ) : null}
             {isDemo ? (
               <button type="button" onClick={() => {
                 setMenuOpen(false);
@@ -1249,6 +1285,14 @@ export default function VipFloorWorkspace() {
         onClose={() => setObservabilityOpen(false)}
         onLoad={loadObservability}
       />
+      {ticketOperationsAvailable ? (
+        <TicketOperationsPanel
+          open={ticketOperationsOpen}
+          mode={isDemo ? "demo" : "production"}
+          displayCapabilities={ticketOperationsCapabilities}
+          onClose={closeTicketOperations}
+        />
+      ) : null}
       <DemoResetDialog
         open={resetOpen}
         pending={state.pending}

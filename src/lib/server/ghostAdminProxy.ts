@@ -6,6 +6,7 @@ import { NextResponse } from "next/server";
 import { normalizeVipAdminRole, type VipAdminRole } from "@/lib/adminPermissions";
 import { readTrustedAccessLane } from "@/lib/demo/accessContract";
 import { resolveAdminOperationAccess } from "./adminOperationAccess";
+import { assertVipCanaryBackendUrl } from "./ticketCanaryRuntimeGuard";
 
 const SESSION_COOKIE = "ghost_vipapp_admin_session";
 const BACKEND_ORIGIN = (process.env.GHOST_ADMIN_API_ORIGIN ?? "https://ghost-ruby-one.vercel.app").replace(/\/$/u, "");
@@ -48,6 +49,7 @@ export async function ghostAdminFetch(path: string, init: RequestInit = {}, toke
   if (token) headers.set("authorization", `Bearer ${token}`);
 
   const backendUrl = new URL(path, BACKEND_ORIGIN);
+  const canaryAuthority = assertVipCanaryBackendUrl(backendUrl);
   const configuredOrigin = new URL(BACKEND_ORIGIN).origin;
   if (backendUrl.origin !== configuredOrigin) {
     throw new Error("ghost_admin_origin_mismatch");
@@ -55,6 +57,9 @@ export async function ghostAdminFetch(path: string, init: RequestInit = {}, toke
   const bypass = process.env.GHOST_BACKEND_PROTECTION_BYPASS;
   if (bypass && backendUrl.origin === configuredOrigin && !PRODUCTION_WEBSITE_ORIGINS.has(backendUrl.origin)) {
     headers.set("x-vercel-protection-bypass", bypass);
+  }
+  if (canaryAuthority.runId) {
+    headers.set("x-ghost-ticket-canary-run-id", canaryAuthority.runId);
   }
 
   return fetch(backendUrl, { ...init, headers, cache: "no-store", redirect: "error" });

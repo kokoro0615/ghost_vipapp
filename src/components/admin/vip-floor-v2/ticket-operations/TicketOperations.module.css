@@ -1,0 +1,1421 @@
+.panelBackdrop,
+.panelBackdrop *,
+.panelBackdrop *::before,
+.panelBackdrop *::after {
+  box-sizing: border-box;
+}
+
+.panelBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  padding: var(--s-5);
+  background: var(--scrim);
+}
+
+.panel {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--r-pane);
+  box-shadow: var(--lift-dialog);
+}
+
+.panel button,
+.panel input,
+.panel select,
+.panel textarea {
+  color: inherit;
+  font-family: var(--font-ui);
+}
+
+.panel button {
+  min-width: var(--h-control);
+  min-height: var(--h-control);
+  border: 1px solid var(--rule-control);
+  border-radius: var(--r-control);
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.panel button:focus-visible,
+.panel input:focus-visible,
+.panel select:focus-visible,
+.panel textarea:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: var(--s-1);
+}
+
+.panelHeader {
+  z-index: 2;
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--s-6);
+  min-height: var(--h-masthead);
+  padding: var(--s-4) var(--s-6);
+  background: var(--surface);
+  border-bottom: 1px solid var(--rule-strong);
+  box-shadow: var(--lift-pane);
+}
+
+.panelIdentity {
+  display: grid;
+  gap: var(--s-1);
+}
+
+.panelIdentity > span {
+  color: var(--accent-ink);
+  font-size: var(--t-micro);
+  font-weight: var(--weight-strong);
+  letter-spacing: var(--track-caps);
+}
+
+.panelIdentity h2 {
+  margin: 0;
+  font-size: var(--t-lead);
+  font-weight: var(--weight-strong);
+  line-height: var(--lh-tight);
+}
+
+.environmentMark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(var(--h-control) - var(--s-4));
+  padding-inline: var(--s-4);
+  color: var(--ink);
+  font-size: var(--t-mini);
+  font-weight: var(--weight-strong);
+  letter-spacing: var(--track-caps);
+  border-bottom: 2px solid var(--accent-line);
+}
+
+.environmentMark[data-environment="test"] {
+  border-bottom-style: dashed;
+}
+
+.panelReadiness {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--s-6);
+  min-width: 0;
+}
+
+.statusLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-3);
+  min-width: 0;
+  color: var(--ink-2);
+  font-size: var(--t-mini);
+  font-weight: var(--weight-ui);
+  line-height: var(--lh-ui);
+}
+
+.statusLabel > span[aria-hidden] {
+  flex: 0 0 auto;
+  width: var(--s-4);
+  height: var(--s-4);
+  background: var(--ink-3);
+  border: 1px solid currentColor;
+  border-radius: var(--r-chip);
+}
+
+.statusLabel[data-tone="live"] {
+  color: var(--live);
+}
+
+.statusLabel[data-tone="live"] > span[aria-hidden] {
+  background: var(--live-line);
+}
+
+.statusLabel[data-tone="warning"] {
+  color: var(--warn);
+}
+
+.statusLabel[data-tone="warning"] > span[aria-hidden] {
+  background: var(--warn-line);
+}
+
+.statusLabel[data-tone="danger"] {
+  color: var(--alert);
+}
+
+.statusLabel[data-tone="danger"] > span[aria-hidden] {
+  background: var(--alert-line);
+}
+
+.sessionRail {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  min-height: var(--h-toolbar);
+  background: var(--surface-quiet);
+  border-bottom: 1px solid var(--rule);
+}
+
+.sessionRail > header {
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+  padding-inline: var(--s-6);
+  border-right: 1px solid var(--rule);
+}
+
+.sessionRail > header strong {
+  font-size: var(--t-body);
+  font-weight: var(--weight-strong);
+}
+
+.sessionRail > header button {
+  min-width: var(--h-control-sm);
+  min-height: var(--h-control-sm);
+  border-color: transparent;
+  background: transparent;
+}
+
+.sessionRail > div {
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-gutter: stable;
+}
+
+.sessionRail article {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--s-5);
+  min-width: 0;
+  padding: var(--s-3) var(--s-6);
+  border-right: 1px solid var(--rule);
+}
+
+.sessionRail article > strong {
+  overflow: hidden;
+  font-size: var(--t-body);
+  font-weight: var(--weight-strong);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sessionRail article time {
+  color: var(--ink-2);
+  font-size: var(--t-mini);
+  white-space: nowrap;
+}
+
+.refundOnlyRail {
+  display: flex;
+  align-items: center;
+  gap: var(--s-6);
+  min-height: var(--h-toolbar);
+  padding-inline: var(--s-6);
+  background: var(--warn-wash);
+  border-bottom: 1px solid var(--warn-line);
+}
+
+.refundOnlyRail > strong {
+  color: var(--ink-2);
+  font-size: var(--t-body);
+  font-weight: var(--weight-body);
+}
+
+.operationsGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 40%) minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.queuePane,
+.inspectorPane {
+  min-width: 0;
+  min-height: 0;
+  background: var(--surface);
+}
+
+.queuePane {
+  display: grid;
+  grid-template-rows: auto auto auto minmax(0, 1fr);
+  border-right: 1px solid var(--rule-strong);
+}
+
+.paneHeader,
+.inspectorHeader {
+  display: flex;
+  align-items: center;
+  min-height: var(--h-toolbar);
+  padding-inline: var(--s-5);
+  background: var(--surface-sunken);
+  border-bottom: 1px solid var(--rule);
+}
+
+.paneHeader > div {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-4);
+  min-width: 0;
+}
+
+.paneHeader h3,
+.inspectorHeader h3 {
+  margin: 0;
+  font-size: var(--t-body);
+  font-weight: var(--weight-strong);
+}
+
+.paneHeader > div > span {
+  color: var(--ink-2);
+  font-size: var(--t-mini);
+}
+
+.paneHeader > button,
+.inspectorHeader > button:last-child {
+  margin-left: auto;
+  border-color: transparent;
+  background: transparent;
+}
+
+.queueSearch {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--s-3);
+  padding: var(--s-4);
+  border-bottom: 1px solid var(--rule);
+}
+
+.queueSearch label {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  min-height: var(--h-control);
+  padding-inline: var(--s-4);
+  color: var(--ink-2);
+  background: var(--surface);
+  border: 1px solid var(--rule-control);
+  border-radius: var(--r-control);
+}
+
+.queueSearch input {
+  width: 100%;
+  min-width: 0;
+  min-height: var(--h-control);
+  padding-inline: var(--s-4);
+  font-size: var(--t-field);
+  background: transparent;
+  border: 0;
+  outline: 0;
+}
+
+.queueSearch > button {
+  padding-inline: var(--s-5);
+  font-size: var(--t-body);
+  font-weight: var(--weight-strong);
+}
+
+.queueFilters {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-width: 0;
+  padding: var(--s-3) var(--s-4);
+  overflow-x: auto;
+  background: var(--surface-quiet);
+  border-bottom: 1px solid var(--rule);
+}
+
+.queueFilters button {
+  flex: 0 0 auto;
+  padding-inline: var(--s-5);
+  color: var(--ink-2);
+  font-size: var(--t-body);
+  font-weight: var(--weight-ui);
+  background: transparent;
+  border-color: transparent;
+}
+
+.queueFilters button[data-active] {
+  color: var(--ink);
+  box-shadow: inset 0 -2px var(--accent);
+}
+
+.queueScroll,
+.inspectorScroll {
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.queueList,
+.recentAdmissions ol,
+.actionList,
+.auditTimeline {
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.queueList > li {
+  border-bottom: 1px solid var(--rule);
+}
+
+.queueList > li > button {
+  display: grid;
+  gap: var(--s-3);
+  width: 100%;
+  min-height: calc(var(--h-row) * 2);
+  padding: var(--s-4) var(--s-5);
+  text-align: left;
+  background: var(--surface);
+  border: 0;
+  border-radius: 0;
+}
+
+.queueList > li > button[data-selected] {
+  background: var(--accent-wash);
+  box-shadow: inset 0 -3px var(--accent);
+}
+
+.queueItemLead,
+.queueIdentity {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-4);
+  min-width: 0;
+}
+
+.queueItemLead time,
+.queueIdentity,
+.queueEvent,
+.queueSummary {
+  color: var(--ink-2);
+  font-size: var(--t-mini);
+}
+
+.queueList > li > button > strong {
+  font-size: var(--t-data);
+  font-weight: var(--weight-strong);
+}
+
+.queueIdentity > span:first-child,
+.queueEvent,
+.queueSummary {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.queueIdentity > span:last-child {
+  flex: 0 0 auto;
+  color: var(--accent-ink);
+  font-weight: var(--weight-strong);
+}
+
+.queueEmpty,
+.inspectorEmpty,
+.unavailableState {
+  display: grid;
+  place-content: center;
+  gap: var(--s-4);
+  min-height: calc(var(--h-row) * 3);
+  padding: var(--s-8);
+  color: var(--ink-2);
+  text-align: center;
+}
+
+.queueEmpty strong,
+.inspectorEmpty strong,
+.unavailableState strong {
+  color: var(--ink);
+  font-size: var(--t-lead);
+  font-weight: var(--weight-strong);
+}
+
+.queueEmpty span,
+.inspectorEmpty span,
+.unavailableState span {
+  font-size: var(--t-body);
+}
+
+.recentAdmissions {
+  border-top: 1px solid var(--rule-strong);
+}
+
+.recentAdmissions > header,
+.sectionRule {
+  display: flex;
+  align-items: center;
+  gap: var(--s-5);
+  min-height: var(--h-control);
+  border-bottom: 1px solid var(--rule);
+}
+
+.recentAdmissions > header {
+  padding-inline: var(--s-5);
+  background: var(--surface-sunken);
+}
+
+.recentAdmissions h4,
+.sectionRule h4 {
+  margin: 0;
+  font-size: var(--t-body);
+  font-weight: var(--weight-strong);
+}
+
+.recentAdmissions > header span,
+.sectionRule > span {
+  margin-left: auto;
+  color: var(--ink-2);
+  font-size: var(--t-mini);
+}
+
+.recentAdmissions > p,
+.emptyLine {
+  margin: 0;
+  padding: var(--s-5);
+  color: var(--ink-2);
+  font-size: var(--t-body);
+}
+
+.recentAdmissions li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--s-4);
+  min-height: var(--h-row);
+  padding-inline: var(--s-5);
+  border-bottom: 1px solid var(--rule);
+}
+
+.recentAdmissions li strong,
+.recentAdmissions li > span:last-child {
+  font-size: var(--t-mini);
+}
+
+.inspectorPane {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.inspectorHeader {
+  gap: var(--s-4);
+}
+
+.inspectorHeader > div {
+  display: grid;
+  gap: var(--s-1);
+  min-width: 0;
+}
+
+.inspectorHeader > div > span {
+  overflow: hidden;
+  color: var(--ink-2);
+  font-size: var(--t-mini);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.backButton {
+  display: none;
+  align-items: center;
+  gap: var(--s-3);
+  padding-inline: var(--s-4);
+  font-size: var(--t-body);
+}
+
+.errorRail {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--s-4);
+  padding: var(--s-4) var(--s-5);
+  color: var(--alert);
+  background: var(--alert-wash);
+  border-bottom: 1px solid var(--alert-line);
+}
+
+.errorRail strong,
+.errorRail span {
+  font-size: var(--t-body);
+}
+
+.errorRail span + span {
+  color: var(--ink-2);
+}
+
+.errorRail button {
+  padding-inline: var(--s-4);
+  color: var(--alert);
+  font-size: var(--t-body);
+  font-weight: var(--weight-strong);
+  border-color: var(--alert-line);
+  background: var(--surface);
+}
+
+.identityRail {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  background: var(--surface-quiet);
+  border-bottom: 1px solid var(--rule-strong);
+}
+
+.identityRail > div {
+  display: grid;
+  align-content: center;
+  gap: var(--s-2);
+  min-height: calc(var(--h-row) * 2);
+  padding: var(--s-4) var(--s-5);
+  border-right: 1px solid var(--rule);
+}
+
+.identityRail > div:last-child {
+  border-right: 0;
+}
+
+.identityRail > div > span:first-child,
+.factGrid dt,
+.healthLine dt,
+.refundFacts dt {
+  color: var(--ink-2);
+  font-size: var(--t-mini);
+}
+
+.identityRail strong {
+  overflow-wrap: anywhere;
+  font-size: var(--t-body);
+  font-weight: var(--weight-strong);
+}
+
+.identityRail small {
+  color: var(--ink-2);
+  font-size: var(--t-mini);
+  overflow-wrap: anywhere;
+}
+
+.operationSection {
+  padding: 0 var(--s-6) var(--s-6);
+  border-bottom: 1px solid var(--rule-strong);
+}
+
+.sectionRule {
+  margin-bottom: var(--s-4);
+}
+
+.sectionRule::after {
+  content: "";
+  flex: 1 1 auto;
+  height: 1px;
+  background: var(--rule);
+}
+
+.sectionRule > span {
+  order: 2;
+  margin-left: 0;
+}
+
+.recoveryInstruction {
+  max-width: 75ch;
+  margin: 0;
+  color: var(--ink);
+  font-size: var(--t-body);
+  line-height: var(--lh-prose);
+}
+
+.checkoutReviewInstruction {
+  display: grid;
+  gap: var(--s-3);
+  padding: var(--s-4) var(--s-5);
+  color: var(--ink);
+  background: var(--warn-wash);
+  border-top: 2px solid var(--warn-line);
+  border-bottom: 1px solid var(--warn-line);
+}
+
+.checkoutReviewInstruction strong {
+  font-size: var(--t-body);
+  font-weight: var(--weight-strong);
+}
+
+.checkoutReviewInstruction p {
+  max-width: 75ch;
+  margin: 0;
+  font-size: var(--t-body);
+  line-height: var(--lh-prose);
+}
+
+.checkoutReviewInstruction small {
+  color: var(--ink-2);
+  font-size: var(--t-mini);
+  overflow-wrap: anywhere;
+}
+
+.refundAuthorityInstruction {
+  display: grid;
+  gap: var(--s-2);
+  padding: var(--s-4) var(--s-5);
+  color: var(--ink);
+  background: var(--warn-wash);
+  border-top: 2px solid var(--warn-line);
+  border-bottom: 1px solid var(--warn-line);
+}
+
+.refundAuthorityInstruction strong {
+  font-size: var(--t-body);
+  font-weight: var(--weight-strong);
+}
+
+.refundAuthorityInstruction p {
+  max-width: 75ch;
+  margin: 0;
+  font-size: var(--t-body);
+  line-height: var(--lh-prose);
+}
+
+.refundAuthorityInstruction small {
+  color: var(--ink-2);
+  font-size: var(--t-mini);
+}
+
+.factGrid,
+.healthLine,
+.refundFacts {
+  display: grid;
+  padding: 0;
+  margin: 0;
+  border-top: 1px solid var(--rule);
+  border-left: 1px solid var(--rule);
+}
+
+.factGrid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.healthLine,
+.refundFacts {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.factGrid > div,
+.healthLine > div,
+.refundFacts > div {
+  display: grid;
+  align-content: center;
+  gap: var(--s-2);
+  min-height: var(--h-row);
+  padding: var(--s-4);
+  border-right: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+}
+
+.factGrid dd,
+.healthLine dd,
+.refundFacts dd {
+  min-width: 0;
+  margin: 0;
+  font-size: var(--t-body);
+  font-weight: var(--weight-strong);
+  overflow-wrap: anywhere;
+}
+
+.actionList {
+  margin-top: var(--s-4);
+  border-top: 1px solid var(--rule);
+}
+
+.actionList > li {
+  display: flex;
+  align-items: center;
+  gap: var(--s-5);
+  min-height: var(--h-row);
+  padding: var(--s-3) 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.actionList > li > div:first-child {
+  display: grid;
+  gap: var(--s-2);
+  min-width: 0;
+}
+
+.actionList > li > div:first-child > strong {
+  font-size: var(--t-body);
+  font-weight: var(--weight-strong);
+}
+
+.actionList > li > div:first-child > span {
+  color: var(--ink-2);
+  font-size: var(--t-mini);
+}
+
+.actionList > li > button,
+.inlineActions {
+  margin-left: auto;
+}
+
+.inlineActions {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+}
+
+.inlineActions button,
+.actionList > li > button,
+.sectionAction button,
+.primaryButton,
+.secondaryButton,
+.dangerButton,
+.dangerOutlineButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-3);
+  padding-inline: var(--s-5);
+  font-size: var(--t-body);
+  font-weight: var(--weight-strong);
+}
+
+.primaryButton {
+  color: var(--action-text) !important;
+  background: var(--action) !important;
+  border-color: var(--action) !important;
+}
+
+.secondaryButton {
+  color: var(--ink);
+  background: var(--surface);
+}
+
+.dangerButton {
+  color: var(--ink-inverse) !important;
+  background: var(--alert) !important;
+  border-color: var(--alert) !important;
+}
+
+.dangerOutlineButton {
+  color: var(--alert) !important;
+  background: var(--surface) !important;
+  border-color: var(--alert-line) !important;
+}
+
+.admissionList {
+  display: grid;
+  padding: 0;
+  margin: 0;
+  border: 1px solid var(--rule);
+}
+
+.admissionList > label {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--s-4);
+  min-height: var(--h-control);
+  padding: var(--s-3) var(--s-4);
+  border-bottom: 1px solid var(--rule);
+  cursor: pointer;
+}
+
+.admissionList > label:last-child {
+  border-bottom: 0;
+}
+
+.admissionList > label[data-disabled] {
+  color: var(--ink-3);
+  background: var(--surface-sunken);
+  cursor: default;
+}
+
+.admissionList input[type="checkbox"] {
+  display: grid;
+  place-content: center;
+  width: var(--s-7);
+  height: var(--s-7);
+  margin: 0;
+  appearance: none;
+  background: var(--surface);
+  border: 1px solid var(--rule-control);
+  border-radius: var(--r-chip);
+}
+
+.admissionList input[type="checkbox"]::after {
+  width: var(--s-4);
+  height: var(--s-2);
+  content: "";
+  border-bottom: 2px solid var(--ink-inverse);
+  border-left: 2px solid var(--ink-inverse);
+  transform: rotate(-45deg) scale(0);
+}
+
+.admissionList input[type="checkbox"]:checked {
+  background: var(--action);
+  border-color: var(--action);
+}
+
+.admissionList input[type="checkbox"]:checked::after {
+  transform: rotate(-45deg) scale(1);
+}
+
+.admissionList small {
+  color: var(--ink-2);
+  font-size: var(--t-mini);
+}
+
+.sectionAction {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-5);
+  margin-top: var(--s-4);
+}
+
+.sectionAction > span {
+  color: var(--ink-2);
+  font-size: var(--t-mini);
+}
+
+.warningLine {
+  margin: var(--s-4) 0 0;
+  padding: var(--s-4);
+  color: var(--warn);
+  font-size: var(--t-body);
+  background: var(--warn-wash);
+  border-top: 2px solid var(--warn-line);
+}
+
+.refundAdmissions {
+  display: grid;
+  padding: 0;
+  margin-top: var(--s-4);
+  border: 0;
+  border-top: 1px solid var(--rule);
+}
+
+.refundAdmissions > legend {
+  width: 100%;
+  padding-block: var(--s-4);
+  font-size: var(--t-body);
+  font-weight: var(--weight-strong);
+}
+
+.refundAdmissions > label {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--s-4);
+  min-height: var(--h-control);
+  border-top: 1px solid var(--rule);
+  cursor: pointer;
+}
+
+.refundAdmissions > label:has(input:disabled) {
+  cursor: default;
+}
+
+.refundAdmissions input[type="checkbox"] {
+  display: grid;
+  place-content: center;
+  width: var(--s-7);
+  height: var(--s-7);
+  margin: 0;
+  appearance: none;
+  background: var(--surface);
+  border: 1px solid var(--rule-control);
+  border-radius: var(--r-chip);
+}
+
+.refundAdmissions input[type="checkbox"]::after {
+  width: var(--s-4);
+  height: var(--s-2);
+  content: "";
+  border-bottom: 2px solid var(--ink-inverse);
+  border-left: 2px solid var(--ink-inverse);
+  transform: rotate(-45deg) scale(0);
+}
+
+.refundAdmissions input[type="checkbox"]:checked {
+  background: var(--action);
+  border-color: var(--action);
+}
+
+.refundAdmissions input[type="checkbox"]:checked::after {
+  transform: rotate(-45deg) scale(1);
+}
+
+.refundResolve {
+  display: grid;
+  gap: var(--s-4);
+  margin-top: var(--s-5);
+  padding-top: var(--s-5);
+  border-top: 1px solid var(--rule-strong);
+}
+
+.refundResolve > label {
+  position: relative;
+  display: grid;
+  gap: var(--s-3);
+  max-width: 75ch;
+  color: var(--ink-2);
+  font-size: var(--t-mini);
+}
+
+.refundResolve > label::after {
+  position: absolute;
+  right: var(--s-5);
+  bottom: calc(var(--h-control) / 2 - var(--s-2));
+  width: var(--s-4);
+  height: var(--s-4);
+  content: "";
+  pointer-events: none;
+  border-right: 2px solid var(--ink-2);
+  border-bottom: 2px solid var(--ink-2);
+  transform: rotate(45deg);
+}
+
+.refundResolve select,
+.reasonField textarea,
+.allocationFields input {
+  min-height: var(--h-control);
+  color: var(--ink);
+  font-size: var(--t-field);
+  background-color: var(--surface);
+  border: 1px solid var(--rule-control);
+  border-radius: var(--r-control);
+}
+
+.refundResolve select {
+  width: 100%;
+  padding: 0 var(--s-9) 0 var(--s-4);
+  appearance: none;
+}
+
+.allocationFields {
+  display: grid;
+  gap: var(--s-3);
+  padding: var(--s-4);
+  margin: 0;
+  background: var(--surface-quiet);
+  border: 1px solid var(--rule);
+}
+
+.allocationFields legend {
+  padding-inline: var(--s-3);
+  font-size: var(--t-body);
+  font-weight: var(--weight-strong);
+}
+
+.allocationFields label {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 40%) auto;
+  align-items: center;
+  gap: var(--s-3);
+  min-height: var(--h-control);
+}
+
+.allocationFields input {
+  width: 100%;
+  padding-inline: var(--s-4);
+  text-align: right;
+}
+
+.allocationFields > p {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--s-5);
+  margin: 0;
+  padding-top: var(--s-4);
+  color: var(--alert);
+  font-size: var(--t-body);
+  border-top: 1px solid var(--rule);
+}
+
+.allocationFields > p[data-valid] {
+  color: var(--live);
+}
+
+.auditTimeline {
+  display: grid;
+}
+
+.auditTimeline > li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: var(--s-3) var(--s-5);
+  padding: var(--s-4) 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.auditTimeline time,
+.auditTimeline > li > span {
+  color: var(--ink-2);
+  font-size: var(--t-mini);
+}
+
+.auditTimeline strong {
+  font-size: var(--t-body);
+  font-weight: var(--weight-strong);
+}
+
+.auditTimeline p {
+  grid-column: 2 / -1;
+  margin: 0;
+  color: var(--ink-2);
+  font-size: var(--t-body);
+}
+
+.panelLiveRegion {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  white-space: nowrap;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+
+.confirmBackdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  padding: var(--s-6);
+  background: var(--scrim);
+}
+
+.confirmDialog {
+  display: grid;
+  gap: var(--s-5);
+  width: min(100%, calc(var(--s-10) * 15));
+  max-height: 100%;
+  padding: var(--s-6);
+  overflow: auto;
+  background: var(--surface-raised);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--r-pane);
+  box-shadow: var(--lift-dialog);
+}
+
+.confirmDialog > header,
+.confirmDialog > footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-5);
+}
+
+.confirmDialog h3 {
+  margin: 0;
+  font-size: var(--t-lead);
+  font-weight: var(--weight-strong);
+}
+
+.confirmDialog > header > span {
+  color: var(--ink-2);
+  font-size: var(--t-mini);
+}
+
+.confirmBoundary {
+  margin: 0;
+  padding: var(--s-4);
+  color: var(--ink-2);
+  font-size: var(--t-body);
+  line-height: var(--lh-prose);
+  background: var(--surface-quiet);
+  border-top: 1px solid var(--rule-strong);
+  border-bottom: 1px solid var(--rule);
+}
+
+.reasonField {
+  display: grid;
+  gap: var(--s-3);
+  color: var(--ink-2);
+  font-size: var(--t-mini);
+}
+
+.reasonField textarea {
+  width: 100%;
+  min-height: calc(var(--h-row) * 2);
+  padding: var(--s-4);
+  resize: vertical;
+}
+
+.confirmError {
+  display: grid;
+  gap: var(--s-2);
+  padding: var(--s-4);
+  color: var(--alert);
+  font-size: var(--t-body);
+  background: var(--alert-wash);
+  border-top: 2px solid var(--alert-line);
+}
+
+.confirmError span:last-child {
+  color: var(--ink-2);
+}
+
+.panel button:disabled,
+.panel input:disabled,
+.panel select:disabled,
+.panel textarea:disabled {
+  color: var(--ink-3) !important;
+  background: var(--surface-sunken) !important;
+  border-color: var(--rule) !important;
+  cursor: not-allowed;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .panel button:not(:disabled):hover {
+    background: var(--surface-hover);
+  }
+
+  .panel .primaryButton:not(:disabled):hover {
+    background: var(--action-hover) !important;
+  }
+
+  .panel .dangerButton:not(:disabled):hover {
+    background: color-mix(in oklch, var(--alert) 88%, var(--ink)) !important;
+  }
+
+  .queueList > li > button:not(:disabled):hover {
+    background: var(--surface-hover);
+  }
+}
+
+@media (hover: none) {
+  .panel button:not(:disabled):active {
+    color: var(--ink);
+    background: var(--surface-active);
+    transform: scale(0.98);
+    transition-duration: 0s;
+  }
+
+  .panel .primaryButton:not(:disabled):active {
+    color: var(--action-text);
+    background: var(--action-press) !important;
+  }
+
+  .panel .dangerButton:not(:disabled):active {
+    color: var(--ink-inverse);
+    background: color-mix(in oklch, var(--alert) 82%, var(--ink)) !important;
+  }
+}
+
+@media (max-width: 1023px) {
+  .panelBackdrop {
+    padding: var(--s-4);
+  }
+
+  .panelReadiness {
+    justify-content: flex-start;
+  }
+
+  .operationsGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .queuePane {
+    border-right: 0;
+  }
+
+  .operationsGrid:not([data-has-selection="true"]) .inspectorPane,
+  .operationsGrid[data-has-selection="true"] .queuePane {
+    display: none;
+  }
+
+  .backButton {
+    display: inline-flex;
+  }
+
+  .identityRail {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .identityRail > div:last-child {
+    grid-column: 1 / -1;
+    border-top: 1px solid var(--rule);
+  }
+}
+
+@media (min-width: 1024px) and (max-width: 1194px) {
+  .queueFilters {
+    flex-wrap: wrap;
+    overflow-x: visible;
+  }
+}
+
+@media (max-width: 767px) {
+  .panelBackdrop {
+    padding: 0;
+  }
+
+  .panel {
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .panelHeader {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    gap: var(--s-3);
+    min-height: calc(var(--h-masthead) + var(--s-8));
+    padding: var(--s-4);
+  }
+
+  .panelReadiness {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    justify-content: space-between;
+  }
+
+  .sessionRail {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sessionRail > header {
+    min-height: var(--h-control);
+    border-right: 0;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .sessionRail article {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .sessionRail article time {
+    grid-column: 1 / -1;
+  }
+
+  .refundOnlyRail {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: var(--s-2);
+    padding-block: var(--s-4);
+  }
+
+  .queueSearch {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .queueSearch > button {
+    width: 100%;
+  }
+
+  .queueFilters {
+    flex-wrap: wrap;
+    overflow-x: visible;
+  }
+
+  .identityRail,
+  .factGrid,
+  .healthLine,
+  .refundFacts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .identityRail > div,
+  .identityRail > div:last-child {
+    grid-column: auto;
+    border-right: 0;
+    border-top: 0;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .operationSection {
+    padding-inline: var(--s-4);
+  }
+
+  .actionList > li,
+  .sectionAction {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .actionList > li > button,
+  .inlineActions,
+  .sectionAction button {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .inlineActions button {
+    flex: 1 1 0;
+  }
+
+  .admissionList > label {
+    grid-template-columns: auto auto minmax(0, 1fr) auto;
+  }
+
+  .admissionList small {
+    grid-column: 3 / -1;
+  }
+
+  .refundAdmissions > label {
+    grid-template-columns: auto auto minmax(0, 1fr);
+  }
+
+  .refundAdmissions > label > :last-child {
+    grid-column: 3;
+  }
+
+  .auditTimeline > li {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .auditTimeline > li > span {
+    grid-column: 2;
+  }
+
+  .auditTimeline p {
+    grid-column: 2;
+  }
+
+  .allocationFields label {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .allocationFields input {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .allocationFields label > span:last-child {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
+  .confirmBackdrop {
+    padding: 0;
+  }
+
+  .confirmDialog {
+    align-self: end;
+    width: 100%;
+    max-height: calc(100dvh - var(--s-6));
+    border-right: 0;
+    border-bottom: 0;
+    border-left: 0;
+    border-radius: var(--r-pane) var(--r-pane) 0 0;
+  }
+
+  .confirmDialog > footer {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}

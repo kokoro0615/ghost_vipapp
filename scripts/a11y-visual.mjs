@@ -40,6 +40,12 @@ async function main() {
       ...process.env,
       VIPAPP_BASIC_USER: "a11y",
       VIPAPP_BASIC_PASSWORD: "synthetic-only",
+      ...(targetedState === null || targetedState === "ticket-operations"
+        ? {
+            FEATURE_TICKET_MANAGER_OPERATIONS_ENABLED: "true",
+            FEATURE_TICKET_REFUND_REVIEW_ENABLED: "true",
+          }
+        : {}),
     },
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -145,7 +151,9 @@ async function main() {
       ? {
           ...summary,
           ok: targetedState
-            ? results.some((result) => result.state === targetedState)
+            ? results.some((result) => targetedState === "ticket-operations"
+                ? result.state.startsWith("ticket-operations-")
+                : result.state === targetedState)
             : summary.missingStates.length === 0,
           ...(targetedViewport ? { targetedViewport } : {}),
           ...(targetedState ? { targetedState } : {}),
@@ -182,11 +190,13 @@ async function auditViewport(context, viewport) {
       await goToWorkspace(phasePage, "chart");
       await assertTimelinePhases(phasePage);
       await capture(phasePage, "chart-phases");
-      await phasePage.close();
+      await closeQaPage(phasePage);
     } else if (targetedState === "operation-date-recovery") {
       await auditOperationDateRecovery(context, capture);
     } else if (targetedState === "chart-empty-grid") {
       await auditMissingEventChart(context, capture);
+    } else if (targetedState === "ticket-operations") {
+      await auditTicketOperations(context, capture);
     } else {
       assert.fail(`unknown targeted QA state: ${targetedState}`);
     }
@@ -197,13 +207,13 @@ async function auditViewport(context, viewport) {
   await bootPage.goto(origin, { waitUntil: "domcontentloaded" });
   await bootPage.locator('main[aria-busy="true"]').waitFor();
   await capture(bootPage, "boot");
-  await bootPage.close();
+  await closeQaPage(bootPage);
 
   const loginPage = await newQaPage(context, { authenticated: false });
   await loginPage.goto(origin, { waitUntil: "domcontentloaded" });
   await loginPage.getByRole("heading", { name: "接続を完了できませんでした" }).waitFor();
   await capture(loginPage, "login");
-  await loginPage.close();
+  await closeQaPage(loginPage);
 
   const page = await newQaPage(context);
   for (const view of ["list", "floor", "chart"]) {
@@ -218,7 +228,7 @@ async function auditViewport(context, viewport) {
   await goToWorkspace(phasePage, "chart");
   await assertTimelinePhases(phasePage);
   await capture(phasePage, "chart-phases");
-  await phasePage.close();
+  await closeQaPage(phasePage);
 
   await goToWorkspace(page, "list");
   await capture(page, "queue");
@@ -315,7 +325,7 @@ async function auditViewport(context, viewport) {
     await page.keyboard.press("Escape");
   }
 
-  await page.close();
+  await closeQaPage(page);
 
   const turnoverPage = await newQaPage(context, {
     boardPayloads: [turnoverBoard, releasedTurnoverBoard, checkedInTurnoverBoard],
@@ -355,7 +365,7 @@ async function auditViewport(context, viewport) {
     ],
     "turnover shortcuts must complete/release before checking in the next guest",
   );
-  await turnoverPage.close();
+  await closeQaPage(turnoverPage);
 
   const extensionPage = await newQaPage(context, {
     boardPayload: {
@@ -371,7 +381,7 @@ async function auditViewport(context, viewport) {
   await extensionPage.getByRole("button", { name: "利用延長", exact: true }).click();
   await extensionPage.getByRole("dialog", { name: "利用時間を延長", exact: true }).waitFor();
   await capture(extensionPage, "command-seat-extension");
-  await extensionPage.close();
+  await closeQaPage(extensionPage);
 
   const menuPage = await newQaPage(context);
   for (const [buttonName, dialogName, state] of [
@@ -392,7 +402,7 @@ async function auditViewport(context, viewport) {
   await menuPage.getByRole("button", { name: "顧客詳細を開く" }).click();
   await menuPage.getByRole("dialog", { name: "顧客詳細と紐付け" }).waitFor();
   await capture(menuPage, "customer");
-  await menuPage.close();
+  await closeQaPage(menuPage);
 
   for (const scenario of [
     { state: "loading", boardDelayMs: 5_000, waitFor: '[aria-label="VIP Floorを読み込んでいます"]' },
@@ -406,7 +416,7 @@ async function auditViewport(context, viewport) {
     await scenarioPage.goto(`${origin}/?view=list&date=2026-07-26`, { waitUntil: "domcontentloaded" });
     await scenarioPage.locator(scenario.waitFor).waitFor();
     await capture(scenarioPage, scenario.state);
-    await scenarioPage.close();
+    await closeQaPage(scenarioPage);
   }
 
   const emptyViewsPage = await newQaPage(context, { boardPayload: emptyBoard });
@@ -432,7 +442,7 @@ async function auditViewport(context, viewport) {
     8,
     "an empty business day must still render all eight floor tables",
   );
-  await emptyViewsPage.close();
+  await closeQaPage(emptyViewsPage);
 
   await auditOperationDateRecovery(context, capture);
   await auditMissingEventChart(context, capture);
@@ -444,7 +454,7 @@ async function auditViewport(context, viewport) {
   await conflictDialog.getByRole("checkbox", { name: /VIP-1/u }).check();
   await conflictDialog.getByRole("button", { name: "競合確認して保存" }).click();
   await conflictDialog.getByRole("alert").getByText("TABLE_CONFLICT", { exact: true }).waitFor();
-  await operationConflictPage.close();
+  await closeQaPage(operationConflictPage);
 
   const demoLeaseRacePage = await newQaPage(context, {
     demoMode: "authenticated",
@@ -459,7 +469,7 @@ async function auditViewport(context, viewport) {
   await demoLeaseRacePage.getByRole("dialog", { name: "新規予約" })
 	    .getByRole("heading", { name: "集客担当" })
     .waitFor();
-  await demoLeaseRacePage.close();
+  await closeQaPage(demoLeaseRacePage);
 
   const demoWalkInPage = await newQaPage(context, { demoMode: "authenticated" });
   await goToDemoWorkspace(demoWalkInPage, "floor", "2026-07-31");
@@ -517,14 +527,14 @@ async function auditViewport(context, viewport) {
   await goToDemoWorkspace(demoWalkInPage, "floor", "2026-07-31");
   await demoWalkInPage.getByRole("button", { name: /VIP-8.*空席/u }).waitFor();
   assert.deepEqual(demoWalkInPage.qaServerErrors, [], "demo Walk-in produced a server 5xx");
-  await demoWalkInPage.close();
+  await closeQaPage(demoWalkInPage);
 
   const offlinePage = await newQaPage(context);
   await goToWorkspace(offlinePage, "list");
   await offlinePage.evaluate(() => window.dispatchEvent(new Event("offline")));
   await offlinePage.locator('main[data-state="stale"]').waitFor();
   await capture(offlinePage, "offline");
-  await offlinePage.close();
+  await closeQaPage(offlinePage);
 
   const conflictPage = await newQaPage(context, { commandStatus: 409 });
   await goToWorkspace(conflictPage, "list");
@@ -535,7 +545,7 @@ async function auditViewport(context, viewport) {
   await conflictPage.getByRole("button", { name: /GHOSTへ反映/u }).click();
   await conflictPage.getByRole("alert").filter({ hasText: "version_conflict" }).waitFor();
   await capture(conflictPage, "conflict");
-  await conflictPage.close();
+  await closeQaPage(conflictPage);
 
   const demoLoginPage = await newQaPage(context, { demoMode: "login" });
   await demoLoginPage.goto(`${origin}/?view=list&date=2026-07-27`, {
@@ -543,7 +553,7 @@ async function auditViewport(context, viewport) {
   });
   await demoLoginPage.getByRole("heading", { name: "VIP予約デモへ再接続" }).waitFor();
   await capture(demoLoginPage, "demo-login");
-  await demoLoginPage.close();
+  await closeQaPage(demoLoginPage);
 
   const demoResetPage = await newQaPage(context, { demoMode: "authenticated" });
   await goToDemoWorkspace(demoResetPage, "list", "2026-07-27");
@@ -551,7 +561,7 @@ async function auditViewport(context, viewport) {
   await demoResetPage.getByRole("button", { name: /デモ初期化/u }).click();
   await demoResetPage.getByRole("dialog", { name: "合成データを初期状態へ戻す" }).waitFor();
   await capture(demoResetPage, "demo-reset");
-  await demoResetPage.close();
+  await closeQaPage(demoResetPage);
 
   const demoNearExpiryPage = await newQaPage(context, {
     demoMode: "authenticated",
@@ -560,7 +570,7 @@ async function auditViewport(context, viewport) {
   await goToDemoWorkspace(demoNearExpiryPage, "list", "2026-08-27");
   await demoNearExpiryPage.locator('[data-expiry-phase="near"]').first().waitFor();
   await capture(demoNearExpiryPage, "demo-near-expiry");
-  await demoNearExpiryPage.close();
+  await closeQaPage(demoNearExpiryPage);
 
   const demoExpiredPage = await newQaPage(context, { demoMode: "expired" });
   await demoExpiredPage.goto(`${origin}/?view=list&date=2026-08-27`, {
@@ -568,7 +578,9 @@ async function auditViewport(context, viewport) {
   });
   await demoExpiredPage.getByRole("heading", { name: "デモ利用期間は終了しました" }).waitFor();
   await capture(demoExpiredPage, "demo-expired");
-  await demoExpiredPage.close();
+  await closeQaPage(demoExpiredPage);
+
+  await auditTicketOperationsLegacyIncomplete(context, capture);
 
   return results;
 }
@@ -626,7 +638,7 @@ async function auditOperationDateRecovery(context, capture) {
     "phone reservation recovery must load the selected canonical business day",
   );
   await capture(page, "operation-date-recovered");
-  await page.close();
+  await closeQaPage(page);
 }
 
 async function auditMissingEventChart(context, capture) {
@@ -640,7 +652,151 @@ async function auditMissingEventChart(context, capture) {
     "the true time grid must remain drawn when no event-day table payload exists",
   );
   await capture(page, "chart-empty-grid");
-  await page.close();
+  await closeQaPage(page);
+}
+
+async function openTicketOperations(page, { demo = false } = {}) {
+  if (demo) await goToDemoWorkspace(page, "list", "2026-08-11");
+  else await goToWorkspace(page, "list");
+  await page.getByRole("button", { name: "メニュー", exact: true }).click();
+  const menu = page.getByRole("dialog", { name: "メニュー" });
+  await menu.getByRole("button", { name: "チケット対応", exact: true }).click();
+  const panel = page.getByRole("dialog", { name: "チケット対応", exact: true });
+  await panel.getByRole("heading", { name: "対応キュー", exact: true }).waitFor();
+  return panel;
+}
+
+async function assertLeastDestructiveFocus(dialog) {
+  assert.equal(
+    await dialog.locator("[data-least-destructive]").evaluate(
+      (element) => element === document.activeElement,
+    ),
+    true,
+    "ticket operation confirmation must initially focus its safe action",
+  );
+}
+
+async function auditTicketOperations(context, capture) {
+  const page = await newQaPage(context, { demoMode: "authenticated" });
+  const panel = await openTicketOperations(page, { demo: true });
+  await panel.getByText("GT-DEMO20260811", { exact: true }).first().waitFor();
+  await capture(page, "ticket-operations-queue");
+
+  const search = panel.getByRole("searchbox", {
+    name: "公開注文番号、メールの一部、イベント、入場状態で検索",
+  });
+  await search.fill("該当なし");
+  await panel.getByText("一致する対応はありません", { exact: true }).waitFor();
+  await capture(page, "ticket-operations-search-empty");
+  await search.fill("");
+
+  await panel.getByRole("button", { name: /GT-DEMO20260811/u }).first().click();
+  await panel.getByRole("heading", { name: "GT-DEMO20260811", exact: true }).waitFor();
+  const inspector = panel.locator('article[aria-labelledby="ticket-order-title"]');
+  for (const state of ["未入場", "入場済み", "無効"]) {
+    await inspector.getByText(state, { exact: true }).first().waitFor();
+  }
+  await inspector.getByText("送信事業者が無効です。再投入は復旧後に実行してください。", {
+    exact: true,
+  }).waitFor();
+  await inspector.getByText("Stripe Checkout / Payment の証跡を確認", {
+    exact: true,
+  }).waitFor();
+  await capture(page, "ticket-operations-inspector");
+
+  await panel.getByRole("checkbox").first().check();
+  await panel.getByRole("button", { name: "補助入場を確認", exact: true }).click();
+  let confirmation = page.getByRole("alertdialog", { name: "Owner補助入場を確定しますか" });
+  await confirmation.waitFor();
+  await assertLeastDestructiveFocus(confirmation);
+  await capture(page, "ticket-operations-override-confirm");
+  await confirmation.getByRole("button", { name: "戻る", exact: true }).click();
+
+  const refundSelection = panel.getByRole("group", { name: "返金配分の対象券" });
+  await refundSelection.getByRole("checkbox").first().check();
+  const allocation = panel.getByRole("spinbutton", { name: /#1/u });
+  await allocation.fill("6500");
+  await panel.getByRole("button", { name: "確認へ", exact: true }).click();
+  confirmation = page.getByRole("alertdialog", { name: "返金確認を解決しますか" });
+  await confirmation.waitFor();
+  await assertLeastDestructiveFocus(confirmation);
+  await capture(page, "ticket-operations-resolve-confirm");
+  await confirmation.getByRole("button", { name: "戻る", exact: true }).click();
+
+  await panel.getByLabel("解決方法").selectOption("record_admitted_exception");
+  await panel.getByRole("button", { name: "確認へ", exact: true }).click();
+  confirmation = page.getByRole("alertdialog", { name: "返金確認を解決しますか" });
+  await confirmation.waitFor();
+  await assertLeastDestructiveFocus(confirmation);
+  await capture(page, "ticket-operations-admitted-exception-confirm");
+  await confirmation.getByRole("button", { name: "戻る", exact: true }).click();
+
+  const conflictPage = await newQaPage(context, {
+    ticketOperations: true,
+    ticketOperationStatus: 409,
+  });
+  const conflictPanel = await openTicketOperations(conflictPage);
+  await conflictPanel.getByRole("button", { name: /GT-QA20260811/u }).first().click();
+  await conflictPanel.getByRole("heading", { name: "GT-QA20260811", exact: true }).waitFor();
+  await conflictPanel.getByRole("checkbox").first().check();
+  await conflictPanel.getByRole("button", { name: "補助入場を確認", exact: true }).click();
+  const conflictDialog = conflictPage.getByRole("alertdialog", {
+    name: "Owner補助入場を確定しますか",
+  });
+  await conflictDialog.getByLabel("理由（8文字以上・監査履歴へ記録）").fill("入口で本人確認を行いました");
+  await conflictDialog.getByRole("button", { name: "選択券を入場済みにする", exact: true }).click();
+  await conflictDialog.getByText("版が変わりました", { exact: true }).waitFor();
+  assert.equal(
+    await conflictDialog.getByRole("button", {
+      name: "選択券を入場済みにする",
+      exact: true,
+    }).isDisabled(),
+    true,
+    "a stale ticket operation must not remain confirmable",
+  );
+  await capture(conflictPage, "ticket-operations-version-conflict");
+
+  /* WPE WebKit's page-level close command can wedge even after an ordinary
+   * application page. Audit the final offline state after the independent
+   * conflict page has completed, then let the enclosing browser context tear
+   * both synthetic pages down together. */
+  await page.evaluate(() => window.dispatchEvent(new Event("offline")));
+  await panel.getByText("オフラインです。回線を再接続してから状態を再読込してください。", {
+    exact: true,
+  }).waitFor();
+  await capture(page, "ticket-operations-offline");
+  await auditTicketOperationsLegacyIncomplete(context, capture);
+}
+
+async function auditTicketOperationsLegacyIncomplete(context, capture) {
+  const page = await newQaPage(context, {
+    ticketOperations: true,
+    ticketOperationsOrder: ticketOperationsLegacyIncompleteOrderFixture,
+  });
+  const panel = await openTicketOperations(page);
+  await panel.getByRole("button", { name: /GT-QA20260811/u }).first().click();
+  const inspector = panel.locator('article[aria-labelledby="ticket-order-title"]');
+  await inspector.getByText(
+    "保存済みの観測履歴が不完全なため、この画面では終端解決できません。Stripeの権威ある決済・返金履歴を照合し、forward fixで回復してください。",
+    { exact: true },
+  ).waitFor();
+  assert.equal(
+    await inspector.getByRole("group", { name: "返金配分の対象券" }).count(),
+    0,
+    "legacy incomplete must not render refund allocation controls",
+  );
+  assert.equal(
+    await inspector.getByLabel("解決方法").count(),
+    0,
+    "legacy incomplete must not render refund resolution controls",
+  );
+  assert.equal(
+    await page.getByRole("alertdialog", { name: "返金確認を解決しますか" }).count(),
+    0,
+    "legacy incomplete must not render a refund confirmation",
+  );
+  await capture(page, "ticket-operations-legacy-incomplete");
+  await closeQaPage(page);
 }
 
 async function assertTimelinePhases(page) {
@@ -725,6 +881,14 @@ async function newQaPage(context, scenario = {}) {
   return page;
 }
 
+async function closeQaPage(page) {
+  /* The task-local WPE MiniBrowser completes context teardown but can wedge on
+   * Playwright's page-level close command. Keep its synthetic pages isolated
+   * inside the current viewport context and tear them down together. */
+  if (page.context().browser()?.browserType().name() === "webkit") return;
+  await page.close();
+}
+
 async function goToWorkspace(page, view, detail = null) {
   const detailQuery = detail ? `&detail=${encodeURIComponent(detail)}` : "";
   await page.goto(`${origin}/?view=${view}&date=2026-07-26${detailQuery}`, {
@@ -764,6 +928,7 @@ async function waitForServer() {
     try {
       const response = await fetch(origin, {
         headers: { authorization },
+        signal: AbortSignal.timeout(1_000),
       });
       if (response.ok) return;
     } catch {
@@ -943,6 +1108,55 @@ async function installSyntheticRoutes(page, scenario = {}) {
     contentType: "application/json",
     body: JSON.stringify(observability),
   }));
+  if (scenario.ticketOperations) {
+    await page.route("**/api/admin/vip-floor/tickets/capabilities", (route) => route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(ticketOperationsCapabilitiesFixture),
+    }));
+    await page.route("**/api/admin/vip-floor/tickets/queue?**", (route) => route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(ticketOperationsQueueFixture),
+    }));
+    await page.route("**/api/admin/vip-floor/tickets/orders/**", (route) => route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(scenario.ticketOperationsOrder ?? ticketOperationsOrderFixture),
+    }));
+    for (const mutationPath of [
+      "sessions/revoke",
+      "admissions/assist",
+      "refund-reviews/resolve",
+      "email-jobs/retry",
+    ]) {
+      await page.route(`**/api/admin/vip-floor/tickets/${mutationPath}`, (route) => route.fulfill({
+        status: scenario.ticketOperationStatus ?? 200,
+        contentType: "application/json",
+        body: JSON.stringify(scenario.ticketOperationStatus === 409
+          ? {
+              ok: false,
+              error: "version_conflict",
+              currentVersion: 8,
+              recovery: "最新状態を再読込してから再実行してください。",
+            }
+          : {
+              ok: true,
+              action: mutationPath === "sessions/revoke"
+                ? "session_revoke"
+                : mutationPath === "admissions/assist"
+                  ? "assisted_admission"
+                  : mutationPath === "refund-reviews/resolve"
+                    ? "refund_resolve"
+                    : "email_retry",
+              entityVersion: 8,
+              auditLogId: "81000000-0000-4000-8000-000000000099",
+              reused: false,
+              serverNow: "2026-08-11T13:06:00.000Z",
+            }),
+      }));
+    }
+  }
   await page.route("**/api/admin/vip-floor/commands", async (route) => {
     const payload = route.request().postDataJSON();
     page.qaCommandPayloads.push(payload);
@@ -1257,6 +1471,7 @@ async function auditPage(page, { state, viewport }) {
       || (state === "demo-expired" && /status of 410 \(Gone\)/u.test(entry))
       || (state === "error" && /status of 503 \(Service Unavailable\)/u.test(entry))
       || (state === "conflict" && /status of 409 \(Conflict\)/u.test(entry))
+      || (state === "ticket-operations-version-conflict" && /status of 409 \(Conflict\)/u.test(entry))
     ));
   assert.deepEqual(
     unexpectedConsoleErrors,
@@ -1285,6 +1500,149 @@ async function auditPage(page, { state, viewport }) {
     screenshot: path.relative(artifactDirectory, screenshotPath),
   };
 }
+
+const ticketOperationsEventSessionFixture = {
+  eventSessionId: "81000000-0000-4000-8000-000000000001",
+  eventTitle: "QA TICKET OPERATIONS 🎙️",
+  eventDate: "2026-08-11",
+  doorsAt: "2026-08-11T12:30:00.000Z",
+  admissionOpensAt: "2026-08-11T12:00:00.000Z",
+  admissionClosesAt: "2026-08-11T17:30:00.000Z",
+  state: "open",
+};
+const ticketOperationsHealthFixture = {
+  emailProvider: "disabled",
+  outboxRetryCount: 2,
+  outboxDeadCount: 1,
+  webhookFreshness: "stale",
+  lastWebhookAt: "2026-08-11T12:55:00.000Z",
+};
+const ticketOperationsCapabilitiesFixture = {
+  ok: true,
+  serverNow: "2026-08-11T13:05:00.000Z",
+  capabilities: {
+    managerOperationsEnabled: true,
+    refundReviewEnabled: true,
+  },
+  readiness: {
+    managerOperations: "ready",
+    refundReview: "ready",
+  },
+};
+const ticketOperationsQueueFixture = {
+  ok: true,
+  serverNow: "2026-08-11T13:05:00.000Z",
+  environment: "test",
+  eventSessions: [ticketOperationsEventSessionFixture],
+  recentAdmissions: [{
+    admissionId: "81000000-0000-4000-8000-000000000003",
+    publicCode: "GT-QA20260811",
+    eventTitle: ticketOperationsEventSessionFixture.eventTitle,
+    admittedCount: 1,
+    admittedAt: "2026-08-11T13:00:00.000Z",
+  }],
+  health: ticketOperationsHealthFixture,
+  items: [
+    {
+      id: "81000000-0000-4000-8000-000000000002",
+      kind: "admission",
+      priority: "urgent",
+      publicCode: "GT-QA20260811",
+      maskedEmail: "qa•••@example.invalid",
+      eventTitle: ticketOperationsEventSessionFixture.eventTitle,
+      eventDate: "2026-08-11",
+      environment: "test",
+      status: "issued",
+      statusLabel: "未入場 1枚",
+      summary: "Owner補助入場の競合回復を確認します。",
+      updatedAt: "2026-08-11T13:05:00.000Z",
+      expectedVersion: 7,
+    },
+    {
+      id: "81000000-0000-4000-8000-000000000019",
+      kind: "checkout_review",
+      priority: "urgent",
+      publicCode: "GT-QA20260811",
+      maskedEmail: "qa•••@example.invalid",
+      eventTitle: ticketOperationsEventSessionFixture.eventTitle,
+      eventDate: "2026-08-11",
+      environment: "test",
+      status: "provider_outcome_unknown",
+      statusLabel: "決済結果不明",
+      summary: "Checkout決済の終端と発行状況を確認します。",
+      updatedAt: "2026-08-11T13:05:30.000Z",
+      expectedVersion: 7,
+    },
+  ],
+};
+const ticketOperationsOrderFixture = {
+  ok: true,
+  serverNow: "2026-08-11T13:05:00.000Z",
+  health: ticketOperationsHealthFixture,
+  order: {
+    publicCode: "GT-QA20260811",
+    maskedEmail: "qa•••@example.invalid",
+    environment: "test",
+    expectedVersion: 7,
+    eventSession: ticketOperationsEventSessionFixture,
+    wallet: {
+      state: "active",
+      activeSessionCount: 1,
+      activeSessions: [{
+        sessionId: "81000000-0000-4000-8000-000000000004",
+        expectedVersion: 3,
+        createdAt: "2026-08-11T12:40:00.000Z",
+        expiresAt: "2026-08-19T14:59:59.000Z",
+      }],
+      lastVerifiedAt: "2026-08-11T12:40:00.000Z",
+      freshAuthenticationUntil: "2026-08-12T00:40:00.000Z",
+      otpDelivery: "delivered",
+      otpRateLimit: "available",
+      challengeState: "prepared",
+    },
+    admissions: [{
+      admissionId: "81000000-0000-4000-8000-000000000005",
+      serial: 1,
+      label: "QA 一般券",
+      status: "issued",
+      admittedAt: null,
+    }],
+    refundReview: null,
+    emailJobs: [],
+    timeline: [{
+      auditId: "81000000-0000-4000-8000-000000000006",
+      type: "wallet_verified",
+      label: "Wallet認証を確認",
+      occurredAt: "2026-08-11T12:40:00.000Z",
+      actorLabel: "QA Owner",
+      reason: null,
+    }],
+    safeRecoveryInstruction: "購入者端末でWalletを再読込し、公開注文番号だけを受付で確認してください。",
+  },
+};
+const ticketOperationsLegacyIncompleteOrderFixture = {
+  ...ticketOperationsOrderFixture,
+  order: {
+    ...ticketOperationsOrderFixture.order,
+    refundReview: {
+      reviewId: "81000000-0000-4000-8000-000000000020",
+      status: "pending",
+      expectedVersion: 3,
+      observationVersion: 2,
+      observationHash: "d".repeat(64),
+      amountMinor: 6500,
+      currency: "JPY",
+      providerEventId: "refund-review:81000000-0000-4000-8000-000000000020",
+      selectedAdmissionIds: [],
+      conflictReason: "refund_observation_history_incomplete",
+      moneyMayHaveMoved: true,
+      authorityResolvable: false,
+      observationHistoryState: "legacy_incomplete",
+      observationHistoryReason: "legacy_conflict_observation_history_unrecoverable",
+      resolutionOptions: [],
+    },
+  },
+};
 
 const tableIds = Array.from(
   { length: 8 },

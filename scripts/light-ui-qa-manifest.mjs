@@ -93,6 +93,7 @@ export const QA_REQUIRED_STATES = Object.freeze([
   "reconnecting",
   "conflict",
   "read-only",
+  "ticket-operations-legacy-incomplete",
 ]);
 
 export const QA_MAJOR_SURFACE_SELECTORS = Object.freeze([
