@@ -63,7 +63,7 @@ function websiteFixedDeployment(id = websiteDeploymentId, commit = websiteCommit
     readyState: "READY",
     target: "production",
     source: "cli",
-    alias: ["ghost-ruby-one.vercel.app"],
+    alias: ["ghost-ruby-one-git-codex-vip-manager-production-backend.vercel.app"],
     meta: {
       gitCommitSha: commit,
       gitCommitRef: "codex/vip-manager-production-backend-20260727",

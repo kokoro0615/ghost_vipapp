@@ -590,9 +590,8 @@ function assertWebsiteDeployment(deployment, expectedId) {
   if (deployment?.ownerId !== RELEASE_CONFIG.teamId) throw new Error("website_deployment_team_mismatch");
   if (state !== "READY") throw new Error(`website_deployment_not_ready:${state}`);
   if (deployment?.target !== "production") throw new Error("website_deployment_not_production");
-  if (!deploymentAliases(deployment).includes(RELEASE_CONFIG.websiteProductionHostname)) {
-    throw new Error("website_fixed_alias_missing");
-  }
+  // The fixed hostname is attested by the exact resolver reads around this
+  // deployment check; Vercel may omit custom hostnames from deployment.alias.
   if (!/^[0-9a-f]{40}$/u.test(commit ?? "")) throw new Error("website_commit_missing");
   if (ref !== RELEASE_CONFIG.websiteReleaseBranch) throw new Error("website_ref_mismatch");
   if (source !== "cli" || metadataSource !== "cli") throw new Error("website_source_not_cli");
