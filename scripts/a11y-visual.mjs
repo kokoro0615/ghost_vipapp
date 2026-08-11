@@ -12,6 +12,10 @@ import {
   QA_VIEWPORTS,
   safeArtifactName,
 } from "./light-ui-qa-manifest.mjs";
+import {
+  createQaViewportSession,
+  retireQaPage,
+} from "./lib/qa-page-lifecycle.mjs";
 
 const root = process.cwd();
 const port = Number(process.env.A11Y_PORT ?? 3312);
@@ -118,7 +122,7 @@ async function main() {
       /* A touch viewport must be driven as a touch device. Emulating only the
        * size leaves `hover: hover` matching, which is exactly the condition
        * under which the iPad's sticky-hover defect is invisible to the audit. */
-      const context = await browser.newContext({
+      const context = await createQaViewportSession(browser, {
         viewport: { width: viewport.width, height: viewport.height },
         ...(viewport.touch
           ? { hasTouch: true, isMobile: viewport.browser === "chromium" }
@@ -882,11 +886,7 @@ async function newQaPage(context, scenario = {}) {
 }
 
 async function closeQaPage(page) {
-  /* The task-local WPE MiniBrowser completes context teardown but can wedge on
-   * Playwright's page-level close command. Keep its synthetic pages isolated
-   * inside the current viewport context and tear them down together. */
-  if (page.context().browser()?.browserType().name() === "webkit") return;
-  await page.close();
+  await retireQaPage(page);
 }
 
 async function goToWorkspace(page, view, detail = null) {
