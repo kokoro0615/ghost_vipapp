@@ -155,18 +155,38 @@ function defaultPromotionLeaseOwner() {
   return `v1.${randomBytes(18).toString("base64url")}.${Date.now() + PROMOTION_LEASE_TTL_MS}`;
 }
 
-async function defaultReadWebsiteReadiness() {
+export async function readWebsiteReadiness({
+  fetchImpl = fetch,
+  waitImpl = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds)),
+} = {}) {
   const secret = process.env.GHOST_WEBSITE_WORKER_RUN_SECRET?.trim() ?? "";
   if (secret.length < 32 || secret.length > 4096 || /[\r\n\0]/u.test(secret)) {
     throw new Error("website_readiness_secret_missing_or_invalid");
   }
-  const response = await fetch(new URL(WEBSITE_READINESS_PATH, RELEASE_CONFIG.backendOrigin), {
-    method: "GET",
-    redirect: "error",
-    cache: "no-store",
-    headers: { accept: "application/json", authorization: `Bearer ${secret}` },
-    signal: AbortSignal.timeout(30_000),
-  });
+  let response;
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    try {
+      response = await fetchImpl(new URL(WEBSITE_READINESS_PATH, RELEASE_CONFIG.backendOrigin), {
+        method: "GET",
+        redirect: "error",
+        cache: "no-store",
+        headers: { accept: "application/json", authorization: `Bearer ${secret}` },
+        signal: AbortSignal.timeout(30_000),
+      });
+    } catch (error) {
+      if (attempt === 3) throw error;
+      await waitImpl(250 * 2 ** attempt);
+      continue;
+    }
+    if ((response.status === 429 || response.status >= 500) && attempt < 3) {
+      const retryAfter = Number(response.headers.get("retry-after") ?? 0);
+      await response.body?.cancel().catch(() => {});
+      await waitImpl(retryAfter > 0 ? retryAfter * 1000 : 250 * 2 ** attempt);
+      continue;
+    }
+    break;
+  }
+  if (!response) throw new Error("website_readiness_transport_unavailable");
   if (response.status !== 200) throw new Error(`website_readiness_http_${response.status}`);
   const cacheControl = response.headers.get("cache-control") ?? "";
   if (!/(?:^|,)\s*(?:private\s*,\s*)?(?:no-cache\s*,\s*)?no-store(?:\s*,|$)/iu.test(cacheControl)) {
@@ -197,7 +217,7 @@ export function createProductionRuntime() {
     mutateVercelProject: defaultMutateVercelProject,
     createPromotionLeaseOwner: defaultPromotionLeaseOwner,
     now: Date.now,
-    readWebsiteReadiness: defaultReadWebsiteReadiness,
+    readWebsiteReadiness,
     run: defaultRun,
   };
   runtime.readWebsiteCompatibilityProof = (options) => readCanonicalWebsiteCompatibility(options, runtime);

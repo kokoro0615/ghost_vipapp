@@ -292,22 +292,32 @@ export async function readVercelToken() {
 export async function vercelApi(
   pathname,
   { token, teamId },
-  { fetchImpl = fetch, apiOrigin = VERCEL_API_ORIGIN } = {},
+  {
+    fetchImpl = fetch,
+    apiOrigin = VERCEL_API_ORIGIN,
+    waitImpl = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds)),
+  } = {},
 ) {
   if (typeof token !== "string" || token.length === 0) throw new Error("vercel_token_unavailable");
   const url = new URL(pathname, apiOrigin);
   if (teamId) url.searchParams.set("teamId", teamId);
   for (let attempt = 0; attempt < 6; attempt += 1) {
-    const response = await fetchImpl(url, {
-      headers: { Authorization: `Bearer ${token}` },
-      redirect: "error",
-      signal: AbortSignal.timeout(120_000),
-    });
+    let response;
+    try {
+      response = await fetchImpl(url, {
+        headers: { Authorization: `Bearer ${token}` },
+        redirect: "error",
+        signal: AbortSignal.timeout(120_000),
+      });
+    } catch (error) {
+      if (attempt === 5) throw error;
+      await waitImpl(250 * 2 ** attempt);
+      continue;
+    }
     if (response.status === 429 || response.status >= 500) {
       const retryAfter = Number(response.headers.get("retry-after") ?? 0);
-      await new Promise((resolve) => {
-        setTimeout(resolve, retryAfter > 0 ? retryAfter * 1000 : 250 * 2 ** attempt);
-      });
+      await response.body?.cancel().catch(() => {});
+      await waitImpl(retryAfter > 0 ? retryAfter * 1000 : 250 * 2 ** attempt);
       continue;
     }
     if (!response.ok) throw new Error(`vercel_api_${response.status}:${pathname}`);

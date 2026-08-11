@@ -22,6 +22,7 @@ import {
   materializeCommitUploadRoot,
   readDeploymentAttestation,
   restoreDeploymentSource,
+  vercelApi,
 } from "../../scripts/lib/production-source-attestation.mjs";
 import {
   RELEASE_CONFIG,
@@ -31,8 +32,80 @@ import {
   createCandidate,
   promoteCandidate,
   readCanonicalWebsiteCompatibility,
+  readWebsiteReadiness,
   releasePromotionLease,
 } from "../../scripts/release-vip-manager.mjs";
+
+test("release read authorities retry bounded transient transport failures", async () => {
+  let vercelCalls = 0;
+  const vercelValue = await vercelApi("/v13/deployments/dpl_Test", {
+    token: "synthetic-vercel-token",
+    teamId: "team_test",
+  }, {
+    apiOrigin: "https://api.example.invalid",
+    waitImpl: async () => {},
+    fetchImpl: async () => {
+      vercelCalls += 1;
+      if (vercelCalls < 3) throw new TypeError("fetch failed");
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    },
+  });
+  assert.deepEqual(vercelValue, { ok: true });
+  assert.equal(vercelCalls, 3);
+  let exhaustedVercelCalls = 0;
+  await assert.rejects(
+    vercelApi("/v13/deployments/dpl_Test", {
+      token: "synthetic-vercel-token",
+      teamId: "team_test",
+    }, {
+      apiOrigin: "https://api.example.invalid",
+      waitImpl: async () => {},
+      fetchImpl: async () => {
+        exhaustedVercelCalls += 1;
+        throw new TypeError("fetch failed");
+      },
+    }),
+    /fetch failed/u,
+  );
+  assert.equal(exhaustedVercelCalls, 6);
+
+  const previousSecret = process.env.GHOST_WEBSITE_WORKER_RUN_SECRET;
+  process.env.GHOST_WEBSITE_WORKER_RUN_SECRET = "s".repeat(32);
+  try {
+    let readinessCalls = 0;
+    const readiness = await readWebsiteReadiness({
+      waitImpl: async () => {},
+      fetchImpl: async () => {
+        readinessCalls += 1;
+        if (readinessCalls === 1) throw new TypeError("fetch failed");
+        return new Response(JSON.stringify({ ok: false, capabilities: {} }), {
+          status: 200,
+          headers: { "cache-control": "private, no-store" },
+        });
+      },
+    });
+    assert.deepEqual(readiness, { ok: false, capabilities: {} });
+    assert.equal(readinessCalls, 2);
+    let deniedReadinessCalls = 0;
+    await assert.rejects(
+      readWebsiteReadiness({
+        waitImpl: async () => {},
+        fetchImpl: async () => {
+          deniedReadinessCalls += 1;
+          return new Response("{}", { status: 401 });
+        },
+      }),
+      /website_readiness_http_401/u,
+    );
+    assert.equal(deniedReadinessCalls, 1);
+  } finally {
+    if (previousSecret === undefined) delete process.env.GHOST_WEBSITE_WORKER_RUN_SECRET;
+    else process.env.GHOST_WEBSITE_WORKER_RUN_SECRET = previousSecret;
+  }
+});
 
 const releaseCommit = "f".repeat(40);
 const websiteCommit = "e".repeat(40);
