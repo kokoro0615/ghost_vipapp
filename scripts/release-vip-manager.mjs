@@ -462,7 +462,10 @@ export async function acquirePromotionLease(
     throw new Error("promotion_lease_held_or_ambiguous");
   }
   const id = created[0]?.id;
-  if (typeof id !== "string" || !/^env_[A-Za-z0-9]+$/u.test(id)) {
+  if (
+    typeof id !== "string"
+    || !/^(?:env_[A-Za-z0-9]{1,64}|[A-Za-z0-9]{16,64})$/u.test(id)
+  ) {
     throw new Error("promotion_lease_id_invalid");
   }
   const lease = Object.freeze({ id, owner, expectedDeploymentId, candidateDeploymentId });

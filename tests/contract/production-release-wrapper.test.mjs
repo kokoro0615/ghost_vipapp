@@ -1540,6 +1540,7 @@ test("promotion re-attests the sealed Website inert proof under the lease and re
 
 test("promotion lease uses create-without-upsert and deletes only its owned env ID", async () => {
   const owner = `v1.${"q".repeat(24)}.1893456000000`;
+  const providerLeaseId = "oZs8CdX5MJ85fn0s";
   const calls = [];
   const readPaths = [];
   let present = true;
@@ -1551,11 +1552,11 @@ test("promotion lease uses create-without-upsert and deletes only its owned env 
         return {
           ok: true,
           status: 200,
-          value: { created: { id: "env_VipOwnedLease" }, failed: [] },
+          value: { created: { id: providerLeaseId }, failed: [] },
         };
       }
       assert.equal(options.method, "DELETE");
-      assert.match(pathname, /\/env\/env_VipOwnedLease$/u);
+      assert.equal(pathname.endsWith(`/env/${providerLeaseId}`), true);
       present = false;
       return { ok: true, status: 200, value: {} };
     },
@@ -1568,7 +1569,7 @@ test("promotion lease uses create-without-upsert and deletes only its owned env 
             key: "DATABASE_PASSWORD",
             target: ["production"],
           }, {
-            id: "env_VipOwnedLease",
+            id: providerLeaseId,
             key: RELEASE_CONFIG.promotionLeaseKey,
             target: ["production"],
             gitBranch: null,
@@ -1576,9 +1577,9 @@ test("promotion lease uses create-without-upsert and deletes only its owned env 
           }] : [{ id: "env_UnrelatedSecret", key: "DATABASE_PASSWORD" }],
         };
       }
-      assert.match(pathname, /\/env\/env_VipOwnedLease\?decrypt=true$/u);
+      assert.equal(pathname.endsWith(`/env/${providerLeaseId}?decrypt=true`), true);
       return {
-        id: "env_VipOwnedLease",
+        id: providerLeaseId,
         key: RELEASE_CONFIG.promotionLeaseKey,
         value: owner,
         type: "plain",
@@ -1604,7 +1605,7 @@ test("promotion lease uses create-without-upsert and deletes only its owned env 
   assert.doesNotMatch(calls[0].pathname, /upsert=true/u);
   assert.equal(calls[1].options.method, "DELETE");
   assert.ok(readPaths.every((pathname) => pathname.endsWith("/env")
-    || pathname.endsWith("/env/env_VipOwnedLease?decrypt=true")));
+    || pathname.endsWith(`/env/${providerLeaseId}?decrypt=true`)));
   assert.ok(readPaths.every((pathname) => !pathname.endsWith("/env?decrypt=true")));
 });
 
