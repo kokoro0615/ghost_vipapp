@@ -54,6 +54,7 @@ export const QA_REQUIRED_STATES = Object.freeze([
   "chart",
   "chart-empty-grid",
   "chart-phases",
+  "business-date-picker",
   "menu",
   "queue",
   "inspector",

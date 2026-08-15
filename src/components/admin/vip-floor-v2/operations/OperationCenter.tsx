@@ -28,6 +28,7 @@ import {
   canSelectWalkInTable,
   resolveWalkInOffering,
 } from "../contract/walkInOffering";
+import { BusinessDateField, formatBusinessDateWithWeekday } from "../shell/BusinessDateField";
 import { DemoCue, useDemoMode } from "../demo/DemoMode";
 import { BusinessTimeFormFields } from "./BusinessTimeFields";
 import { ReservationWizard } from "./ReservationWizard";
@@ -478,7 +479,7 @@ export function OperationCenter({
             <div className={styles.commandScroll}>
 	          <div className={styles.commandContext}>
 	            <strong>{displayedOperationContextLabel}</strong>
-	            <span className="tabular-nums">{displayedBusinessDate} / 22:00–翌05:00</span>
+	            <span className="tabular-nums">{formatBusinessDateWithWeekday(displayedBusinessDate)} / 22:00–翌05:00</span>
 	          </div>
 
           {!options ? (
@@ -496,20 +497,18 @@ export function OperationCenter({
                         : "受付ブロックを設定する営業日を選んで続けてください。"}</small>
                 </span>
               </div>
-              <label>
-                予約・受付日
-                <input
-                  type="date"
-                  name="businessDate"
-                  value={recoveryBusinessDate}
-                  required
-                  disabled={datePending}
-                  onChange={(event) => {
-                    setRecoveryBusinessDate(event.target.value);
-                    setFailedBusinessDate(null);
-                  }}
-                />
-              </label>
+              <BusinessDateField
+                label="予約・受付日"
+                name="businessDate"
+                value={recoveryBusinessDate}
+                required
+                disabled={datePending}
+                openDates={suggestedBusinessDates}
+                onChange={(next) => {
+                  setRecoveryBusinessDate(next);
+                  setFailedBusinessDate(null);
+                }}
+              />
               {suggestionsPending ? (
                 <p role="status">次に予約を受けられる営業日を確認しています…</p>
               ) : suggestedBusinessDates.length > 0 ? (

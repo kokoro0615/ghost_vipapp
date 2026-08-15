@@ -19,6 +19,7 @@ import type {
 import { DemoCue, useDemoMode } from "../demo/DemoMode";
 import styles from "../VipFloorWorkspace.module.css";
 import { useTrialMode } from "../TrialMode";
+import { formatBusinessDateWithWeekday } from "../shell/BusinessDateField";
 
 type Props = {
   open: boolean;
@@ -172,7 +173,7 @@ export function WaitlistPanel({
           <form className={styles.commandForm} onSubmit={create}>
             <div className={styles.commandContext}>
               <strong>待機へ追加</strong>
-              <span>{board.businessDay.businessDate} / 連絡は任意</span>
+              <span>{formatBusinessDateWithWeekday(board.businessDay.businessDate)} / 連絡は任意</span>
             </div>
             <fieldset disabled={pending}>
               <legend>{demoMode.enabled ? "合成データ専用・外部通知なし" : "連絡先は暗号化し、Owner以外へ表示しません"}</legend>

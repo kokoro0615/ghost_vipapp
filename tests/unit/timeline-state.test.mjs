@@ -5,6 +5,7 @@ import {
   ARRIVAL_SOON_MINUTES,
   CLOSING_SOON_MINUTES,
   getClosingWindowPercent,
+  formatElapsedMinutes,
   getTimelinePhase,
   TIMELINE_PHASE_META,
   TIMELINE_PHASE_ORDER,
@@ -60,7 +61,7 @@ test("timeline distinguishes a missing arrival, release overtime and terminal re
 test("a party that never arrives remains an arrival exception after the booked end", () => {
   const stillMissing = phaseAt("2026-07-31T15:30:00.000Z", "expected");
   assert.equal(stillMissing.key, "arrival_overdue");
-  assert.equal(stillMissing.label, "未着150分");
+  assert.equal(stillMissing.label, "未着2時間30分");
   assert.match(stillMissing.description, /到着を確認/u);
 
   const recordedDelay = phaseAt("2026-07-31T15:30:00.000Z", "no_contact");
@@ -203,4 +204,34 @@ test("the closing window follows an extended release time", () => {
   assert.equal(extended("2026-07-31T15:46:00.000Z").key, "closing_soon");
   /* Three hours of table, so the same fifteen minutes is a narrower slice. */
   assert.equal(Math.round(getClosingWindowPercent(startAt, extendedEnd) * 100) / 100, 8.33);
+});
+
+
+/*
+ * The board used to print raw minutes with no ceiling, so a reservation nobody
+ * closed reported `未着28952分`. Twenty days stated in minutes does not read as
+ * a duration at all — it reads as a broken counter.
+ */
+test("an elapsed duration is restated in the unit the floor thinks in", () => {
+  assert.equal(formatElapsedMinutes(0), "0分");
+  assert.equal(formatElapsedMinutes(1), "1分");
+  assert.equal(formatElapsedMinutes(59), "59分");
+  assert.equal(formatElapsedMinutes(60), "1時間");
+  assert.equal(formatElapsedMinutes(90), "1時間30分");
+  assert.equal(formatElapsedMinutes(1439), "23時間59分");
+  assert.equal(formatElapsedMinutes(1440), "1日");
+  assert.equal(formatElapsedMinutes(1500), "1日1時間");
+  assert.equal(formatElapsedMinutes(28952), "20日2時間");
+});
+
+test("an elapsed duration never renders a bare unbounded minute count", () => {
+  for (const minutes of [60, 240, 1440, 10_000, 28_952, 100_000]) {
+    assert.ok(
+      !/^\d+分$/u.test(formatElapsedMinutes(minutes)),
+      `${minutes} must not render as a bare minute count`,
+    );
+  }
+  /* Negative and non-finite inputs are clock skew, not a duration. */
+  assert.equal(formatElapsedMinutes(-5), "0分");
+  assert.equal(formatElapsedMinutes(Number.NaN), "0分");
 });

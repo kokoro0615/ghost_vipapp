@@ -8,13 +8,11 @@ import {
   Activity,
   BellRing,
   CalendarPlus,
-  CalendarDays,
   ChartNoAxesGantt,
   ClipboardList,
   LayoutGrid,
   LogOut,
   Menu,
-  Radio,
   RefreshCw,
   Search,
   ShieldCheck,
@@ -41,6 +39,7 @@ import { WaitlistPanel } from "./waitlist/WaitlistPanel";
 import { DemoCue, DemoModeProvider } from "./demo/DemoMode";
 import { DemoExpiryBoundary } from "./demo/DemoExpiryBoundary";
 import { DemoResetDialog } from "./demo/DemoResetDialog";
+import { BusinessDateField } from "./shell/BusinessDateField";
 import styles from "./VipFloorWorkspace.module.css";
 import { canExecuteVipCommand } from "@/lib/adminPermissions";
 import type { OperationOptions } from "./contract/uiTypes";
@@ -771,33 +770,23 @@ export default function VipFloorWorkspace({
           <strong>VIP MANAGER</strong>
         </div>
         <DemoCue compact className={styles.ribbonDemoCue} />
-        <label className={styles.ribbonControl}>
-          <CalendarDays size={16} aria-hidden />
-          <span>営業日</span>
-          <input
-            type="date"
-            aria-label="営業日"
-            value={businessDate}
-            onChange={(event) => {
-              if (event.target.value) {
-                void setBusinessDate(event.target.value);
-                updateRoute({ date: event.target.value });
-              }
-            }}
-          />
-        </label>
-        <div className={styles.ribbonControl} data-optional aria-label="営業枠">
-          <Radio size={16} aria-hidden />
-          <span>営業枠</span>
-          <strong>22:00–05:00</strong>
-        </div>
-
+        <BusinessDateField
+          variant="ribbon"
+          label="営業日"
+          value={businessDate}
+          onChange={(next) => {
+            if (!next) return;
+            void setBusinessDate(next);
+            updateRoute({ date: next });
+          }}
+        />
         <div className={styles.pulseCluster} aria-label="本日の稼働状況">
           {pulseItems.map((item) => (item.filter ? (
             <button
               key={item.key}
               type="button"
               data-alert={item.alert || undefined}
+              data-zero={item.value === 0 || item.value === "0" ? "" : undefined}
               data-active={state.statusFilter === item.filter || undefined}
               data-optional={item.optional || undefined}
               aria-pressed={state.statusFilter === item.filter}
@@ -807,7 +796,11 @@ export default function VipFloorWorkspace({
               <strong>{item.value}</strong>
             </button>
           ) : (
-            <div key={item.key} data-optional={item.optional || undefined}>
+            <div
+              key={item.key}
+              data-optional={item.optional || undefined}
+              data-zero={item.value === 0 || item.value === "0" ? "" : undefined}
+            >
               <span>{item.label}</span>
               <strong>{item.value}</strong>
             </div>
@@ -859,6 +852,7 @@ export default function VipFloorWorkspace({
               key={item.key}
               type="button"
               data-alert={item.alert || undefined}
+              data-zero={item.value === 0 || item.value === "0" ? "" : undefined}
               data-active={state.statusFilter === item.filter || undefined}
               data-optional={item.optional || undefined}
               aria-pressed={state.statusFilter === item.filter}
@@ -868,7 +862,11 @@ export default function VipFloorWorkspace({
               <strong>{item.value}</strong>
             </button>
           ) : (
-            <div key={item.key} data-optional={item.optional || undefined}>
+            <div
+              key={item.key}
+              data-optional={item.optional || undefined}
+              data-zero={item.value === 0 || item.value === "0" ? "" : undefined}
+            >
               <span>{item.label}</span>
               <strong>{item.value}</strong>
             </div>

@@ -9,7 +9,7 @@
  *
  * Rules of the direction:
  *   - planes separate by VALUE plus one hairline; no shadow clouds, no glass
- *   - exactly one accent (champagne) and it only ever means "you are here"
+ *   - exactly one accent (violet) and it only ever means "you are here"
  *   - status = swatch glyph + word, never a pill that reads as a button
  *   - emphasis is horizontal (top/bottom rules), never a coloured side tab
  *   - every figure uses the one UI family + tabular numerals; no terminal face
@@ -466,6 +466,7 @@
   color: var(--ink-3);
   font-size: var(--t-mini);
   line-height: var(--lh-ui);
+  letter-spacing: var(--track-micro);
 }
 .loginMessage[data-tone="danger"] { color: var(--alert); font-weight: var(--weight-strong); }
 .loginPanel > button,
@@ -496,6 +497,7 @@
   color: var(--ink-3);
   font-size: var(--t-micro);
   line-height: var(--lh-ui);
+  letter-spacing: var(--track-micro);
 }
 .loginHint::before {
   width: 12px;
@@ -559,6 +561,7 @@
   font-family: var(--font-figure);
   font-size: var(--t-lead);
   font-weight: var(--weight-strong);
+  letter-spacing: var(--track-lead);
 }
 .loginBrand { display: grid; gap: var(--s-1); }
 .loginBrand span, .loginEyebrow, .maintenanceEyebrow {
@@ -598,6 +601,7 @@
   background: var(--accent-wash);
   color: var(--ink-2);
   font-size: var(--t-mini);
+  letter-spacing: var(--track-micro);
 }
 .loginPanel [data-lease-state] strong, .loginPanel [data-lease-state] span,
 .maintenanceStatus span, .demoExpiredStatus span { display: flex; align-items: center; gap: var(--s-3); }
@@ -609,7 +613,7 @@
 .maintenanceStatus { grid-template-columns: auto minmax(0, 1fr); align-items: center; background: var(--surface-quiet); }
 .maintenanceStatus div { display: grid; gap: var(--s-1); }
 .maintenanceStatus span { color: var(--ink-2); line-height: var(--lh-ui); }
-.maintenanceSecurity { display: flex; align-items: center; gap: var(--s-3); margin: 0; color: var(--ink-3); font-size: var(--t-micro); }
+.maintenanceSecurity { display: flex; align-items: center; gap: var(--s-3); margin: 0; color: var(--ink-3); font-size: var(--t-micro); letter-spacing: var(--track-micro); }
 
 /* ── 3. workspace shell ────────────────────────────────────────────────── */
 
@@ -634,16 +638,17 @@
   grid-row: 1;
   z-index: 30;
   display: flex;
+  /* An explicit floor, not an emergent one. The row used to take its height
+     from whatever the tallest child happened to be, so when the ribbon filled
+     up — a demo cue plus a wider date control was enough — every counter
+     button in it compressed below the 44px touch floor at once. */
+  min-height: var(--h-masthead);
   min-width: 0;
-  align-items: center;
-  gap: var(--s-5);
+  align-items: stretch;
+  gap: var(--s-4);
   padding: 0 var(--s-4) 0 var(--s-6);
   border-bottom: 1px solid var(--rule-strong);
   background: var(--surface);
-  /* Chrome that stays while the board moves under it. The contact shadow is a
-     z-relationship, not decoration — without it the masthead reads as a band
-     printed into the paper rather than as a fixed rail. */
-  box-shadow: var(--lift-pane);
 }
 .venueIdentity {
   display: grid;
@@ -654,30 +659,18 @@
   padding-right: calc(var(--s-5) + 0.04em);
   border-right: 1px solid var(--rule);
 }
-.venueIdentity span { color: var(--accent-ink); font-size: var(--t-micro); font-weight: var(--weight-strong); letter-spacing: var(--track-caps); }
-.venueIdentity strong { font-size: var(--t-body); font-weight: var(--weight-strong); letter-spacing: 0.06em; white-space: nowrap; }
+.venueIdentity span { color: var(--accent-ink); font-size: var(--t-micro); font-weight: var(--weight-ui); letter-spacing: var(--track-brand); }
+.venueIdentity strong { font-size: var(--t-data); font-weight: var(--weight-strong); letter-spacing: var(--track-data); white-space: nowrap; }
 
-.ribbonControl { display: flex; min-width: 0; flex: 0 0 auto; align-items: center; gap: var(--s-3); color: var(--ink-3); }
-.ribbonControl > span { padding-inline-end: 0.15em; font-size: var(--t-micro); font-weight: var(--weight-ui); letter-spacing: var(--track-caps); white-space: nowrap; }
-.ribbonControl input {
-  min-width: 0;
-  height: var(--h-control-sm);
-  padding: 0 var(--s-3);
-  border: 1px solid var(--rule);
-  border-radius: var(--r-control);
-  background: var(--surface-quiet);
-  color: var(--ink);
-  font-family: var(--font-figure);
-  font-size: var(--t-field);
-  font-variant-numeric: tabular-nums;
-}
-.ribbonControl strong { color: var(--ink-2); font-family: var(--font-figure); font-size: var(--t-mini); font-weight: var(--weight-ui); white-space: nowrap; }
 
 /* Live counters double as filters, so the queue and the ledger stay one list. */
-.pulseCluster { display: flex; min-width: 0; margin-left: auto; align-items: stretch; align-self: stretch; border-left: 1px solid var(--rule); }
+.pulseCluster { display: flex; min-width: 0; flex: 0 0 auto; margin-left: auto; align-items: stretch; align-self: stretch; border-left: 1px solid var(--rule); }
 .pulseCluster > * {
   display: grid;
-  min-width: 72px;
+  /* Both floors are declared here rather than inherited from the row, so a
+     counter can never be shrunk under the touch minimum by a neighbour. */
+  min-width: var(--w-pulse-item);
+  min-height: var(--h-control);
   align-content: center;
   gap: 1px;
   padding: 0 var(--s-5);
@@ -686,20 +679,34 @@
   background: transparent;
   text-align: left;
 }
+.pulseCluster > *:last-child { border-right: 0; }
 .pulseCluster button { transition: color var(--dur-fast) var(--ease-ui); }
 .pulseCluster button[data-active] { background: var(--accent-wash); box-shadow: inset 0 -2px var(--accent); }
-.pulseCluster span { color: var(--ink-3); font-size: var(--t-micro); letter-spacing: 0.04em; white-space: nowrap; }
-.pulseCluster strong { color: var(--ink); font-family: var(--font-figure); font-size: var(--t-data); font-weight: var(--weight-strong); font-variant-numeric: tabular-nums; }
+.pulseCluster span { color: var(--ink-3); font-size: var(--t-micro); letter-spacing: var(--track-micro); white-space: nowrap; }
+/* A counter that reads zero is not news. Muting it keeps the eye on the one
+   that is not zero, which is the only reason the cluster exists. */
+.pulseCluster strong { color: var(--ink); font-family: var(--font-figure); font-size: var(--t-figure); font-weight: var(--weight-strong); font-variant-numeric: tabular-nums; letter-spacing: var(--track-figure); }
+.pulseCluster [data-zero] strong { color: var(--ink-3); font-weight: var(--weight-ui); }
 .pulseCluster [data-alert] strong { color: var(--alert); }
 
-.syncStatus { display: flex; flex: 0 0 auto; align-items: center; gap: var(--s-3); padding: 0 var(--s-5); color: var(--live); }
+.syncStatus { display: flex; flex: 0 0 auto; align-items: center; gap: var(--s-3); padding: 0 var(--s-4); color: var(--live); }
 .syncStatus[data-state="stale"], .syncStatus[data-state="reconnecting"], .syncStatus[data-state="read_only"] { color: var(--warn); }
 .syncStatus[data-state="error"] { color: var(--alert); }
-.syncStatus span { font-size: var(--t-micro); white-space: nowrap; }
-.syncStatus strong { color: var(--ink-2); font-family: var(--font-figure); font-size: var(--t-mini); font-weight: var(--weight-ui); }
+.syncStatus span { font-size: var(--t-micro); white-space: nowrap; letter-spacing: var(--track-micro); }
+.syncStatus strong { color: var(--ink-2); font-family: var(--font-figure); font-size: var(--t-mini); font-weight: var(--weight-ui); letter-spacing: var(--track-micro); }
 
-.operatorIdentity { display: flex; flex: 0 0 auto; align-items: center; gap: var(--s-4); color: var(--ink-2); }
-.operatorIdentity span { overflow: hidden; max-width: 118px; font-size: var(--t-mini); text-overflow: ellipsis; white-space: nowrap; }
+/* The identity block is the one thing in the ribbon that may lose width: a
+   truncated operator name still identifies the session, whereas a truncated
+   counter or a truncated date does not. Everything else holds its size, so an
+   overflowing ribbon can never paint a positioned control over a counter — the
+   defect this replaced. */
+.operatorIdentity { display: flex; min-width: 0; flex: 0 1 auto; align-items: center; gap: var(--s-3); color: var(--ink-2); }
+/* The block may lose width; the *name* is what gives it up. Making the block
+   shrinkable without pinning the button squeezed the lock control to 38.8px at
+   390px — the gate caught it. A truncated operator name still identifies the
+   session; a lock button under the touch floor is a control the hand misses. */
+.operatorIdentity span { overflow: hidden; min-width: 0; flex: 0 1 auto; max-width: var(--w-operator-name); font-size: var(--t-mini); text-overflow: ellipsis; white-space: nowrap; letter-spacing: var(--track-micro); }
+.operatorIdentity button { flex: 0 0 auto; }
 .operatorIdentity button {
   display: flex;
   min-height: var(--h-control-sm);
@@ -711,6 +718,7 @@
   background: var(--surface);
   font-size: var(--t-mini);
   white-space: nowrap;
+  letter-spacing: var(--track-micro);
 }
 
 .ribbonDemoCue {
@@ -725,6 +733,7 @@
   background: var(--accent-wash);
   color: var(--accent-ink);
   font-size: var(--t-micro);
+  letter-spacing: var(--track-micro);
 }
 .ribbonDemoCue strong { white-space: nowrap; letter-spacing: 0.03em; }
 .ribbonDemoCue span { display: flex; align-items: center; gap: var(--s-2); color: var(--ink-2); white-space: nowrap; }
@@ -750,7 +759,6 @@
   padding: 0 var(--s-5);
   border-bottom: 1px solid var(--rule);
   background: var(--surface);
-  box-shadow: var(--lift-pane);
 }
 .desktopCreate { flex: 0 0 auto; }
 .viewSwitcher {
@@ -796,6 +804,7 @@
   background: var(--warn-wash);
   color: var(--warn);
   font-size: var(--t-mini);
+  letter-spacing: var(--track-micro);
 }
 .stateBanner strong { font-weight: var(--weight-strong); white-space: nowrap; }
 .stateBanner span { min-width: 0; overflow: hidden; color: var(--ink-2); text-overflow: ellipsis; white-space: nowrap; }
@@ -829,9 +838,10 @@
   background: var(--surface-quiet);
   color: var(--ink-2);
   font-size: var(--t-mini);
+  letter-spacing: var(--track-micro);
 }
 .liveMessage p { min-width: 0; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.liveMessage strong { color: var(--ink-3); font-family: var(--font-figure); font-size: var(--t-micro); }
+.liveMessage strong { color: var(--ink-3); font-family: var(--font-figure); font-size: var(--t-micro); letter-spacing: var(--track-micro); }
 
 .viewFrame { min-width: 0; min-height: 0; flex: 1; overflow: hidden; background: var(--surface); }
 .floorView, .timelineView, .listView {
@@ -855,6 +865,7 @@
   background: var(--surface-quiet);
   color: var(--ink-3);
   font-size: var(--t-micro);
+  letter-spacing: var(--track-micro);
 }
 .viewStrip h1, .viewStrip h2 { margin: 0; color: var(--ink-2); font-size: var(--t-mini); font-weight: var(--weight-strong); letter-spacing: var(--track-caps); }
 .stripSpacer { margin-left: auto; }
@@ -862,7 +873,7 @@
 
 .zoomControl { display: flex; align-items: center; border: 1px solid var(--rule); border-radius: var(--r-control); background: var(--surface); }
 .zoomControl button { display: grid; width: var(--h-control); height: var(--h-control); place-items: center; border: 0; background: transparent; color: var(--ink-2); }
-.zoomControl span { min-width: 42px; color: var(--ink-2); font-size: var(--t-mini); text-align: center; }
+.zoomControl span { min-width: 42px; color: var(--ink-2); font-size: var(--t-mini); text-align: center; letter-spacing: var(--track-micro); }
 
 /* ── 4. attention queue ────────────────────────────────────────────────── */
 
@@ -880,7 +891,7 @@
 }
 .railHeader div { display: grid; min-width: 0; gap: 1px; }
 .railHeader strong { font-size: var(--t-body); font-weight: var(--weight-strong); }
-.railHeader span { color: var(--ink-3); font-size: var(--t-micro); }
+.railHeader span { color: var(--ink-3); font-size: var(--t-micro); letter-spacing: var(--track-micro); }
 .railHeader button {
   display: grid;
   width: var(--h-control);
@@ -905,7 +916,7 @@
   color: var(--ink-3);
 }
 .queueGroup header span { display: flex; align-items: center; gap: var(--s-3); font-size: var(--t-micro); font-weight: var(--weight-ui); letter-spacing: 0.05em; }
-.queueGroup header strong { font-family: var(--font-figure); font-size: var(--t-mini); font-variant-numeric: tabular-nums; }
+.queueGroup header strong { font-family: var(--font-figure); font-size: var(--t-mini); font-variant-numeric: tabular-nums; letter-spacing: var(--track-micro); }
 .queueGroup[data-severity="critical"] header { background: var(--alert-wash); color: var(--alert); }
 .queueItem {
   display: grid;
@@ -922,14 +933,14 @@
   transition: background var(--dur-fast) var(--ease-ui);
 }
 .queueItem[data-selected] { background: var(--accent-wash); box-shadow: inset 0 -2px var(--accent); }
-.queueTime { color: var(--ink); font-family: var(--font-figure); font-size: var(--t-data); font-weight: var(--weight-strong); font-variant-numeric: tabular-nums; }
+.queueTime { color: var(--ink); font-family: var(--font-figure); font-size: var(--t-data); font-weight: var(--weight-strong); font-variant-numeric: tabular-nums; letter-spacing: var(--track-data); }
 .queueMain { display: grid; min-width: 0; gap: 1px; }
-.queueMain strong { font-family: var(--font-figure); font-size: var(--t-mini); font-weight: var(--weight-ui); }
-.queueMain small { overflow: hidden; color: var(--ink-2); font-size: var(--t-mini); text-overflow: ellipsis; white-space: nowrap; }
-.queueCue { display: flex; align-items: center; gap: var(--s-2); color: var(--ink-3); font-size: var(--t-micro); white-space: nowrap; }
+.queueMain strong { font-family: var(--font-figure); font-size: var(--t-mini); font-weight: var(--weight-ui); letter-spacing: var(--track-micro); }
+.queueMain small { overflow: hidden; color: var(--ink-2); font-size: var(--t-mini); text-overflow: ellipsis; white-space: nowrap; letter-spacing: var(--track-micro); }
+.queueCue { display: flex; align-items: center; gap: var(--s-2); color: var(--ink-3); font-size: var(--t-micro); white-space: nowrap; letter-spacing: var(--track-micro); }
 .queueCue[data-tone="danger"] { color: var(--alert); font-weight: var(--weight-strong); }
 .queueCue[data-tone="warning"] { color: var(--warn); font-weight: var(--weight-ui); }
-.queueEmpty { margin: 0; padding: var(--s-5) var(--s-6); color: var(--ink-3); font-size: var(--t-mini); }
+.queueEmpty { margin: 0; padding: var(--s-5) var(--s-6); color: var(--ink-3); font-size: var(--t-mini); letter-spacing: var(--track-micro); }
 
 /* ── 5. ledger (List) ──────────────────────────────────────────────────── */
 
@@ -982,7 +993,7 @@
 .reservationTable tbody tr { position: relative; transition: background var(--dur-fast) var(--ease-ui); }
 .reservationTable tbody tr:nth-child(even) { background: var(--surface-quiet); }
 .reservationTable tr[data-attention] { background: var(--alert-wash); }
-/* Selection is the champagne spine every ledger entry on this surface takes,
+/* Selection is the accent spine every ledger entry on this surface takes,
    matching `.queueItem` and `.checkGrid label`. It used to share a declaration
    block with the empty-state cell, so the row the operator had just opened
    inherited that cell's `height: 140px`, its muted `--ink-3` and its centred
@@ -1007,11 +1018,11 @@
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.01em;
 }
-.rowOpen small { color: var(--ink-3); font-family: var(--font-figure); font-size: var(--t-micro); font-variant-numeric: tabular-nums; }
+.rowOpen small { color: var(--ink-3); font-family: var(--font-figure); font-size: var(--t-micro); font-variant-numeric: tabular-nums; letter-spacing: var(--track-micro); }
 .rowOpen:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
 
 /* Status: swatch glyph plus word. Never a pill that reads as a button. */
-.statusBadge { display: inline-flex; align-items: center; gap: var(--s-3); color: var(--ink-2); font-size: var(--t-mini); white-space: nowrap; }
+.statusBadge { display: inline-flex; align-items: center; gap: var(--s-3); color: var(--ink-2); font-size: var(--t-mini); white-space: nowrap; letter-spacing: var(--track-micro); }
 /* The swatch has to read across a dark room from a metre away, so it carries
    real weight rather than a hairline tick. */
 .statusBadge::before { width: 4px; height: 16px; border-radius: 1px; background: var(--ink-3); content: ""; }
@@ -1026,9 +1037,9 @@
 .statusBadge[data-cue="dash"]::before { height: 8px; }
 .statusBadge[data-cue="double"]::before { width: 6px; background-image: linear-gradient(90deg, transparent 2px, var(--surface) 2px 4px, transparent 4px); }
 
-.codeCell { color: var(--ink-2); font-family: var(--font-figure); font-size: var(--t-mini); font-variant-numeric: tabular-nums; }
+.codeCell { color: var(--ink-2); font-family: var(--font-figure); font-size: var(--t-mini); font-variant-numeric: tabular-nums; letter-spacing: var(--track-micro); }
 .numberCell { color: var(--ink); font-family: var(--font-figure); font-variant-numeric: tabular-nums; text-align: right; }
-.seatCell { color: var(--ink); font-family: var(--font-figure); font-size: var(--t-mini); }
+.seatCell { color: var(--ink); font-family: var(--font-figure); font-size: var(--t-mini); letter-spacing: var(--track-micro); }
 .guestCell { display: block; max-width: 26ch; overflow: hidden; color: var(--ink); text-overflow: ellipsis; }
 .exceptionText { color: var(--alert); font-weight: var(--weight-strong); }
 .mutedText { color: var(--ink-3); }
@@ -1044,6 +1055,7 @@
   background: var(--surface-quiet);
   color: var(--ink-3);
   font-size: var(--t-micro);
+  letter-spacing: var(--track-micro);
 }
 .listFooter > div { display: flex; margin-left: auto; align-items: center; gap: var(--s-2); }
 .listFooter button { display: grid; width: var(--h-control); height: var(--h-control); place-items: center; border: 0; border-radius: var(--r-control); background: transparent; color: var(--ink-2); }
@@ -1342,9 +1354,9 @@
 }
 .nodeCardHead { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s-4); }
 .nodeCardHead b { font-family: var(--font-figure); font-size: var(--t-body); }
-.nodeCardHead em { color: var(--floor-tone); font-size: var(--t-micro); font-style: normal; white-space: nowrap; }
-.nodeCardGuest { overflow: hidden; color: oklch(0.96 0.01 82); font-size: var(--t-mini); text-overflow: ellipsis; white-space: nowrap; }
-.nodeCardMeta { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); color: oklch(0.76 0.015 82); font-size: var(--t-micro); }
+.nodeCardHead em { color: var(--floor-tone); font-size: var(--t-micro); font-style: normal; white-space: nowrap; letter-spacing: var(--track-micro); }
+.nodeCardGuest { overflow: hidden; color: oklch(0.96 0.01 82); font-size: var(--t-mini); text-overflow: ellipsis; white-space: nowrap; letter-spacing: var(--track-micro); }
+.nodeCardMeta { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); color: oklch(0.76 0.015 82); font-size: var(--t-micro); letter-spacing: var(--track-micro); }
 .nodeCardFlag {
   margin-top: var(--s-1);
   padding: var(--s-2);
@@ -1352,6 +1364,7 @@
   background: oklch(0.22 0.03 66);
   color: oklch(0.88 0.08 76);
   font-size: var(--t-micro);
+  letter-spacing: var(--track-micro);
 }
 
 .floorLegend {
@@ -1366,6 +1379,7 @@
   background: var(--surface-quiet);
   color: var(--ink-3);
   font-size: var(--t-micro);
+  letter-spacing: var(--track-micro);
 }
 .floorLegend span { display: inline-flex; align-items: center; gap: var(--s-3); }
 .floorLegend span::before {
@@ -1429,12 +1443,7 @@
   background: var(--surface);
   color: var(--ink-2);
   font-size: var(--t-micro);
-}
-.timelineLegend > strong {
-  color: var(--ink-3);
-  font-size: var(--t-micro);
-  font-weight: var(--weight-strong);
-  letter-spacing: var(--track-caps);
+  letter-spacing: var(--track-micro);
 }
 .timelineLegend > span {
   --band-frame: var(--rule-strong);
@@ -1476,7 +1485,12 @@
 .timelineLegend [data-signal="medium"] { --legend-reach: 3px; }
 .timelineLegend [data-signal="high"] { --legend-reach: 5px; }
 .timelineLegend [data-signal="high"] i::before { width: 3px; }
-.timelineLegend b { color: var(--ink-3); font-weight: var(--weight-ui); }
+.timelineLegend b { color: var(--ink); font-weight: var(--weight-strong); }
+/* A phase standing at zero is not news; it stays legible as a key entry and
+   stops competing with the one phase that has something on the board. */
+.timelineLegend [data-zero] { color: var(--ink-3); }
+.timelineLegend [data-zero] b { color: var(--ink-3); font-weight: var(--weight-ui); }
+.timelineLegend [data-zero] i { opacity: 0.55; }
 
 .timelineScroller { min-height: 0; flex: 1; overflow: auto; overscroll-behavior: contain; background: var(--surface); }
 .timelineGrid {
@@ -1506,6 +1520,7 @@
   color: var(--ink-3);
   font-size: var(--t-micro);
   flex: 0 0 32px;
+  letter-spacing: var(--track-micro);
 }
 .timelineTicks {
   position: sticky;
@@ -1532,6 +1547,7 @@
   font-family: var(--font-figure);
   font-size: var(--t-micro);
   font-variant-numeric: tabular-nums;
+  letter-spacing: var(--track-micro);
 }
 .timelineTicks span[data-hour] {
   border-left-color: var(--rule-strong);
@@ -1556,6 +1572,7 @@
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
   transform: translate(-50%, -50%);
+  letter-spacing: var(--track-micro);
 }
 .timelineRow {
   display: grid;
@@ -1577,9 +1594,9 @@
   background: var(--surface);
 }
 .timelineRow:nth-of-type(even) .timelineTableLabel { background: var(--surface-quiet); }
-.timelineTableLabel strong { color: var(--ink); font-family: var(--font-figure); font-size: var(--t-mini); font-weight: var(--weight-strong); }
-.timelineTableLabel span { color: var(--ink-3); font-size: var(--t-micro); }
-.timelineTableLabel small { color: var(--alert); font-size: var(--t-micro); }
+.timelineTableLabel strong { color: var(--ink); font-family: var(--font-figure); font-size: var(--t-mini); font-weight: var(--weight-strong); letter-spacing: var(--track-micro); }
+.timelineTableLabel span { color: var(--ink-3); font-size: var(--t-micro); letter-spacing: var(--track-micro); }
+.timelineTableLabel small { color: var(--alert); font-size: var(--t-micro); letter-spacing: var(--track-micro); }
 /* ── the alarm · part one, the lane says what is wrong ────────────────────
  *
  * The track is 1020–1560px wide and the iPad shows about 960 of it, so anything
@@ -1610,6 +1627,7 @@
   font-variant-numeric: tabular-nums;
   text-overflow: ellipsis;
   white-space: nowrap;
+  letter-spacing: var(--track-micro);
 }
 .timelineLaneAlarm[data-signal="low"] { background: var(--accent-wash); color: var(--accent-ink) !important; }
 .timelineLaneAlarm[data-signal="medium"] {
@@ -1649,6 +1667,7 @@
   color: var(--ink-2);
   font-size: var(--t-mini);
   line-height: var(--lh-ui);
+  letter-spacing: var(--track-micro);
 }
 /* A band answers two questions that must not compete for the same ink:
  *   what kind of table is this  → the top rule and the fill (service status)
@@ -1702,6 +1721,7 @@
   font-size: var(--t-micro);
   text-overflow: ellipsis;
   white-space: nowrap;
+  letter-spacing: var(--track-micro);
 }
 .timelineBarTime { flex: 0 0 auto; font-weight: var(--weight-ui); }
 .timelineBarPhase { min-width: 0; font-weight: var(--weight-strong); }
@@ -1784,11 +1804,11 @@
 .timelineBar[data-signal="high"] { --band-rule: var(--ink-2); }
 /* Selection never repaints the border — that would make the two semantic layers
  * lie for as long as a band is selected — and it no longer draws a ring around
- * it either. A champagne outline floating one pixel outside a coloured frame
- * gave every selected band a picture-frame edge (champagne, white, phase
+ * it either. An accent outline floating one pixel outside a coloured frame
+ * gave every selected band a picture-frame edge (accent, white, phase
  * colour, then finally the label) and made the calmest phase on the chart its
  * loudest object. A band is a ledger entry, so it takes the mark every other
- * ledger entry on this surface takes: the champagne spine on its baseline,
+ * ledger entry on this surface takes: the accent spine on its baseline,
  * matching `.queueItem`, `.reservationTable tr` and `.checkGrid label`.
  * Keyboard focus is separate and still draws its own ring (§6.1). */
 .timelineBar[data-selected] {
@@ -1975,11 +1995,12 @@
   color: var(--alert);
   font-size: var(--t-micro);
   transform: translateY(-50%);
+  letter-spacing: var(--track-micro);
 }
 /* One line, one cap. The cap repeated on all eight rows read as a beaded chain
  * rather than as the single authoritative "you are here". */
-/* Graphite, not champagne. "Now" is structure, not status — and champagne is
- * already the arrival frame and the selection ring, so a champagne now-line
+/* Graphite, not the accent. "Now" is structure, not status — and the accent is
+ * already the arrival frame and the selection ring, so an accent now-line
  * competed with the very bands standing closest to it. Line, cap and clock are
  * now one object in one colour. */
 .nowLine { position: absolute; z-index: 3; top: 0; bottom: 0; left: var(--bar-start); width: 2px; background: var(--action); }
@@ -2016,9 +2037,10 @@
   background: var(--surface-sunken);
   color: var(--ink-3);
   font-size: var(--t-micro);
+  letter-spacing: var(--track-micro);
 }
 .chartExceptions header strong { font-weight: var(--weight-ui); letter-spacing: 0.05em; }
-.chartExceptions header span { color: var(--ink); font-family: var(--font-figure); font-size: var(--t-mini); font-weight: var(--weight-strong); }
+.chartExceptions header span { color: var(--ink); font-family: var(--font-figure); font-size: var(--t-mini); font-weight: var(--weight-strong); letter-spacing: var(--track-micro); }
 .chartExceptions > div > div { min-height: 0; flex: 1; overflow-y: auto; }
 /* Rule 7 — the idle state costs no pixels. With nothing outstanding the rail
  * was three panels saying 対象なし three times: 140px in landscape and, once it
@@ -2042,9 +2064,10 @@
   font-family: var(--font-figure);
   font-size: var(--t-micro);
   text-align: left;
+  letter-spacing: var(--track-micro);
 }
 .chartExceptions button small { color: var(--alert); font-family: var(--font-ui); }
-.chartExceptions p { margin: 0; padding: var(--s-4) var(--s-5); color: var(--ink-3); font-size: var(--t-micro); }
+.chartExceptions p { margin: 0; padding: var(--s-4) var(--s-5); color: var(--ink-3); font-size: var(--t-micro); letter-spacing: var(--track-micro); }
 .chartMobileFocus { display: none; }
 
 /* ── 8. inspector ──────────────────────────────────────────────────────── */
@@ -2076,7 +2099,7 @@
 }
 .inspectorHeader div { display: grid; min-width: 0; gap: 1px; }
 .inspectorHeader span { color: var(--ink-3); font-size: var(--t-micro); letter-spacing: 0.05em; }
-.inspectorHeader strong { color: var(--ink); font-family: var(--font-figure); font-size: var(--t-data); font-weight: var(--weight-strong); }
+.inspectorHeader strong { color: var(--ink); font-family: var(--font-figure); font-size: var(--t-data); font-weight: var(--weight-strong); letter-spacing: var(--track-data); }
 .inspectorHeader button {
   display: grid;
   width: var(--h-control);
@@ -2088,6 +2111,12 @@
   color: var(--ink-2);
 }
 
+/* The identity band states the reservation's state, which is not the same
+   thing as "you are here" — the accent's only job. Tinting it with the accent
+   by default spent the one colour the surface has on a row that is already
+   unmistakably the selected one, and left a violet band sitting inside a pink
+   attention wash. The default is now neutral, and colour appears only when the
+   state itself is carrying a warning. */
 .focusSummary {
   display: grid;
   min-height: 62px;
@@ -2096,17 +2125,17 @@
   align-items: center;
   gap: var(--s-4);
   padding: var(--s-4) var(--s-6);
-  border-bottom: 2px solid var(--accent);
-  background: var(--accent-wash);
-  color: var(--accent-ink);
+  border-bottom: 1px solid var(--rule);
+  background: var(--surface-sunken);
+  color: var(--ink);
 }
 .focusSummary[data-tone="danger"] { border-bottom-color: var(--alert); background: var(--alert-wash); color: var(--alert); }
 .focusSummary[data-tone="warning"] { border-bottom-color: var(--warn); background: var(--warn-wash); color: var(--warn); }
 .focusSummary[data-tone="success"] { border-bottom-color: var(--live); background: var(--live-wash); color: var(--live); }
 .focusSummary div { display: grid; min-width: 0; gap: 1px; }
 .focusSummary strong { font-size: var(--t-body); font-weight: var(--weight-strong); }
-.focusSummary div span { color: var(--ink-2); font-family: var(--font-figure); font-size: var(--t-micro); }
-.focusTable { color: var(--ink); font-family: var(--font-figure); font-size: var(--t-mini); font-weight: var(--weight-strong); }
+.focusSummary div span { color: var(--ink-2); font-family: var(--font-figure); font-size: var(--t-micro); letter-spacing: var(--track-micro); }
+.focusTable { color: var(--ink); font-family: var(--font-figure); font-size: var(--t-mini); font-weight: var(--weight-strong); letter-spacing: var(--track-micro); }
 
 .turnoverAction {
   flex: 0 0 auto;
@@ -2130,7 +2159,7 @@
 }
 .turnoverAction button > span { display: grid; min-width: 0; gap: 1px; }
 .turnoverAction strong { font-size: var(--t-body); font-weight: var(--weight-strong); }
-.turnoverAction small { overflow: hidden; color: var(--action-text); font-size: var(--t-micro); text-overflow: ellipsis; white-space: nowrap; }
+.turnoverAction small { overflow: hidden; color: var(--action-text); font-size: var(--t-micro); text-overflow: ellipsis; white-space: nowrap; letter-spacing: var(--track-micro); }
 
 /* Actions sit directly under the identity block, never stranded at the fold. */
 .commandGrid {
@@ -2141,15 +2170,20 @@
   border-bottom: 1px solid var(--rule);
   background: var(--rule);
 }
-/* Left-aligned on a shared icon column so six commands read as a menu an
-   operator scans, not as six co-equal tiles. Centring them was what made this
-   block look generated. */
+/* Left-aligned labels so six commands read as a menu an operator scans, not as
+   six co-equal tiles.
+
+   The icons that used to lead each row were removed on 2026-08-16, reversing
+   the 2026-07-31 shared-icon-column decision. The reason the reversal is an
+   improvement rather than a regression: the glyphs were metaphorical rather
+   than denotative — a bell for 接客状態, a sofa for 卓を決める, a rewind for
+   利用延長 — so none of them could be read faster than its own label, and six
+   of them stacked is the texture that makes a panel look generated. The menu
+   structure the earlier pass was actually after is kept. */
 .commandGrid button {
   display: grid;
   min-height: var(--h-control);
-  grid-template-columns: 18px minmax(0, 1fr);
   align-items: center;
-  gap: var(--s-4);
   padding: 0 var(--s-5);
   border: 0;
   background: var(--surface);
@@ -2158,16 +2192,18 @@
   text-align: left;
   transition: color var(--dur-fast) var(--ease-ui);
 }
-.commandGrid button svg { color: var(--ink-3); transition: color var(--dur-fast) var(--ease-ui); }
+/* 予約編集 spans the menu because it is the entry to a different surface, not
+   because it outranks check-in during service. It is marked by an accent edge
+   and ink — never by a solid fill, which put a second near-black bar directly
+   under the turnover primary and made the panel read as two stacked banners. */
 .commandGrid button:first-child {
   grid-column: 1 / -1;
-  grid-template-columns: auto auto;
-  justify-content: center;
-  background: var(--action);
-  color: var(--action-text);
+  /* Marked with the house's horizontal rule, not a coloured side tab (§3): the
+     direction reserves vertical edges for the band language in the chart. */
+  box-shadow: inset 0 -2px var(--accent);
+  color: var(--accent-ink);
   font-weight: var(--weight-strong);
 }
-.commandGrid button:first-child svg { color: var(--action-text); }
 .commandGrid button[data-danger] { color: var(--alert); }
 .commandGrid button[data-danger] svg { color: var(--alert); }
 
@@ -2190,6 +2226,7 @@
   color: var(--ink-3);
   font-size: var(--t-mini);
   white-space: nowrap;
+  letter-spacing: var(--track-micro);
 }
 .inspectorTabs button[aria-selected="true"] { border-bottom-color: var(--ink); color: var(--ink); font-weight: var(--weight-strong); }
 
@@ -2209,7 +2246,7 @@
   padding: var(--s-2) var(--s-6);
 }
 .detailList div[data-band] { margin-top: var(--s-5); padding-top: var(--s-6); border-top: 1px solid var(--rule); }
-.detailList dt { color: var(--ink-3); font-size: var(--t-mini); }
+.detailList dt { color: var(--ink-3); font-size: var(--t-mini); letter-spacing: var(--track-micro); }
 .detailList dd {
   min-width: 0;
   margin: 0;
@@ -2221,32 +2258,33 @@
   text-align: right;
   text-overflow: ellipsis;
   white-space: nowrap;
+  letter-spacing: var(--track-micro);
 }
 /* The operational triad is what a runner reads across the room. */
 .detailList div[data-rank="lead"] { min-height: 34px; }
-.detailList div[data-rank="lead"] dd { color: var(--ink); font-size: var(--t-data); font-weight: var(--weight-strong); }
+.detailList div[data-rank="lead"] dd { color: var(--ink); font-size: var(--t-data); font-weight: var(--weight-strong); letter-spacing: var(--track-data); }
 /* Version and exception are provenance, not instructions. */
 .detailList div[data-rank="meta"] dt,
-.detailList div[data-rank="meta"] dd { color: var(--ink-3); font-size: var(--t-micro); font-weight: var(--weight-body); }
+.detailList div[data-rank="meta"] dd { color: var(--ink-3); font-size: var(--t-micro); font-weight: var(--weight-body); letter-spacing: var(--track-micro); }
 .detailStack { display: grid; gap: var(--s-5); padding: var(--s-6); }
-.detailStack p { display: flex; align-items: center; gap: var(--s-3); margin: 0; color: var(--ink-2); font-size: var(--t-mini); line-height: var(--lh-ui); }
-.detailStack small { color: var(--ink-3); font-size: var(--t-micro); line-height: var(--lh-ui); }
-.maskedName { color: var(--ink) !important; font-size: var(--t-data) !important; font-weight: var(--weight-strong); }
+.detailStack p { display: flex; align-items: center; gap: var(--s-3); margin: 0; color: var(--ink-2); font-size: var(--t-mini); line-height: var(--lh-ui); letter-spacing: var(--track-micro); }
+.detailStack small { color: var(--ink-3); font-size: var(--t-micro); line-height: var(--lh-ui); letter-spacing: var(--track-micro); }
+.maskedName { color: var(--ink) !important; font-size: var(--t-data) !important; font-weight: var(--weight-strong); letter-spacing: var(--track-data); }
 .noteList { display: grid; gap: var(--s-4); padding: var(--s-6); }
 .noteList article { padding: var(--s-4) var(--s-5); border: 1px solid var(--rule); border-top: 2px solid var(--accent); border-radius: 0 0 var(--r-chip) var(--r-chip); background: var(--surface-quiet); }
-.noteList strong { display: flex; align-items: center; gap: var(--s-3); color: var(--ink); font-size: var(--t-mini); }
-.noteList p { margin: var(--s-3) 0; color: var(--ink-2); font-size: var(--t-mini); line-height: var(--lh-ui); }
-.noteList small { color: var(--ink-3); font-family: var(--font-figure); font-size: var(--t-micro); }
+.noteList strong { display: flex; align-items: center; gap: var(--s-3); color: var(--ink); font-size: var(--t-mini); letter-spacing: var(--track-micro); }
+.noteList p { margin: var(--s-3) 0; color: var(--ink-2); font-size: var(--t-mini); line-height: var(--lh-ui); letter-spacing: var(--track-micro); }
+.noteList small { color: var(--ink-3); font-family: var(--font-figure); font-size: var(--t-micro); letter-spacing: var(--track-micro); }
 .historyList { margin: 0; padding: var(--s-5) var(--s-6); list-style: none; }
 .historyList li { display: grid; grid-template-columns: 46px minmax(0, 1fr); gap: var(--s-4); padding: var(--s-4) 0; border-bottom: 1px solid var(--rule); }
-.historyList > li > span { color: var(--ink-3); font-family: var(--font-figure); font-size: var(--t-micro); font-variant-numeric: tabular-nums; }
+.historyList > li > span { color: var(--ink-3); font-family: var(--font-figure); font-size: var(--t-micro); font-variant-numeric: tabular-nums; letter-spacing: var(--track-micro); }
 .historyList strong, .historyList p, .historyList small { display: block; margin: 0; }
-.historyList strong { color: var(--ink); font-size: var(--t-mini); }
-.historyList p, .historyList small { color: var(--ink-3); font-size: var(--t-micro); }
+.historyList strong { color: var(--ink); font-size: var(--t-mini); letter-spacing: var(--track-micro); }
+.historyList p, .historyList small { color: var(--ink-3); font-size: var(--t-micro); letter-spacing: var(--track-micro); }
 
 .noSelection { display: flex; min-height: 0; flex: 1; flex-direction: column; align-items: center; justify-content: center; gap: var(--s-4); padding: var(--s-8); color: var(--ink-3); text-align: center; }
 .noSelection h2 { margin: 0; color: var(--ink); font-size: var(--t-body); font-weight: var(--weight-strong); }
-.noSelection p { max-width: 28ch; margin: 0; font-size: var(--t-mini); line-height: var(--lh-prose); }
+.noSelection p { max-width: 28ch; margin: 0; font-size: var(--t-mini); line-height: var(--lh-prose); letter-spacing: var(--track-micro); }
 
 /* ── 9. dialog system ──────────────────────────────────────────────────── */
 
@@ -2327,8 +2365,9 @@
   background: var(--accent-wash);
   color: var(--accent-ink);
   font-size: var(--t-micro);
+  letter-spacing: var(--track-micro);
 }
-.trialInputHint { margin: var(--s-1) 0 0; color: var(--warn); font-size: var(--t-micro); line-height: var(--lh-ui); }
+.trialInputHint { margin: var(--s-1) 0 0; color: var(--warn); font-size: var(--t-micro); line-height: var(--lh-ui); letter-spacing: var(--track-micro); }
 .syntheticInputHint, .fieldError {
   display: block;
   margin: calc(var(--s-2) * -1) 0 0;
@@ -2347,7 +2386,7 @@
   box-shadow: 0 0 0 1px var(--alert);
 }
 
-.stepRail { display: flex; min-height: 32px; flex: 0 0 auto; align-items: center; justify-content: center; gap: var(--s-4); border-bottom: 1px solid var(--rule); color: var(--ink-3); font-size: var(--t-micro); }
+.stepRail { display: flex; min-height: 32px; flex: 0 0 auto; align-items: center; justify-content: center; gap: var(--s-4); border-bottom: 1px solid var(--rule); color: var(--ink-3); font-size: var(--t-micro); letter-spacing: var(--track-micro); }
 .stepRail span[data-current] { color: var(--ink); font-weight: var(--weight-strong); }
 
 .commandForm { min-height: 0; flex: 1; overflow-y: auto; padding: var(--s-6); }
@@ -2363,8 +2402,8 @@
   border-radius: 0 0 var(--r-chip) var(--r-chip);
   background: var(--surface-quiet);
 }
-.commandContext strong { color: var(--ink); font-family: var(--font-figure); font-size: var(--t-data); font-weight: var(--weight-strong); }
-.commandContext span { color: var(--ink-2); font-size: var(--t-mini); }
+.commandContext strong { color: var(--ink); font-family: var(--font-figure); font-size: var(--t-data); font-weight: var(--weight-strong); letter-spacing: var(--track-data); }
+.commandContext span { color: var(--ink-2); font-size: var(--t-mini); letter-spacing: var(--track-micro); }
 .operationDateRecovery {
   display: grid;
   gap: var(--s-6);
@@ -2383,7 +2422,7 @@
 .operationDateRecovery > div > span { display: grid; min-width: 0; gap: var(--s-2); }
 .operationDateRecovery strong { color: var(--ink); font-size: var(--t-body); font-weight: var(--weight-strong); }
 .operationDateRecovery small,
-.operationDateRecovery p { margin: 0; color: var(--ink-2); font-size: var(--t-mini); line-height: var(--lh-ui); }
+.operationDateRecovery p { margin: 0; color: var(--ink-2); font-size: var(--t-mini); line-height: var(--lh-ui); letter-spacing: var(--track-micro); }
 .operationDateRecovery p { padding-top: var(--s-4); border-top: 1px solid var(--rule); }
 .operationDateRecovery > .operationDateSuggestions {
   display: grid;
@@ -2391,10 +2430,10 @@
   align-items: center;
   gap: var(--s-3);
 }
-.operationDateRecovery > .operationDateSuggestions > span { color: var(--ink-3); font-size: var(--t-micro); font-weight: var(--weight-ui); }
+.operationDateRecovery > .operationDateSuggestions > span { color: var(--ink-3); font-size: var(--t-micro); font-weight: var(--weight-ui); letter-spacing: var(--track-micro); }
 .operationDateRecovery > .operationDateSuggestions > button { width: 100%; min-width: 0; padding-inline: var(--s-3); }
 .commandForm fieldset, .wizardBody fieldset { display: grid; min-width: 0; gap: var(--s-5); margin: 0; padding: 0; border: 0; }
-.commandForm legend { margin-bottom: var(--s-4); color: var(--ink-3); font-size: var(--t-mini); }
+.commandForm legend { margin-bottom: var(--s-4); color: var(--ink-3); font-size: var(--t-mini); letter-spacing: var(--track-micro); }
 .commandForm label, .wizardBody label, .staffCreate label,
 .customerAttributeForm label, .waitlistActions label { display: grid; gap: var(--s-3); color: var(--ink-3); font-size: var(--t-micro); font-weight: var(--weight-ui); letter-spacing: 0.03em; }
 .commandForm input, .commandForm select, .commandForm textarea,
@@ -2418,10 +2457,10 @@
 .commandForm textarea, .wizardBody textarea { min-height: 88px; resize: vertical; }
 .commandForm input:focus-visible, .commandForm select:focus-visible, .commandForm textarea:focus-visible,
 .wizardBody input:focus-visible, .wizardBody select:focus-visible, .wizardBody textarea:focus-visible { border-color: var(--focus); }
-.helperText { margin: 0; color: var(--ink-3); font-size: var(--t-micro); line-height: var(--lh-ui); }
+.helperText { margin: 0; color: var(--ink-3); font-size: var(--t-micro); line-height: var(--lh-ui); letter-spacing: var(--track-micro); }
 
 .assignmentOptions { display: grid; gap: 1px; overflow: hidden; border: 1px solid var(--rule); border-radius: var(--r-control); background: var(--rule); }
-.assignmentOptions > span { padding: var(--s-3) var(--s-5); background: var(--surface-sunken); color: var(--ink-2); font-size: var(--t-micro); }
+.assignmentOptions > span { padding: var(--s-3) var(--s-5); background: var(--surface-sunken); color: var(--ink-2); font-size: var(--t-micro); letter-spacing: var(--track-micro); }
 .assignmentOptions label {
   display: grid !important;
   min-height: var(--h-control);
@@ -2498,14 +2537,15 @@
   padding: var(--s-3) var(--s-5);
   border-bottom: 1px solid var(--rule);
 }
-.walkInReceipt dt { color: var(--ink-3); font-size: var(--t-micro); }
-.walkInReceipt dd { min-width: 0; margin: 0; overflow: hidden; color: var(--ink); font-size: var(--t-mini); font-weight: var(--weight-strong); text-align: right; text-overflow: ellipsis; white-space: nowrap; }
-.walkInAttribution > p { margin: 0; padding: var(--s-4) var(--s-5); color: var(--ink-3); font-size: var(--t-micro); line-height: var(--lh-ui); }
+.walkInReceipt dt { color: var(--ink-3); font-size: var(--t-micro); letter-spacing: var(--track-micro); }
+.walkInReceipt dd { min-width: 0; margin: 0; overflow: hidden; color: var(--ink); font-size: var(--t-mini); font-weight: var(--weight-strong); text-align: right; text-overflow: ellipsis; white-space: nowrap; letter-spacing: var(--track-micro); }
+.walkInAttribution > p { margin: 0; padding: var(--s-4) var(--s-5); color: var(--ink-3); font-size: var(--t-micro); line-height: var(--lh-ui); letter-spacing: var(--track-micro); }
 .businessTimeHint, .businessTimeReadout {
   margin: 0;
   color: var(--ink-2);
   font-size: var(--t-micro);
   line-height: var(--lh-ui);
+  letter-spacing: var(--track-micro);
 }
 .businessTimeHint strong { color: var(--ink); font-weight: var(--weight-strong); }
 .businessTimeReadout {
@@ -2516,7 +2556,7 @@
   padding-bottom: var(--s-3);
   border-bottom: 1px solid var(--rule);
 }
-.businessTimeReadout strong { color: var(--ink); font-size: var(--t-data); font-weight: var(--weight-strong); }
+.businessTimeReadout strong { color: var(--ink); font-size: var(--t-data); font-weight: var(--weight-strong); letter-spacing: var(--track-data); }
 .checkGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: var(--s-3); }
 .checkGrid label {
   display: flex !important;
@@ -2529,9 +2569,24 @@
   background: var(--surface);
   color: var(--ink) !important;
   font-size: var(--t-mini) !important;
+  letter-spacing: var(--track-micro);
 }
 .checkGrid input, .checkRow input { width: 24px; min-width: 24px; height: 24px; min-height: 24px; accent-color: var(--action); }
-.checkGrid small { margin-left: auto; color: var(--ink-3); font-size: var(--t-micro); }
+/* A table code is an identifier and never breaks: `VIP-5` wrapping to `VIP-`
+   over `5`, with `プラン外` splitting to `プ` over `ラン外`, is what the
+   incompatible cells did at this column width. The code holds its line and the
+   reason is allowed to wrap under it instead. */
+.checkGrid label > span { flex: 0 0 auto; white-space: nowrap; }
+.checkGrid small {
+  margin-left: auto;
+  min-width: 0;
+  color: var(--ink-3);
+  font-size: var(--t-micro);
+  text-align: right;
+  letter-spacing: var(--track-micro);
+}
+.checkGrid label[data-unavailable] { flex-wrap: wrap; row-gap: 0; }
+.checkGrid label[data-unavailable] small { margin-left: 0; flex: 1 0 100%; text-align: left; }
 .checkGrid label[data-unavailable] { border-color: var(--rule); background: var(--surface-sunken); color: var(--ink-3) !important; }
 .checkGrid label[data-unavailable] small { color: var(--ink-3); }
 .checkRow { display: flex !important; min-height: var(--h-control); align-items: center; gap: var(--s-4) !important; }
@@ -2559,7 +2614,7 @@
 }
 .confirmation strong, .confirmation p, .confirmation small,
 .conflictBox strong, .conflictBox p, .conflictBox small { display: block; margin: 0; }
-.confirmation p, .confirmation small, .conflictBox p, .conflictBox small { color: var(--ink-2); font-size: var(--t-mini); line-height: var(--lh-ui); }
+.confirmation p, .confirmation small, .conflictBox p, .conflictBox small { color: var(--ink-2); font-size: var(--t-mini); line-height: var(--lh-ui); letter-spacing: var(--track-micro); }
 .confirmation[data-danger] { border-top-color: var(--alert); background: var(--alert-wash); }
 .confirmation[data-danger] > svg,
 .confirmation[data-danger] strong { color: var(--alert); }
@@ -2606,12 +2661,13 @@
   background: var(--surface);
   color: var(--ink-3);
   font-size: var(--t-mini);
+  letter-spacing: var(--track-micro);
 }
 .operationTabs > button[data-active],
 .operationTabs > [role="tablist"] > button[data-active] { background: var(--surface); color: var(--ink); box-shadow: inset 0 -2px var(--ink); font-weight: var(--weight-strong); }
 .operationTabs > button:disabled,
 .operationTabs > [role="tablist"] > button:disabled { flex-wrap: wrap; }
-.operationTabs small { flex-basis: 100%; color: var(--ink-3); font-size: var(--t-micro); text-align: center; }
+.operationTabs small { flex-basis: 100%; color: var(--ink-3); font-size: var(--t-micro); text-align: center; letter-spacing: var(--track-micro); }
 
 .reservationWizard { display: flex; min-height: 0; flex: 1; flex-direction: column; overflow: hidden; }
 
@@ -2632,8 +2688,8 @@
 }
 .wizardPhase { display: flex; align-items: baseline; gap: var(--s-3); margin: 0; }
 .wizardPhase strong { color: var(--ink); font-size: var(--t-data); font-weight: var(--weight-strong); letter-spacing: -0.005em; }
-.wizardPhase span { color: var(--ink-2); font-size: var(--t-mini); font-weight: var(--weight-ui); }
-.wizardPhase em { min-width: 0; overflow: hidden; color: var(--ink-2); font-size: var(--t-mini); font-style: normal; text-overflow: ellipsis; white-space: nowrap; }
+.wizardPhase span { color: var(--ink-2); font-size: var(--t-mini); font-weight: var(--weight-ui); letter-spacing: var(--track-micro); }
+.wizardPhase em { min-width: 0; overflow: hidden; color: var(--ink-2); font-size: var(--t-mini); font-style: normal; text-overflow: ellipsis; white-space: nowrap; letter-spacing: var(--track-micro); }
 .wizardPhase em::before { margin-right: var(--s-3); color: var(--ink-3); content: "／"; }
 
 .wizardRail { display: grid; margin: 0; padding: 0; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: var(--s-2); list-style: none; }
@@ -2647,6 +2703,7 @@
   border-top: 2px solid var(--rule-strong);
   color: var(--ink-3);
   font-size: var(--t-micro);
+  letter-spacing: var(--track-micro);
 }
 /* Phase boundaries are read as a gap, not as another line. */
 .wizardRail li[data-phase-start]:not(:first-child) { margin-left: var(--s-5); }
@@ -2663,6 +2720,7 @@
   font-size: var(--t-micro);
   font-variant-numeric: tabular-nums;
   line-height: 1;
+  letter-spacing: var(--track-micro);
 }
 .wizardRail li[data-state="done"] .wizardRailMark { border-color: var(--ink-2); background: var(--ink-2); color: var(--ink-inverse); }
 .wizardRail li[data-state="defaulted"] .wizardRailMark { border-style: dashed; background: var(--surface); color: var(--ink-2); }
@@ -2689,7 +2747,7 @@
   padding: var(--s-3) var(--s-6);
 }
 .wizardSummaryBar > div + div { border-left: 1px solid var(--rule); }
-.wizardSummaryBar dt { flex: 0 0 auto; color: var(--ink-3); font-size: var(--t-micro); }
+.wizardSummaryBar dt { flex: 0 0 auto; color: var(--ink-3); font-size: var(--t-micro); letter-spacing: var(--track-micro); }
 .wizardSummaryBar dd { min-width: 0; margin: 0; overflow: hidden; color: var(--ink); font-size: var(--t-body); font-weight: var(--weight-ui); text-overflow: ellipsis; white-space: nowrap; }
 .wizardSummaryBar dd[data-empty] { color: var(--ink-3); font-weight: var(--weight-body); }
 
@@ -2708,20 +2766,19 @@
   gap: var(--s-4);
   border-bottom: 1px solid var(--rule);
 }
-.wizardAside dt, .wizardConfirm dt, .wizardFacts dt { color: var(--ink-3); font-size: var(--t-micro); }
-.wizardAside dd, .wizardConfirm dd, .wizardFacts dd { min-width: 0; margin: 0; color: var(--ink); font-size: var(--t-mini); overflow-wrap: anywhere; text-align: right; }
+.wizardAside dt, .wizardConfirm dt, .wizardFacts dt { color: var(--ink-3); font-size: var(--t-micro); letter-spacing: var(--track-micro); }
+.wizardAside dd, .wizardConfirm dd, .wizardFacts dd { min-width: 0; margin: 0; color: var(--ink); font-size: var(--t-mini); overflow-wrap: anywhere; text-align: right; letter-spacing: var(--track-micro); }
 .wizardAside dd[data-empty], .wizardConfirm dd[data-empty] { color: var(--ink-3); }
 
 .wizardActive > fieldset > legend { margin-bottom: var(--s-5); color: var(--ink); font-size: var(--t-lead); font-weight: var(--weight-strong); letter-spacing: -0.005em; }
 .wizardConfirm h3 { margin: 0; color: var(--ink); font-size: var(--t-lead); font-weight: var(--weight-strong); letter-spacing: -0.005em; }
-.wizardConfirm fieldset legend { margin-bottom: var(--s-4); color: var(--ink-2); font-size: var(--t-mini); font-weight: var(--weight-ui); }
+.wizardConfirm fieldset legend { margin-bottom: var(--s-4); color: var(--ink-2); font-size: var(--t-mini); font-weight: var(--weight-ui); letter-spacing: var(--track-micro); }
 .wizardConfirm { display: grid; gap: var(--s-6); }
 
-.wizardLockedValue { margin: 0; color: var(--ink); font-size: var(--t-figure); font-weight: var(--weight-ui); }
+.wizardLockedValue { margin: 0; color: var(--ink); font-size: var(--t-figure); font-weight: var(--weight-ui); letter-spacing: var(--track-figure); }
 .wizardDateControl { width: min(100%, 260px); }
-.wizardDateControl input { font-size: var(--t-field) !important; font-variant-numeric: tabular-nums; }
-.wizardHint { margin: 0; color: var(--ink-2); font-size: var(--t-micro); line-height: var(--lh-ui); }
-.wizardWarning { margin: 0; color: var(--alert); font-size: var(--t-mini); font-weight: var(--weight-strong); line-height: var(--lh-ui); }
+.wizardHint { margin: 0; color: var(--ink-2); font-size: var(--t-micro); line-height: var(--lh-ui); letter-spacing: var(--track-micro); }
+.wizardWarning { margin: 0; color: var(--alert); font-size: var(--t-mini); font-weight: var(--weight-strong); line-height: var(--lh-ui); letter-spacing: var(--track-micro); }
 /* Validation sits with the field it concerns, never in a standing side panel. */
 .wizardFieldError {
   margin: 0;
@@ -2733,6 +2790,7 @@
   font-size: var(--t-mini);
   font-weight: var(--weight-strong);
   line-height: var(--lh-ui);
+  letter-spacing: var(--track-micro);
 }
 .wizardReadout {
   display: flex;
@@ -2744,14 +2802,14 @@
   border-radius: var(--r-control);
   background: var(--surface-quiet);
 }
-.wizardReadout span { color: var(--ink-3); font-size: var(--t-micro); }
-.wizardReadout strong { color: var(--ink); font-size: var(--t-figure); font-weight: var(--weight-ui); }
-.wizardReadout em { color: var(--ink-2); font-size: var(--t-mini); font-style: normal; }
+.wizardReadout span { color: var(--ink-3); font-size: var(--t-micro); letter-spacing: var(--track-micro); }
+.wizardReadout strong { color: var(--ink); font-size: var(--t-figure); font-weight: var(--weight-ui); letter-spacing: var(--track-figure); }
+.wizardReadout em { color: var(--ink-2); font-size: var(--t-mini); font-style: normal; letter-spacing: var(--track-micro); }
 
 /* ---- The plan as a working instrument on the table step ---- */
 .wizardMap { position: relative; margin: 0; overflow: hidden; border: 1px solid var(--rule-strong); border-radius: var(--r-chip); background: var(--paper); }
 .wizardMapImage { display: block; width: 100%; height: auto; filter: none; }
-/* Champagne means "you are here", so the selection bracket is the only overlay.
+/* Violet means "you are here", so the selection bracket is the only overlay.
  * It stays open-centred so the table code printed on the plan reads through it. */
 .wizardMapNode {
   position: absolute;
@@ -2761,7 +2819,7 @@
   border-radius: var(--r-chip);
   transform: translate(-50%, -50%);
 }
-.wizardMap figcaption { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--rule); background: var(--surface); color: var(--ink-3); font-size: var(--t-micro); line-height: var(--lh-ui); }
+.wizardMap figcaption { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--rule); background: var(--surface); color: var(--ink-3); font-size: var(--t-micro); line-height: var(--lh-ui); letter-spacing: var(--track-micro); }
 .checkGrid label[data-selected] { border-color: var(--accent); box-shadow: inset 0 -2px var(--accent); }
 
 .wizardFooter {
@@ -2775,7 +2833,7 @@
   border-top: 1px solid var(--rule-strong);
   background: var(--surface-quiet);
 }
-.wizardFooter > span { min-width: 0; overflow: hidden; color: var(--ink-2); font-size: var(--t-micro); text-align: center; text-overflow: ellipsis; white-space: nowrap; }
+.wizardFooter > span { min-width: 0; overflow: hidden; color: var(--ink-2); font-size: var(--t-micro); text-align: center; text-overflow: ellipsis; white-space: nowrap; letter-spacing: var(--track-micro); }
 .wizardOptionalButton { width: fit-content; max-width: 100%; justify-self: center; padding-inline: var(--s-4); }
 
 .blockLedger { display: grid; max-height: 220px; overflow: auto; border-top: 1px solid var(--rule); background: var(--surface); }
@@ -2789,14 +2847,14 @@
   border-bottom: 1px solid var(--rule);
 }
 .blockLedger > header { min-height: 32px; grid-template-columns: 1fr auto; background: var(--surface-sunken); color: var(--ink-3); font-size: var(--t-micro); letter-spacing: var(--track-caps); }
-.blockLedger > div > span, .blockLedger > div > small { color: var(--ink-2); font-family: var(--font-figure); font-size: var(--t-micro); }
-.blockLedger > div > button { min-width: var(--h-control); min-height: var(--h-control); border: 1px solid var(--rule); border-radius: var(--r-control); background: var(--surface); color: var(--ink); font-size: var(--t-micro); }
+.blockLedger > div > span, .blockLedger > div > small { color: var(--ink-2); font-family: var(--font-figure); font-size: var(--t-micro); letter-spacing: var(--track-micro); }
+.blockLedger > div > button { min-width: var(--h-control); min-height: var(--h-control); border: 1px solid var(--rule); border-radius: var(--r-control); background: var(--surface); color: var(--ink); font-size: var(--t-micro); letter-spacing: var(--track-micro); }
 
 .staffBody, .waitlistBody, .customerBody, .observabilityBody { min-height: 0; flex: 1; overflow-y: auto; }
 .staffCreate { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: var(--s-4); padding: var(--s-5) var(--s-6); border-bottom: 1px solid var(--rule); }
 .staffMemberRow { display: grid; min-height: 56px; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: var(--s-4); padding: var(--s-3) var(--s-6); border-bottom: 1px solid var(--rule); }
-.staffMemberRow small { color: var(--ink-3); font-size: var(--t-micro); }
-.staffMemberRow button { min-width: var(--h-control); min-height: var(--h-control); padding: 0 var(--s-4); border: 1px solid var(--rule); border-radius: var(--r-control); background: var(--surface); color: var(--ink); font-size: var(--t-mini); }
+.staffMemberRow small { color: var(--ink-3); font-size: var(--t-micro); letter-spacing: var(--track-micro); }
+.staffMemberRow button { min-width: var(--h-control); min-height: var(--h-control); padding: 0 var(--s-4); border: 1px solid var(--rule); border-radius: var(--r-control); background: var(--surface); color: var(--ink); font-size: var(--t-mini); letter-spacing: var(--track-micro); }
 /* A fixed trailing column, so the select edge is a straight line down all eight
    rows. An `auto` column let "ASSIGN REV 1" and "未割当" set different widths
    and every select started somewhere else. */
@@ -2804,7 +2862,7 @@
 .staffAssignmentGrid > label { display: grid; min-height: 56px; grid-template-columns: 76px minmax(140px, 1fr) 92px; align-items: center; gap: var(--s-4); padding: var(--s-3) var(--s-6); border-bottom: 1px solid var(--rule); }
 .staffAssignmentGrid > label > span { display: grid; gap: 1px; }
 .staffAssignmentGrid > label > span strong { font-family: var(--font-figure); font-size: var(--t-body); font-variant-numeric: tabular-nums; }
-.staffAssignmentGrid small { color: var(--ink-3); font-family: var(--font-figure); font-size: var(--t-micro); font-variant-numeric: tabular-nums; text-align: right; }
+.staffAssignmentGrid small { color: var(--ink-3); font-family: var(--font-figure); font-size: var(--t-micro); font-variant-numeric: tabular-nums; text-align: right; letter-spacing: var(--track-micro); }
 
 .waitlistBody { padding: var(--s-5) var(--s-6); }
 .waitlistRow { margin-bottom: var(--s-4); border: 1px solid var(--rule); border-top: 3px solid var(--ink-3); border-radius: 0 0 var(--r-control) var(--r-control); background: var(--surface); }
@@ -2813,17 +2871,17 @@
 .waitlistRow[data-status="expired"], .waitlistRow[data-status="cancelled"] { border-top-color: var(--alert); }
 .waitlistRow > header { display: flex; min-height: 52px; align-items: center; justify-content: space-between; gap: var(--s-4); padding: var(--s-3) var(--s-5); border-bottom: 1px solid var(--rule); }
 .waitlistRow > header div { display: grid; gap: 1px; }
-.waitlistRow > header span { color: var(--ink-3); font-size: var(--t-micro); }
-.waitlistStatus { color: var(--ink) !important; font-size: var(--t-micro) !important; font-weight: var(--weight-strong); white-space: nowrap; }
+.waitlistRow > header span { color: var(--ink-3); font-size: var(--t-micro); letter-spacing: var(--track-micro); }
+.waitlistStatus { color: var(--ink) !important; font-size: var(--t-micro) !important; font-weight: var(--weight-strong); white-space: nowrap; letter-spacing: var(--track-micro); }
 .waitlistActions { display: flex; flex-wrap: wrap; align-items: end; gap: var(--s-3); padding: var(--s-4) var(--s-5); background: var(--surface-quiet); }
-.waitlistActions button { min-width: var(--h-control); min-height: var(--h-control); padding: 0 var(--s-4); border: 1px solid var(--rule); border-radius: var(--r-control); background: var(--surface); color: var(--ink); font-size: var(--t-mini); }
+.waitlistActions button { min-width: var(--h-control); min-height: var(--h-control); padding: 0 var(--s-4); border: 1px solid var(--rule); border-radius: var(--r-control); background: var(--surface); color: var(--ink); font-size: var(--t-mini); letter-spacing: var(--track-micro); }
 .waitlistActions select { min-width: 160px; }
 
 .customerBody { padding: var(--s-6); }
 .customerIdentity { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--s-4); padding: var(--s-5); border: 1px solid var(--rule); border-top: 2px solid var(--accent); border-radius: 0 0 var(--r-control) var(--r-control); background: var(--surface-quiet); }
 .customerIdentity div { display: grid; min-width: 0; gap: var(--s-1); }
 .customerIdentity strong, .customerIdentity span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.customerIdentity span, .customerIdentity small { color: var(--ink-3); font-size: var(--t-micro); }
+.customerIdentity span, .customerIdentity small { color: var(--ink-3); font-size: var(--t-micro); letter-spacing: var(--track-micro); }
 .customerAttributeForm { margin-top: var(--s-5); }
 .customerAttributeForm fieldset { display: grid; gap: var(--s-5); padding: var(--s-5); border: 1px solid var(--rule); border-radius: var(--r-control); }
 .customerAttributeForm legend { padding: 0 var(--s-3); color: var(--ink-3); font-size: var(--t-micro); font-weight: var(--weight-strong); letter-spacing: var(--track-caps); }
@@ -2831,18 +2889,18 @@
 .customerHistory h3 { margin: 0 0 var(--s-3); color: var(--ink-3); font-size: var(--t-micro); font-weight: var(--weight-strong); letter-spacing: var(--track-caps); }
 .customerHistory ol { max-height: 220px; margin: 0; padding: 0; overflow-y: auto; border: 1px solid var(--rule); border-radius: var(--r-control); list-style: none; }
 .customerHistory li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--s-1) var(--s-4); padding: var(--s-4) var(--s-5); border-bottom: 1px solid var(--rule); }
-.customerHistory li span { color: var(--ink-3); font-family: var(--font-figure); font-size: var(--t-micro); }
-.customerHistory li small { grid-column: 1 / -1; color: var(--ink-3); font-size: var(--t-micro); }
+.customerHistory li span { color: var(--ink-3); font-family: var(--font-figure); font-size: var(--t-micro); letter-spacing: var(--track-micro); }
+.customerHistory li small { grid-column: 1 / -1; color: var(--ink-3); font-size: var(--t-micro); letter-spacing: var(--track-micro); }
 .customerLinkControl { margin-top: var(--s-5); padding: var(--s-5); border: 1px solid var(--alert-line); border-radius: var(--r-control); background: var(--alert-wash); }
-.customerLinkControl h3 { margin: 0 0 var(--s-3); color: var(--alert); font-size: var(--t-mini); }
-.customerLinkControl p { margin: 0 0 var(--s-4); color: var(--ink-2); font-size: var(--t-micro); line-height: var(--lh-ui); }
+.customerLinkControl h3 { margin: 0 0 var(--s-3); color: var(--alert); font-size: var(--t-mini); letter-spacing: var(--track-micro); }
+.customerLinkControl p { margin: 0 0 var(--s-4); color: var(--ink-2); font-size: var(--t-micro); line-height: var(--lh-ui); letter-spacing: var(--track-micro); }
 .customerLinkControl div { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: var(--s-3); }
 
 .observabilityBody { padding: var(--s-6); }
 .sloStatus { display: grid; min-height: 64px; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--s-4); padding: var(--s-4) var(--s-5); border: 1px solid var(--rule); border-top: 3px solid var(--live); border-radius: 0 0 var(--r-control) var(--r-control); background: var(--live-wash); color: var(--live); }
 .sloStatus[data-alert] { border-top-color: var(--alert); background: var(--alert-wash); color: var(--alert); }
 .sloStatus div { display: grid; gap: var(--s-1); }
-.sloStatus span { color: var(--ink-2); font-size: var(--t-micro); }
+.sloStatus span { color: var(--ink-2); font-size: var(--t-micro); letter-spacing: var(--track-micro); }
 /* An instrument readout, not KPI tiles. Seven metrics on an auto-fit tile grid
    left a dead cell in the last row and spent 240px saying what 7 ruled lines
    say better — and a reading is compared against its neighbours, which a
@@ -2864,14 +2922,14 @@
   padding: var(--s-3) var(--s-5);
 }
 .sloGrid div:nth-child(even) { background: var(--surface-quiet); }
-.sloGrid dt { color: var(--ink-2); font-size: var(--t-mini); }
-.sloGrid dd { margin: 0; color: var(--ink); font-family: var(--font-figure); font-size: var(--t-data); font-weight: var(--weight-strong); font-variant-numeric: tabular-nums; text-align: right; }
-.sloGrid dd small { margin-left: var(--s-2); color: var(--ink-3); font-family: var(--font-ui); font-size: var(--t-micro); font-weight: var(--weight-body); }
+.sloGrid dt { color: var(--ink-2); font-size: var(--t-mini); letter-spacing: var(--track-micro); }
+.sloGrid dd { margin: 0; color: var(--ink); font-family: var(--font-figure); font-size: var(--t-data); font-weight: var(--weight-strong); font-variant-numeric: tabular-nums; text-align: right; letter-spacing: var(--track-data); }
+.sloGrid dd small { margin-left: var(--s-2); color: var(--ink-3); font-family: var(--font-ui); font-size: var(--t-micro); font-weight: var(--weight-body); letter-spacing: var(--track-micro); }
 .alertRail { overflow: hidden; border: 1px solid var(--rule); border-radius: var(--r-control); }
 .alertRail h3 { margin: 0; padding: var(--s-3) var(--s-5); border-bottom: 1px solid var(--rule); background: var(--surface-sunken); color: var(--ink-3); font-size: var(--t-micro); font-weight: var(--weight-strong); letter-spacing: var(--track-caps); }
-.alertRail p { display: flex; min-height: var(--h-control); align-items: center; gap: var(--s-3); margin: 0; padding: var(--s-3) var(--s-5); border-bottom: 1px solid var(--rule); color: var(--ink-2); font-size: var(--t-mini); }
+.alertRail p { display: flex; min-height: var(--h-control); align-items: center; gap: var(--s-3); margin: 0; padding: var(--s-3) var(--s-5); border-bottom: 1px solid var(--rule); color: var(--ink-2); font-size: var(--t-mini); letter-spacing: var(--track-micro); }
 .alertRail p:last-child { border-bottom: 0; }
-.alertRail p strong { margin-left: auto; font-size: var(--t-micro); text-transform: uppercase; }
+.alertRail p strong { margin-left: auto; font-size: var(--t-micro); text-transform: uppercase; letter-spacing: var(--track-micro); }
 .alertRail p[data-severity="critical"] { color: var(--alert); }
 .alertRail p[data-severity="warning"] { color: var(--warn); }
 
@@ -2883,7 +2941,7 @@
 
 .centerState { display: flex; height: 100%; flex-direction: column; align-items: center; justify-content: center; gap: var(--s-4); padding: var(--s-9) var(--s-6); text-align: center; }
 .centerState svg { color: var(--ink-3); }
-.centerState h2 { margin: 0; font-size: var(--t-lead); font-weight: var(--weight-strong); }
+.centerState h2 { margin: 0; font-size: var(--t-lead); font-weight: var(--weight-strong); letter-spacing: var(--track-lead); }
 .centerState p { max-width: 48ch; margin: 0 0 var(--s-3); color: var(--ink-2); font-size: var(--t-body); line-height: var(--lh-prose); }
 
 .skeletonState { position: relative; display: grid; height: 100%; grid-template-rows: 34px repeat(5, 1fr); gap: 1px; background: var(--rule); }
@@ -2909,6 +2967,7 @@
   color: var(--ink-2);
   font-size: var(--t-mini);
   transform: translate(-50%, -50%);
+  letter-spacing: var(--track-micro);
 }
 @keyframes paperPulse { from { opacity: 0.5; } to { opacity: 1; } }
 
@@ -2922,13 +2981,13 @@
   background: var(--paper);
   font-family: var(--font-ui);
 }
-.routeError h1 { margin: 0; font-size: var(--t-lead); font-weight: var(--weight-strong); }
+.routeError h1 { margin: 0; font-size: var(--t-lead); font-weight: var(--weight-strong); letter-spacing: var(--track-lead); }
 .routeError p { margin: 0; color: var(--ink-2); font-size: var(--t-body); }
 .routeError button { display: flex; min-height: var(--h-control); align-items: center; gap: var(--s-3); padding: 0 var(--s-5); border: 1px solid var(--action); border-radius: var(--r-control); background: var(--action); color: var(--action-text); font-weight: var(--weight-ui); }
 
 /* ── 10b. boot ──────────────────────────────────────────────────────────
  * The shell every pre-ledger frame renders: route Suspense, app/loading, and
- * the owner session check. It carries the same champagne top edge as the login
+ * the owner session check. It carries the same accent top edge as the login
  * and workspace shells, so a cold load reads as one surface being filled in
  * rather than as three pages replacing each other.
  * See docs/DESIGN.md section 7.2. */
@@ -3017,7 +3076,7 @@
   animation: bootQueueAdvance var(--boot-cycle) linear infinite;
   will-change: transform;
 }
-/* The champagne head of the queue. Colour is not keyframed: an accent copy
+/* The accent head of the queue. Colour is not keyframed: an accent copy
  * sits over the graphite dot and only its opacity moves, which keeps the whole
  * loop on transform and opacity. */
 .bootDot::before {
@@ -3064,7 +3123,7 @@
   95% { transform: translate3d(calc(var(--boot-gap) * 0.37), calc(var(--boot-dot) * -1.5), 0) scale(1.14); }
   100% { transform: translate3d(0, 0, 0) scale(1); }
 }
-/* Champagne only while the record is off the rule. The window is narrower than
+/* Violet only while the record is off the rule. The window is narrower than
  * the 25% that separates two dots, so exactly one record is ever the accent —
  * one focal object, not two competing ones. */
 @keyframes bootQueueLead {
@@ -3089,7 +3148,7 @@
  * block tried to walk the accent at half speed and measured as four grey dots
  * with no accent at all. The still state is the loop's phase 0: the records
  * hold their slots (already their base transform) and the one at the head is
- * champagne. The status line carries the progress. */
+ * the accent. The status line carries the progress. */
 @media (prefers-reduced-motion: reduce) {
   .bootDot { animation: none; will-change: auto; }
   .bootDot:nth-child(4)::before { opacity: 1; }
@@ -3140,7 +3199,7 @@
 .shellMenuGrid > span[aria-disabled="true"] { color: var(--ink-3); }
 .shellMenuGrid svg { grid-row: 1 / -1; align-self: center; color: var(--ink-2); }
 .shellMenuGrid > button > span, .shellMenuGrid > span > span { font-size: var(--t-body); font-weight: var(--weight-ui); }
-.shellMenuGrid small { color: var(--ink-3); font-size: var(--t-micro); }
+.shellMenuGrid small { color: var(--ink-3); font-size: var(--t-micro); letter-spacing: var(--track-micro); }
 
 /* ── 12. responsive ────────────────────────────────────────────────────── */
 
@@ -3152,7 +3211,7 @@
 
 @media (max-width: 1439px) {
   .workspace { --inspector-w: clamp(300px, 25vw, 340px); }
-  .ribbonControl[data-optional], .pulseCluster > [data-optional] { display: none; }
+  .pulseCluster > [data-optional] { display: none; }
 }
 
 @media (max-width: 1279px) {
@@ -3373,8 +3432,8 @@
     text-align: left;
   }
   .mobileSummary button[data-active] { background: var(--accent-wash); box-shadow: inset 0 -2px var(--accent); }
-  .mobileSummary span { overflow: hidden; color: var(--ink-3); font-size: var(--t-micro); text-overflow: ellipsis; white-space: nowrap; }
-  .mobileSummary strong { color: var(--ink); font-family: var(--font-figure); font-size: var(--t-data); font-weight: var(--weight-strong); font-variant-numeric: tabular-nums; }
+  .mobileSummary span { overflow: hidden; color: var(--ink-3); font-size: var(--t-micro); text-overflow: ellipsis; white-space: nowrap; letter-spacing: var(--track-micro); }
+  .mobileSummary strong { color: var(--ink); font-family: var(--font-figure); font-size: var(--t-data); font-weight: var(--weight-strong); font-variant-numeric: tabular-nums; letter-spacing: var(--track-data); }
   .mobileSummary [data-alert] strong { color: var(--alert); }
   .summaryRefresh { display: grid; width: 52px; place-items: center; border: 0; background: transparent; color: var(--ink-2); font-size: 0; }
 
@@ -3399,6 +3458,7 @@
     background: transparent;
     color: var(--ink-3);
     font-size: var(--t-micro);
+    letter-spacing: var(--track-micro);
   }
   .primaryNav button small { display: none; }
   .primaryNav button[data-active] { border-top-color: var(--ink); color: var(--ink); font-weight: var(--weight-strong); }
@@ -3408,19 +3468,17 @@
   .desktopCreate, .desktopMenu, .viewSwitcher { display: none; }
   .toolbarSearch { width: auto; min-width: 0; flex: 1; margin-left: 0; }
 
-  .venueIdentity strong { font-size: var(--t-mini); }
+  .venueIdentity strong { font-size: var(--t-mini); letter-spacing: var(--track-micro); }
   .pulseCluster { display: none; }
 
   .workspace { --inspector-w: 0px; }
   .serviceRibbon { min-height: 52px; gap: var(--s-3); padding: 0 var(--s-3); }
-  .ribbonControl > span, .ribbonControl > svg { display: none; }
   /* Never below --t-field, even where the phone toolbar is tightest: a
      focused sub-16px control zooms Safari's layout viewport. */
-  .ribbonControl input { font-size: var(--t-field); }
   .operatorIdentity button { width: var(--h-control); padding: 0; font-size: 0; }
   .operatorIdentity button svg { flex: 0 0 auto; }
   .viewStrip { min-height: 44px; gap: var(--s-3); padding: 0 var(--s-4); }
-  .viewStrip .secondaryButton { padding: 0 var(--s-4); font-size: var(--t-micro); }
+  .viewStrip .secondaryButton { padding: 0 var(--s-4); font-size: var(--t-micro); letter-spacing: var(--track-micro); }
   .timelineLegend {
     display: grid;
     min-height: 52px;
@@ -3457,7 +3515,7 @@
     border-top: 1px solid var(--rule-strong);
     background: var(--surface-quiet);
   }
-  .floorContextAction span { min-width: 0; overflow: hidden; color: var(--ink-2); font-size: var(--t-mini); text-overflow: ellipsis; white-space: nowrap; }
+  .floorContextAction span { min-width: 0; overflow: hidden; color: var(--ink-2); font-size: var(--t-mini); text-overflow: ellipsis; white-space: nowrap; letter-spacing: var(--track-micro); }
   .chartExceptions { max-height: 128px; }
 
   /* Phones: the ruler keeps all eight marks, and the step's name is carried by
@@ -3476,7 +3534,7 @@
   .commandForm { padding: var(--s-4); }
   .operationDateRecovery > .operationDateSuggestions { grid-template-columns: minmax(0, 1fr); }
   .operationDateRecovery > .operationDateSuggestions > span { padding-bottom: var(--s-2); border-bottom: 1px solid var(--rule); }
-  .wizardOptionalButton { padding-inline: var(--s-3); font-size: var(--t-micro); }
+  .wizardOptionalButton { padding-inline: var(--s-3); font-size: var(--t-micro); letter-spacing: var(--track-micro); }
   .operationDialog .commandFooter {
     margin-right: calc(var(--s-4) * -1);
     margin-bottom: calc(var(--s-4) * -1);
@@ -3491,7 +3549,7 @@
   .reservationTable th:nth-child(5), .reservationTable td:nth-child(5) { display: none; }
   .loginEyebrow { max-inline-size: 225px; }
   .venueIdentity { padding-right: calc(var(--s-4) + 6.2px); }
-  .venueIdentity strong { font-size: var(--t-micro); }
+  .venueIdentity strong { font-size: var(--t-micro); letter-spacing: var(--track-micro); }
   /* Brand + business date + sync state + a logout is more than 320px carries,
      and the masthead's items do not shrink — so the last one was painted half
      off the edge. メニュー already owns ログアウト on the bottom nav, and the
@@ -3533,7 +3591,6 @@
     border-color: var(--action-hover);
     background: var(--action-hover);
   }
-  .ribbonControl input:hover { border-color: var(--rule-control); }
   .pulseCluster button:hover { background: var(--surface-hover); }
   .operatorIdentity button:hover { background: var(--surface-hover); }
   .viewSwitcher button:hover { color: var(--ink); }
@@ -3551,11 +3608,8 @@
   .chartExceptions button:hover { background: var(--surface-hover); }
   .turnoverAction button:hover:not(:disabled) { border-color: var(--action-hover); background: var(--action-hover); }
   .commandGrid button:hover:not(:disabled) { background: var(--surface-hover); color: var(--ink); }
-  .commandGrid button:hover:not(:disabled) svg { color: var(--accent-ink); }
-  .commandGrid button:first-child:hover:not(:disabled) { background: var(--action-hover); color: var(--action-text); }
-  .commandGrid button:first-child:hover:not(:disabled) svg { color: var(--action-text); }
+  .commandGrid button:first-child:hover:not(:disabled) { background: var(--accent-wash); color: var(--accent-ink); }
   .commandGrid button[data-danger]:hover:not(:disabled) { background: var(--alert-wash); color: var(--alert); }
-  .commandGrid button[data-danger]:hover:not(:disabled) svg { color: var(--alert); }
   .inspectorTabs button:hover { color: var(--ink); }
   .commandHeader button:hover { background: var(--surface-hover); }
   .shellMenuGrid > button:hover { background: var(--surface-hover); }

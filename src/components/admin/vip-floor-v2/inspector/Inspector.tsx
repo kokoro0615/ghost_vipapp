@@ -1,6 +1,6 @@
 "use client";
 
-import { Armchair, BellRing, ChevronLeft, ChevronRight, CircleX, Clock3, DoorOpen, MapPin, NotebookPen, Pencil, ShieldCheck, TimerReset, UserRoundCheck } from "lucide-react";
+import { ChevronLeft, ChevronRight, DoorOpen, MapPin, UserRoundCheck } from "lucide-react";
 
 import type { VipFloorBoardV2 } from "@/lib/vipFloorV2Contract";
 
@@ -18,13 +18,13 @@ export const INSPECTOR_TABS = [
 ] as const;
 export type InspectorTab = (typeof INSPECTOR_TABS)[number]["key"];
 
-const commandButtons: Array<{ kind: CommandKind; label: string; icon: typeof Clock3 }> = [
-  { kind: "check_in", label: "チェックイン", icon: ShieldCheck },
-  { kind: "arrival_time", label: "到着時刻", icon: Clock3 },
-  { kind: "service_status", label: "接客状態", icon: BellRing },
-  { kind: "assignment", label: "卓を決める", icon: Armchair },
-  { kind: "seat_extension", label: "利用延長", icon: TimerReset },
-  { kind: "note", label: "メモ", icon: NotebookPen },
+const commandButtons: Array<{ kind: CommandKind; label: string }> = [
+  { kind: "check_in", label: "チェックイン" },
+  { kind: "arrival_time", label: "到着時刻" },
+  { kind: "service_status", label: "接客状態" },
+  { kind: "assignment", label: "卓を決める" },
+  { kind: "seat_extension", label: "利用延長" },
+  { kind: "note", label: "メモ" },
 ];
 
 type Props = {
@@ -151,12 +151,11 @@ export function Inspector({
               onClick={onEdit}
               disabled={readOnly || reservation.sourceChannel === "walk_in"}
             >
-              <Pencil size={16} aria-hidden />予約編集
+              予約編集
             </button>
             {commandButtons.filter((command) => (
               !(quickAction === "next_check_in" && command.kind === "check_in")
             )).map((command) => {
-              const CommandIcon = command.icon;
               const unavailableForState =
                 (command.kind === "check_in" && reservation.lifecycleStatus === "checked_in")
                 || (command.kind === "seat_extension" && reservation.lifecycleStatus !== "checked_in")
@@ -167,7 +166,7 @@ export function Inspector({
                 onClick={() => onCommand(command.kind)}
                 disabled={readOnly || unavailableForState || !canCommand(command.kind)}
               >
-                <CommandIcon size={16} aria-hidden />{command.label}
+                {command.label}
               </button>;
             })}
             {reservation.sourceChannel === "walk_in" ? (
@@ -183,7 +182,7 @@ export function Inspector({
                   || !canCommand("walk_in_cancel")
                 }
               >
-                <CircleX size={16} aria-hidden />Walk-in取消
+                Walk-in取消
               </button>
             ) : null}
           </div>

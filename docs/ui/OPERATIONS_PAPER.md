@@ -16,11 +16,17 @@ staff working 22:00–05:00 under time pressure, on a laptop and an iPad, in a
 dark venue.
 
 The reference class is **not** SaaS admin. It is the trading desk / broadcast
-control room: paper-white ground, hairline rules, tabular figures, one strict
-accent, status carried by position and word rather than decoration.
+control room: white ground, hairline rules, tabular figures, one strict accent,
+status carried by position and word rather than decoration.
 
 Committed direction: **OPERATIONS PAPER** — a precision instrument printed on
-warm paper.
+white.
+
+*(The direction was "printed on warm paper" until 2026-08-16. The warmth was a
+defensible idea that did not survive contact with the surface: at hue 85 it put
+a yellow cast under every white pane, under the accent and under the attention
+washes, and read as unwashed rather than warm. The instrument is the same; the
+paper is now actually paper-white.)*
 
 ### Operating-time contract
 
@@ -70,11 +76,11 @@ Measured before → after (dense 14-reservation board):
    masthead, the toolbar, a sticky table head, the timeline's tick row. No
    shadow clouds, no blur, no glass, and never a second layer. Elevation is a
    statement about z-order, not a decoration (`DESIGN.md` §4.7).
-2. **Exactly one accent.** Champagne means "you are here" — the selected row,
+2. **Exactly one accent.** Violet means "you are here" — the selected row,
    the selected table, the current filter. Nothing else. **"Now" is not one of
    them**: the timeline's now-line, its cap and its clock are graphite, because
-   now is structure rather than status, and because champagne is also the
-   arrival frame — a champagne now-line competed with the very bands standing
+   now is structure rather than status, and because the accent is also the
+   arrival frame — an accent now-line competed with the very bands standing
    closest to it (2026-08-02).
 3. **Status is a swatch glyph plus a word**, never a pill that reads as a
    button. Colour is never the only carrier.
@@ -205,7 +211,7 @@ or submits an Owner PIN.
   within a single scroll-free reading path.
 - The isolated synthetic-data demo lane retains its own demo PIN and cannot
   enter the Production Owner lane.
-- Graphite carries actions; champagne is limited to rules and orientation
+- Graphite carries actions; the accent is limited to rules and orientation
   labels. There are no glass, gradient, floating-card or generic SaaS surfaces.
 
 ---
@@ -215,101 +221,149 @@ or submits an Owner PIN.
 ### Surface stack (value separation)
 
 ```
---paper           oklch(0.968 0.0035 85)   application ground (#f5f4f2)
+--paper           oklch(0.977 0.0018 268)  application ground (#f7f7f8)
 --surface         oklch(1 0 0)             working pane
---surface-quiet   oklch(0.984 0.0025 85)   zebra rows, inset blocks
---surface-sunken  oklch(0.943 0.005 85)    pane headers, rails
+--surface-quiet   oklch(0.988 0.0012 268)  zebra rows, inset blocks
+--surface-sunken  oklch(0.9655 0.0022 268) pane headers, rails, toolbar
 --surface-hover / --surface-active         interaction states
 ```
 
-The ground is a warm translation of the measured Apple `#f5f5f7` canvas, not a
-copy: `#f5f4f2` keeps GHOST's champagne temperature. White working panes remain
-distinct through the solid value step and authored hairlines; hierarchy does
-not need a dark beige desk or a shadow stack. `--rule` sits at
-`oklch(0.893 0.004 82)` — restrained, but dark enough to hold an edge on a
-surface that has no shadow to fall back on. It was `0.92` until the 2026-08-01
-texture pass found that a table head had stopped reading as a head
-(`DESIGN.md` §4.7). Every step stays warm white; none is a generic blue-grey
-SaaS surface.
+The ground is white with a single 2.3% value step below the panes, so a pane
+still reads as something laid on a desk rather than as a hole cut in it. That
+step is comparable to Stripe's `#f8fafd` against `#ffffff`; like Stripe, the
+edge is carried by the hairline rather than by the value alone.
+
+Hue 268 at chroma ≤0.0025 is neutral to the eye with the faintest cool cast,
+which keeps the graphite ink from reading brown. This is not a blue-grey SaaS
+surface — the chroma is an order of magnitude below what would read as blue —
+but it is deliberately no longer warm.
+
+`--rule` sits at `oklch(0.912 0.0025 268)`, one step darker than the beige era
+needed: with the elevation budget cut to almost nothing (`DESIGN.md` §4.9),
+hairlines now carry most of the plane separation on their own.
 
 ### Ink (all verified against WCAG 2.2 AA)
 
 | Token | Value | vs white | vs sunken |
 |---|---|---|---|
-| `--ink` | `oklch(0.215 0.006 70)` | 17.5:1 | 15.4:1 |
-| `--ink-2` | `oklch(0.435 0.006 70)` | 7.9:1 | 7.0:1 |
-| `--ink-3` | `oklch(0.52 0.005 70)` | 5.5:1 | 4.8:1 |
+| `--ink` | `oklch(0.215 0.006 268)` | 17.6:1 | 15.9:1 |
+| `--ink-2` | `oklch(0.435 0.006 268)` | 7.9:1 | 7.2:1 |
+| `--ink-3` | `oklch(0.52 0.005 268)` | 5.5:1 | 5.0:1 |
 
-### Accent and action — graphite, never blue
+Lightness is carried over unchanged from the audited warm ramp — those values
+were contrast-verified — and only the hue moved to neutral. Every ratio improved
+slightly because the ground beneath them got lighter. Re-measured by
+`scripts/verify-palette-contrast.mjs`, which paints each token and reads the
+sRGB pixel; parsing `getComputedStyle` does not work here, because Chromium
+returns `oklch()` unchanged and a naive probe reports nonsense.
+
+### Accent and action — graphite acts, violet marks
 
 | Token | Value | vs white |
 |---|---|---|
-| `--accent` (champagne, marks/lines) | `oklch(0.605 0.078 76)` | 3.9:1 |
-| `--accent-ink` (champagne text) | `oklch(0.442 0.062 72)` | 7.8:1 |
-| `--action` (primary fill) | `oklch(0.245 0.007 70)` | 16.2:1 with `--action-text` |
-| `--rule-control` (control borders, 1.4.11) | `oklch(0.635 0.005 82)` | 3.4:1 |
+| `--accent` (marks, edges) | `oklch(0.47 0.19 305)` | 7.5:1 |
+| `--accent-ink` (text, icons) | `oklch(0.42 0.20 308)` | 9.5:1 |
+| `--accent-line` (rules, focus ring) | `oklch(0.58 0.20 305)` | 4.7:1 |
+| `--action` (primary fill) | `oklch(0.245 0.007 268)` | 16.3:1 with `--action-text` |
+| `--rule-control` (control borders, 1.4.11) | `oklch(0.635 0.005 268)` | 3.4:1 |
+
+The accent was champagne until 2026-08-16 and it did not clear its own floor:
+`oklch(0.605 0.078 76)` is `#9d7b4a` at **3.91:1** on white, under the 4.5:1
+body-text minimum. `--accent-ink` existed as a workaround for exactly that.
+Champagne is a *material* — it needs dark lacquer behind it to become metal —
+and on paper it is a brown.
+
+The violet is the venue's other real signal, the LED, so this is a translation
+rather than a substitution. **It is only ever ink, a 2–3px edge, a hairline or a
+≤7% wash. Every action stays graphite; nothing the operator presses is violet.**
+That last rule is what separates this from the generic purple-on-white
+dashboard, and it is machine-enforced (`DESIGN.md` §4.8).
 
 ### Status — meaning only, each paired with a word
 
 | Token | Value | vs white |
 |---|---|---|
-| `--alert` | `oklch(0.487 0.176 27)` | 7.0:1 |
-| `--warn` | `oklch(0.492 0.104 66)` | 6.4:1 |
-| `--live` | `oklch(0.452 0.096 158)` | 7.0:1 |
+| `--alert` | `oklch(0.505 0.185 27)` | 6.5:1 |
+| `--warn` | `oklch(0.515 0.115 62)` | 5.8:1 |
+| `--live` | `oklch(0.47 0.10 158)` | 6.5:1 |
 
 ### Type
 
-One Japanese-first family: **M PLUS 2** (400/500/600/700) for Japanese, Latin
-and every figure. Hierarchy comes from four explicit roles, not size inflation:
-Regular reading text, Medium quiet controls, Semibold section/action/data, Bold
-display copy only.
-`display: swap`, `preload: false`, with next/font's metrics-matched fallback in
-front of a Hiragino-first system stack.
+**Two faces, one voice.** **Instrument Sans** carries Latin and every figure;
+**Noto Sans JP** carries Japanese. Both load as variable fonts through
+`next/font`, `display: swap`, `preload: false`, in front of a Hiragino-first
+system stack.
 
-The previous pairing was IBM Plex Sans JP + **IBM Plex Mono for every figure**.
-That mono was the single largest reason the board read as a generated developer
-dashboard: `22:30`, `GHO-0726-01`, `VIP-1`, `v4` in an IDE face turn a
-reservation ledger into a log viewer. Mono is retired. The figure role stays a
+The ledger is dominated by Latin and figures — `VIP-1`, `22:30`, `GHO-0726-01`,
+`¥120,000` — so the Latin face carries most of the surface's texture and the
+Japanese labels support it. The pairing was chosen by measuring glyph **ink
+boxes**, not line boxes: line boxes are identical for every font at the same
+`font-size` and cannot answer the only question that matters here, which is
+whether the Latin steps down next to kanji in a run like `4名`.
+
+Against Noto Sans JP's own digit height: **Instrument Sans +0.8pt** (adopted),
+Onest 1.4pt, Inter Tight 2.2pt, **Host Grotesk 8.5pt** (rejected). Host Grotesk
+read best in isolation and lost on measurement — its x-height is 17% smaller
+than the Japanese face's. Inter Tight matched most closely on x-height and was
+rejected as the most recognisable machine-generated typeface on the web, which
+is the complaint the pass existed to answer.
+
+**M PLUS 2 is retired.** It was adopted on 2026-07-31 as "the only humane
+Japanese candidate with uniform digit advances and an effective `tnum`". That
+conclusion measured the *default* digit spread only; re-measured, every Latin
+candidate is proportional by default and **fully tabular under `tnum`**, which
+this surface already declares at `:root`. M PLUS 2's own digits also carry 23%
+more ink width than Noto Sans JP's, which is most of why the ledger read as
+loose and inflated at every density.
+
+Mono was retired earlier and stays retired: `22:30`, `GHO-0726-01`, `VIP-1` in
+an IDE face turn a reservation ledger into a log viewer. The figure role stays a
 distinct register through weight, `tabular-nums` and tracking — how printed
-timetables do it — and one family also removes the seam in mixed runs like `4名`
-or `¥120,000`, where the digit and the counter used to come from two fonts.
+timetables do it.
 
-The replacement was chosen by measurement, not taste: M PLUS 2 was the only
-humane Japanese candidate with **uniform digit advances and an effective `tnum`**.
-Zen Kaku Gothic New/Antique, Murecho and BIZ UDPGothic have no tabular figures at
-all (15–19.5px drift across a ten-digit string), so a ledger column would jitter;
-BIZ UDPGothic also ships only 400/700. Full matrix and method:
-`docs/ui/VIP_MANAGER_LIGHT_RESERVATION_RESEARCH.md` §4.
+**Hierarchy comes from size, tracking and ink, not from weight.** Four roles on
+a variable axis: `--weight-body` 400 · `--weight-ui` 460 · `--weight-strong` 560
+· `--weight-display` 620. The previous 400/500/600/700 ladder put most labels on
+screen at semibold or bolder; every measured reference goes the other way
+(Stripe sets even 56px display copy at weight 300; Linear uses 510/590).
 
-**The scale is not the same size on the device.** Between 768px and 1439px the
+**Every step above body is optically tracked.** Until 2026-08-16 there was no
+negative tracking anywhere on this surface — every size ran at the font's
+default spacing, which is drawn for text at reading size, so headings, counters
+and the date lockup sat visibly loose. That single fact carried more of the
+"nobody authored this" texture than any other:
+
+```
+--track-micro    +0.005em   11–13px labels — the one step that does not tighten
+--track-body     -0.006em   13–15px reading text, and the :root default
+--track-data     -0.012em   15–17px values and codes
+--track-lead     -0.018em   18–20px pane titles
+--track-figure   -0.024em   22–26px counters
+--track-display  -0.03em    display copy
+--track-caps     +0.04em    functional uppercase
+--track-brand    +0.13em    the GHOST OSAKA lockup only
+```
+
+Stripe runs −0.010em at 12px through −0.025em at 56px; Linear −0.011em body and
+−0.022em display. This curve is the same shape. Tightening 11px labels costs
+legibility and is itself a recognisable slop tell, which is why the micro step
+is positive.
+
+**The scale is not the same size on the device.** Between 768px and 1279px the
 six reading steps move up roughly one Apple register (13→15 body, 15→17 data).
 On a 10.2" iPad a CSS pixel is a point, so the desk scale's `--t-body: 13px` is
 Apple's *Footnote* — three registers under the 17pt iPadOS uses for body text,
 and most of why the surface read as a shrunken desktop app. It costs no density:
-`--h-row` was already 52px for the touch floor and the taller stack still fits,
-so the ledger shows the same number of rows. Text controls are pinned separately
-at 16px and never move (`DESIGN.md` §4.5–4.6).
-
-The 2026-07-31 Owner-requested bake-off retained M PLUS 2 rather than copying an
-Apple system stack: true Apple/Hiragino rendering was unavailable on this Linux
-host, while M PLUS 2 kept licensed, consistent Japanese and effective tabular
-digits. The earlier 600 declarations had no 600 face to resolve to; loading it
-explicitly now prevents Bold substitution. Apple product-page measurements also
-showed 400/600 as the main vocabulary, with ordinary labels at normal tracking,
-so GHOST reserves 700 and reduces caps tracking from `0.09em` to `0.04em`.
-Where a label's intrinsic width anchors the next masthead/toolbar control, the
-removed terminal advance is retained as invisible end inset. Visible tracking
-still resolves to `0.04em`; the inset exists only to hold audited geometry.
-
-The built M PLUS 2 face measured no width delta between default spacing and
-`palt` on the audited Japanese/mixed labels. Both global `palt` declarations
-were therefore removed; `.tabular-nums` keeps the actual invariant,
-`tabular-nums lining-nums`, inherited by the operator root so mixed runs stay
-inside the same numeric scope. The utility adds figure-role tracking. Verified
-in the built app: `1111111111` and `0000000000` render at identical width.
+`--h-row` was already 52px for the touch floor and the taller stack still fits.
+Text controls are pinned separately at 16px and never move (`DESIGN.md`
+§4.5–4.6).
 
 Six-step scale: `--t-micro 11 · --t-mini 12 · --t-body 13 · --t-data 15 ·
 --t-lead 18 · --t-figure 22` plus a fluid `--t-display`.
+
+Verified in the built app: `1111111111` and `0000000000` render at identical
+width. Full matrix and method:
+`docs/research/vip-manager-type-accent-bakeoff-2026-08-16.md`.
 
 ### Geometry, spacing, motion
 
@@ -501,7 +555,7 @@ overridden it: `.rowOpen` re-declared the 44px touch floor as its own
 a declaration block with the empty-state cell, inheriting `height: 140px`,
 `--ink-3` and centred text — so the one row under inspection was 2.6× the
 others, the palest in the ledger, and the only one out of column. Compact is
-53px, comfortable 64px, and selection is the champagne spine.
+53px, comfortable 64px, and selection is the accent spine.
 
 ---
 
@@ -511,9 +565,12 @@ others, the palest in the ledger, and the only one out of column. Compact is
 npm run ci     # lint · typecheck · unit+contract+PII · build · maintenance · a11y
 ```
 
-`npm run test:a11y` audits **45 states × 9 viewports** (405 screenshots; the
-authoritative counts are `QA_REQUIRED_STATES` and `QA_VIEWPORTS` in
-`scripts/light-ui-qa-manifest.mjs`) and asserts zero axe
+`npm run test:a11y` defines **52 required states plus one date-unavailable
+fixture across 13 viewports**. On the current host, 11 Chromium viewports
+produce 583 audited screenshots and the two WebKit viewports are recorded as
+`notRun` when the pinned browser binary is unavailable; they are never counted
+as passes. The authoritative counts are `QA_REQUIRED_STATES` and `QA_VIEWPORTS`
+in `scripts/light-ui-qa-manifest.mjs`. The gate asserts zero axe
 violations, zero horizontal overflow, zero controls under 44×44, zero legacy
 purple chrome, zero console errors and zero 5xx.
 

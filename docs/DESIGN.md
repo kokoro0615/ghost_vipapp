@@ -13,7 +13,8 @@ and is not repeated here.
 |---|---|
 | Locked decisions, stack, conventions, gates (**this file**) | `docs/DESIGN.md` |
 | Visual language, layout, token rationale | `docs/ui/OPERATIONS_PAPER.md` |
-| Measurement behind the type/palette decisions | `docs/ui/VIP_MANAGER_LIGHT_RESERVATION_RESEARCH.md` |
+| Measurement behind the **current** type/palette decisions | `docs/research/vip-manager-type-accent-bakeoff-2026-08-16.md` |
+| Measurement behind the superseded 2026-07-31 decisions | `docs/ui/VIP_MANAGER_LIGHT_RESERVATION_RESEARCH.md` |
 | Source-of-truth boundary and operating rules | `AGENTS.md` |
 | Business scope | `docs/GHOST_VIP_MANAGER_SPEC.md` |
 
@@ -34,7 +35,7 @@ are *actively wrong* in this app. Where they conflict, **DESIGN.md wins**.
 |---|---|---|
 | Tailwind v4.3 `@theme` tokens | **Overridden** — CSS custom properties in `src/app/globals.css` | Tailwind is not installed and will not be added (§2.2) |
 | Motion v12 / GSAP / Lenis / R3F ladder | **Overridden** — CSS transitions and `@keyframes` only | No animation runtime ships to an operator console (§7) |
-| Distinctive display face + body face | **Overridden** — one family, M PLUS 2 | Measured decision; hierarchy comes from weight (§4.3) |
+| Distinctive display face + body face | **Overridden** — one Latin face + one Japanese face, no display cut | Measured decision; hierarchy comes from size, tracking and ink (§4.3) |
 | Editorial asymmetry, one signature move, hero composition | **Overridden** — density, scanability, one focal object | This is a console, not a landing page |
 | Dark-mode value stack | **Overridden** — light only, no toggle | Owner decision (§1) |
 
@@ -63,17 +64,18 @@ call inside a feature task.
 
 | # | Decision | Locked because |
 |---|---|---|
-| L1 | **Light surface only.** Warm-white ground, pure-white working panes. No dark mode, no theme toggle, no `prefers-color-scheme` branch. `color-scheme: light` is declared in `:root`. | Owner decision, reconfirmed 2026-07-31 |
-| L2 | **Graphite actions, single champagne accent.** No blue, no purple, no second accent. Champagne ≤8% of any screen and only means "you are here". | `OPERATIONS_PAPER.md` §3 |
-| L3 | **One type family: M PLUS 2** (400/500/600/700). No monospace. No Inter / Roboto / Noto Sans JP / BIZ UDPGothic / Zen Kaku / Murecho. 600 carries UI hierarchy; 700 is display-only. | Owner-requested 2026-07-31 bake-off retained the only humane JP candidate with uniform digit advances and effective `tnum`; `docs/research/vip-manager-apple-type-surface-study-2026-07-31.md` |
-| L4 | **Every figure is tabular** via `.tabular-nums`; Japanese spacing stays at the font default. | A ledger column must never reflow; built M PLUS 2 showed no effective `palt` delta on audited mixed labels |
-| L5 | **Planes separate by value + one hairline**, plus a single contact shadow (`--lift-pane`) on things that genuinely float above scrolled content. No glass, no backdrop-filter, no shadow *stacks*, no radius ≥12px, no coloured side tabs. | `OPERATIONS_PAPER.md` §3; contact layer added 2026-08-01 (§4.7) |
+| L1 | **Light surface only.** White ground, pure-white working panes. No dark mode, no theme toggle, no `prefers-color-scheme` branch. `color-scheme: light` is declared in `:root`. | Owner decision, reconfirmed 2026-07-31; the ground moved from warm beige to white on Owner instruction 2026-08-16 |
+| L2 | **Graphite actions, single violet accent.** No blue, no second accent. The accent is ≤8% of any screen, only means "you are here", and is **only ever ink, an edge, a hairline or a ≤7% wash — never a fill the operator presses.** | Owner reopened 2026-08-16; the champagne it replaced measured **3.91:1 on white**, under the body-text floor. Bake-off §3 |
+| L3 | **An authored pairing: Instrument Sans (Latin, figures) + Noto Sans JP (Japanese)**, both variable. No monospace. No Inter / Inter Tight / Roboto / BIZ UDPGothic / Zen Kaku / Murecho / M PLUS 2. Weight roles are 400 / 460 / 560 / 620 — hierarchy comes from size, tracking and ink, not from weight. | Owner reopened 2026-08-16. Instrument Sans matches Noto Sans JP's own digit height to **0.8pt**; M PLUS 2 carried **23% more digit ink width**. Bake-off §2 |
+| L4 | **Every figure is tabular** via `.tabular-nums` and the `:root` declaration; Japanese spacing stays at the font default. | A ledger column must never reflow. The Latin face is proportional by default with an effective `tnum` (299.3px → 0.00px at 100px); Noto Sans JP's digits are uniform regardless. Bake-off §2.1 |
+| L5 | **Planes separate by value + one hairline.** The contact shadow (`--lift-pane`) is legal **only on rules that are `position: sticky` or `fixed`** — content passing underneath is the only z-relationship a hairline cannot state. No glass, no backdrop-filter, no shadow *stacks*, no radius ≥12px, no coloured side tabs. | `OPERATIONS_PAPER.md` §3; narrowed 2026-08-16 after the contact step was found on two static bands that already carried hairlines (§4.8) |
 | L6 | **Status = swatch glyph + word.** Colour is never the sole carrier and never a pill that reads as a button. | WCAG 1.4.1 + operator scanability |
 | L7 | **Two columns ≥1024px; one column with an overlaid inspector 768–1023px; the phone shell only ≤767px.** Chrome above the work area stays ≤108px desktop / ≤156px phone. | Measured regression fix; `OPERATIONS_PAPER.md` §2; tier boundary corrected 2026-08-01 (§6) |
 | L8 | **No Tailwind, no CSS-in-JS, no component library, no animation library.** | §2.2 |
 | L9 | **Operating window is 22:00–翌05:00 in 15-minute steps**, `翌` labelled explicitly. `event_days.sales_open_at` is a sales boundary and must not be used as the floor opening time. | `docs/research/vip-manager-operating-hours-2026-07-30.md` |
 | L10 | **44px touch floor** for anything a hand touches, enforced at every audited viewport. | WCAG 2.2 2.5.8 + venue reality (iPad, dark room) |
 | L11 | **The target device is an iPad (8th generation, 2020) running Safari on iPadOS 18** — 10.2", 2160×1620 at 2x, i.e. **1080×810pt landscape / 810×1080pt portrait**, touch only, no hover, home button (so `env(safe-area-inset-*)` is 0). Both orientations lead the QA matrix and are audited **with touch emulation at 2x**. Desktop and phone shells remain as regression cover, not as design targets. | Owner decision 2026-08-01: the app is used on venue iPads only |
+| L12 | **Type is optically tracked.** Every step above body tightens as it grows (`--track-body` −0.006em → `--track-display` −0.03em); micro labels never tighten. The surface default is `--track-body`, not the font default. | Added 2026-08-16. Running every size at the font's default reading spacing was the single largest reason the surface read as un-authored; all three measured references tighten with size (§4.3) |
 
 ### 1.1 What L11 changes about how you read this file
 
@@ -104,7 +106,7 @@ about the device rather than about the markup.
 | Node | **>= 24** | `engines.node` |
 | Language | **TypeScript ^5**, `strict`; alias `@/*` → `./src/*` | |
 | Styling | **CSS Modules + CSS custom properties.** No preprocessor, no plugin. | `globals.css` tokens + `*.module.css` |
-| Type | **`next/font/google` → `M_PLUS_2`** with `variable: "--font-operator"`, `display: "swap"`, `preload: false` | see §2.3 |
+| Type | **`next/font/google` → `Instrument_Sans` + `Noto_Sans_JP`**, variable, `display: "swap"`, `preload: false` | see §2.3 |
 | Icons | **lucide-react 1.7.0** — the only icon source | §5.5 |
 | Lint | eslint 9.39.5 + `eslint-config-next` core-web-vitals + typescript | `eslint.config.mjs` |
 | QA | `playwright-core` + `axe-core`, Chromium + WebKit | `scripts/a11y-visual.mjs` |
@@ -190,16 +192,23 @@ authored as raw `oklch()`. Measured: **41 raw values, 40 of them inside §6**
 
 Rules that follow, all now machine-enforced (§8):
 
-- **The website's black-violet may not appear outside §6.** Any raw `oklch()` at
-  hue `300–340` elsewhere fails the contract test. This is the guard that keeps
-  the public site's purple direction out of the operator app.
+- **The website's black-violet may not appear outside §6 as a raw value.** Any
+  raw `oklch()` at hue `300–340` elsewhere fails the contract test.
+
+  This guard reads differently since 2026-08-16, and the difference is the whole
+  point: the accent is *now* a violet, and it is legal — as `--accent`,
+  `--accent-ink`, `--accent-line` and `--accent-wash`, authored once in
+  `globals.css`. What stays banned is a **raw** violet in a component
+  stylesheet, because that is how the public site's surface treatment would
+  arrive: as a hand-written value on a pane, a gradient or a fill. A token
+  cannot do that — §4.8 restricts where the accent may be painted at all.
 - **No new raw colour outside §6** either: the count is ratcheted at 1, so a new
   raw value fails instead of quietly starting a second palette.
 - Inside §6, do not add raw values — when you next edit the floor map, converge
   the existing ones into named `--floor-*` tokens so the venue palette is
   governed rather than ad hoc. Do not open a standalone refactor for it.
 - This exception covers the floor-plan artwork only. It is not a licence for a
-  dark surface, a dark mode, or a violet accent anywhere else (L1).
+  dark surface or a dark mode (L1).
 
 ### 4.2 Token families
 
@@ -211,43 +220,79 @@ Defined in `globals.css`, documented with contrast ratios in
 | Surface | `--paper` `--surface` `--surface-raised` `--surface-quiet` `--surface-sunken` `--surface-hover` `--surface-active` | Value separation only. `--paper` is the ground; `--surface` is exactly `oklch(1 0 0)` |
 | Ink | `--ink` `--ink-2` `--ink-3` `--ink-inverse` | Three steps. Graphite, never pure black |
 | Rules | `--rule` `--rule-strong` `--rule-control` | `--rule-control` is the 3:1 floor for control borders (WCAG 1.4.11) |
-| Accent | `--accent` `--accent-ink` `--accent-line` `--accent-wash` | Champagne. `--accent-ink` is the only champagne allowed on text |
+| Accent | `--accent` `--accent-ink` `--accent-line` `--accent-wash` | Violet. Every step clears its own floor (§4.8), so any of them may carry text; `--accent-line` is the focus ring. **Never a fill** |
 | Action | `--action` `--action-hover` `--action-press` `--action-text` `--focus` | Graphite fill |
 | Status | `--alert` `--warn` `--live` + `-line` / `-wash` | Meaning only, always paired with a word (L6) |
-| Type | `--t-micro` 11 · `--t-mini` 12 · `--t-body` 13 · `--t-field` **16** · `--t-data` 15 · `--t-lead` 18 · `--t-figure` 22 · `--t-display`; `--weight-body` 400 · `--weight-ui` 500 · `--weight-strong` 600 · `--weight-display` 700 | Six steps + one field step + one fluid; four explicit weight roles. **No size or raw weight outside the scale.** The six reading steps shift up one register on tablets (§4.5); `--t-field` never moves |
+| Type | `--t-micro` 11 · `--t-mini` 12 · `--t-body` 13 · `--t-field` **16** · `--t-data` 15 · `--t-lead` 18 · `--t-figure` 22 · `--t-display`; `--weight-body` 400 · `--weight-ui` 460 · `--weight-strong` 560 · `--weight-display` 620 | Six steps + one field step + one fluid; four explicit weight roles on a variable axis. **No size or raw weight outside the scale.** The six reading steps shift up one register on tablets (§4.5); `--t-field` never moves |
+| Tracking | `--track-micro` +0.005 · `--track-body` −0.006 · `--track-data` −0.012 · `--track-lead` −0.018 · `--track-figure` −0.024 · `--track-display` −0.03 · `--track-caps` +0.04 · `--track-brand` +0.13 (em) | One step per type role, tightening as size grows (L12). `--track-micro` is the only reading step that does not tighten |
 | Space | `--s-1` 2 … `--s-10` 40 | 4px rhythm |
 | Radius | `--r-chip` 3 · `--r-control` 6 · `--r-pane` 8 | Structural. Nothing reaches 12 (§4.7) |
-| Elevation | `--lift-pane` `--lift-raised` `--lift-dialog` `--scrim` | Only for things that actually float. `--lift-pane` is the one-layer contact shadow (§4.7) |
+| Elevation | `--lift-pane` `--lift-raised` `--lift-dialog` `--scrim` | Three steps, no more. `--lift-pane` is the contact shadow and is legal **only on `position: sticky` / `fixed`** rules (L5, §4.9) |
 | Motion | `--ease-ui` `--ease-enter` `--ease-exit` · `--dur-fast` 110 · `--dur-ui` 160 · `--dur-panel` 220 | §7 |
 | Metrics | `--h-control` 44 · `--h-control-sm` 44 · `--h-masthead` 60 · `--h-toolbar` 56 · `--h-row` 52 | Both control heights are 44 by design (L10) |
 
-Legacy aliases (`--canvas`, `--champagne`, `--border`, `--danger`, `--success`,
-`--warning`) exist so route-level shells resolve. **Do not add new aliases**, and
+Legacy aliases (`--canvas`, `--border`, `--danger`, `--success`, `--warning`)
+exist so route-level shells resolve. The `--champagne` aliases were removed with
+the accent they named. **Do not add new aliases**, and
 prefer the primary name in new code.
 
 ### 4.3 Type
 
-One family; hierarchy from explicit weight roles (400/500/600/700), not size
-inflation. Regular carries reading text, Medium carries quiet controls,
-Semibold carries section titles/actions/data, and Bold is reserved for the
-largest display copy. Loading 600 explicitly removes the prior browser weight
-substitution that made Semibold selectors render as Bold. Figures use
-`.tabular-nums`, which re-declares the family, turns on
-`tabular-nums lining-nums`, and adds `0.005em` tracking.
-The same numeric feature is inherited from `:root` so mixed runs such as
-`VIP-1 7名` do not fall between prose and figure scopes.
+**Two faces, one voice.** Instrument Sans carries Latin and every figure; Noto
+Sans JP carries Japanese. The ledger is dominated by Latin and figures —
+`VIP-1`, `22:30`, `GHO-0726-01`, `¥120,000` — so the Latin face carries most of
+the surface's texture and the Japanese labels support it.
 
-The Apple/HIG research measured a narrow 400/600 vocabulary and ordinary labels
-at normal tracking. GHOST therefore reduced `--track-caps` from `0.09em` to
-`0.04em`. A built-font specimen measured zero width change between default
-spacing and `palt` for the audited Japanese/mixed labels, so the global `palt`
-declarations were removed instead of preserving a non-operative contract.
-Content-sized masthead/toolbar labels retain the removed terminal advance as
-quiet end inset. This does not widen the visible glyph spacing; it preserves the
-frozen x-position of adjacent controls while the type texture becomes quieter.
+The pairing was measured, not chosen. Against Noto Sans JP's own digit height,
+Instrument Sans lands **0.8pt** away — closer than any other candidate — so a
+mixed run like `4名` does not step down mid-word. Host Grotesk read best in
+isolation and lost here by **8.5pt**; Inter Tight matched on x-height and was
+rejected as the most recognisable machine-generated typeface on the web, which
+is the complaint this pass exists to answer. Full matrix:
+`docs/research/vip-manager-type-accent-bakeoff-2026-08-16.md` §2.
+
+**Hierarchy comes from size, tracking and ink — not from weight.** Both faces
+load as variable fonts, so the four roles sit at 400 / 460 / 560 / 620 rather
+than 400 / 500 / 600 / 700. The old ladder put most labels on screen at semibold
+or bolder; all three measured reference systems go the other way (Stripe sets
+even 56px display copy at weight 300; Linear uses 510/590).
+
+**Every step above body is optically tracked (L12).** Until 2026-08-16 there was
+no negative tracking anywhere on this surface: every size ran at the font's
+default spacing, which is drawn for text at reading size, so headings, counters
+and the date lockup all sat visibly loose. The curve follows the references —
+Stripe runs −0.010em at 12px through −0.025em at 56px, Linear −0.011em body and
+−0.022em display:
+
+| Role | Token | Value |
+|---|---|---|
+| Micro labels (11–13px) | `--track-micro` | **+0.005em** — the one reading step that does not tighten |
+| Reading text (13–15px) | `--track-body` | −0.006em, and the `:root` default |
+| Values and codes (15–17px) | `--track-data` | −0.012em |
+| Pane titles (18–20px) | `--track-lead` | −0.018em |
+| Counters (22–26px) | `--track-figure` | −0.024em |
+| Display copy | `--track-display` | −0.03em |
+| Functional uppercase | `--track-caps` | +0.04em |
+| The GHOST OSAKA lockup only | `--track-brand` | +0.13em |
+
+Tightening 11px labels costs legibility and is itself a recognisable slop tell,
+which is why `--track-micro` is positive.
+
+**Figures.** `.tabular-nums` re-declares the family and the numeric feature; the
+same feature is inherited from `:root` so mixed runs such as `VIP-1 7名` do not
+fall between prose and figure scopes. Instrument Sans is proportional by default
+with an effective `tnum` (299.3px → 0.00px spread at 100px); Noto Sans JP's
+digits are uniform regardless.
 
 Verification that must keep holding: `1111111111` and `0000000000` render at
 identical width in the built app.
+
+**The font variables must be declared on `<html>`.** `--font-ui` is composed from
+them in `:root`, and a custom property is only visible on the element that
+declares it and its descendants. Declared on `<body>` — which is where
+`next/font` puts them by default — the whole `font-family` declaration is
+invalid and the surface silently drops to the browser's default serif. That
+shipped for one build of this pass before the guard existed.
 
 ### 4.4 Two rules that exist because auditors caught them
 
@@ -326,13 +371,65 @@ Three decisions inside that table are GHOST's, not SmartHR's:
   toolbar, the ledger's sticky `th`, the timeline's tick row. A pane that does
   not move does not get one, and there is still no second layer anywhere.
 - **No blue.** SmartHR's `MAIN #0077c7` is its brand, not ours. Graphite and one
-  champagne accent are unchanged (L2).
+  single accent are unchanged (L2).
 
 What was explicitly *not* imported: SmartHR's component structure, its blue, its
 `full` pill radius, and its shadow ladder. The direction is still OPERATIONS
 PAPER; this pass raised its craft, it did not replace it.
 
 ---
+
+### 4.8 The accent is a mark, never a surface
+
+The accent moved from champagne to violet on 2026-08-16 (L2). The reason is
+measured: the shipped champagne `oklch(0.605 0.078 76)` resolves to `#9d7b4a` at
+**3.91:1 on white** — under the 4.5:1 body-text floor. That is why a separate
+`--accent-ink` token existed at all: it was a workaround for an accent that
+could not carry text. Champagne is a *material*; it needs dark lacquer behind it
+to read as metal, and on paper it is a brown.
+
+The violet is the venue's other real signal — the LED — so this is a
+translation, not a substitution. Measured on white: `--accent` **7.53:1**,
+`--accent-ink` **9.49:1**, `--accent-line` **4.69:1**.
+
+**State the risk plainly: violet on white is the single most recognisable
+machine-generated look**, and adopting it to fix "reads as AI-generated" is only
+defensible under discipline. Three rules, and the third is the one that actually
+separates the two looks:
+
+1. Deep and magenta-leaning (hue ~305), not the blue-violet ~275 of every
+   generated dashboard.
+2. **Only** ink, a 2–3px edge, a hairline, or a ≤7% wash. Never a fill, never a
+   gradient, never a glow, never a surface.
+3. **Every action stays graphite.** Nothing the operator presses is violet.
+
+Rule 2 is machine-enforced: `background: var(--accent)` is legal only on a
+pseudo-element, which is what a mark is drawn with here. A control that fills
+itself with the accent fails the contract test.
+
+Coverage stays ≤8% of any screen (L2).
+
+### 4.9 Elevation is for content passing underneath
+
+Both measured light-surface references are explicit about shadows. Stripe:
+*"avoids shadows entirely — depth is created through background tint
+progression."* Anthropic: *"don't use box-shadow for elevation; this system
+elevates through surface tone and 1px borders only."*
+
+Until 2026-08-16 this surface ran **four** separation systems at once — value
+steps, hairlines, contact shadows and coloured washes — and they competed.
+
+But those references are marketing sites, where nothing scrolls beneath sticky
+chrome. This is an operator console, and a shadow still earns its place in
+exactly one situation: **content passing underneath an element.** A sticky
+ledger header with rows sliding beneath it is a z-relationship, and a hairline
+cannot state one.
+
+So the rule is narrow and enforced: `--lift-pane` is legal **only on a rule that
+is `position: sticky` or `fixed`**. It was being spent on two static bands that
+already carried hairlines; those now separate by hairline and value like every
+other pane. Three elevation steps exist in total — contact, popover, dialog —
+and the two long ones belong to things that float over the whole surface.
 
 ## 5. Authoring conventions
 
@@ -427,6 +524,19 @@ what the inspector is not. Where an icon does appear, its metaphor must be the
 control's actual job — a sort glyph on a density toggle is a defect, not a
 detail.
 
+**And an icon on a control is still not automatic.** On 2026-08-16 the six
+icons leading the inspector's command menu were removed, reversing the
+2026-07-31 shared-icon-column decision. They passed the rule above — they were
+on controls — and still failed the test behind it: the glyphs were metaphorical
+rather than denotative (a bell for 接客状態, a sofa for 卓を決める, a rewind for
+利用延長), so none could be read faster than its own label, and six of them
+stacked is the texture that makes a panel look generated. The left-aligned menu
+structure the earlier pass was actually after was kept.
+
+The question to ask is not "is this on a control" but **"would the operator
+reach this faster because of the glyph?"** If the label is already the fastest
+route, the glyph is decoration wearing a functional coat.
+
 ### 5.6 Numbers, time and identifiers
 
 Any element containing a figure — time, party size, table code, reservation
@@ -434,6 +544,40 @@ number, currency, version, counter — carries `.tabular-nums` (L4). Times rende
 in the operating-window vocabulary of §L9 and never in a native
 `datetime-local`/24h-ambiguous picker: use the shared 15-minute selects in
 `operations/BusinessTimeFields.tsx`.
+
+### 5.6b The business date is picked, never typed
+
+Every screen where the operator chooses **the night the board is showing** uses
+`shell/BusinessDateField`. `<input type="date">` is banned there, and the
+contract test sweeps the whole component tree for it.
+
+Four reasons, in order of how certain each one is:
+
+1. **The weekday is missing.** A club floor is planned in 金/土, and the native
+   control shows a bare numeric date.
+2. **Two calendar glyphs.** Safari draws its own affordance inside the field, so
+   the ribbon carried the app's glyph and the browser's side by side.
+3. **It is chrome.** The native popover cannot be told which nights the venue is
+   open, cannot be styled, and does not honour the 44px floor.
+4. **Its format follows the device, not the document.** The QA browser runs
+   en-US and rendered `07/26/2026`; a Japanese-locale iPad renders `2026/07/26`.
+   So this was never proof that the venue sees US order — but it is proof the
+   order is outside the app's control, on a single-purpose console where a
+   re-imaged device would silently change what a date means.
+
+**Personal dates are the deliberate exception.** 生年月日 and 記念日 keep the
+native control: a month grid cannot reach 1985 in a usable number of taps, and
+iPadOS gives a locale-correct wheel for exactly that job. The exception is named
+in the guard rather than left to drift.
+
+The control never fetches. `openDates` is additive — a caller that already knows
+which nights take reservations passes them and they are marked; a caller that
+does not leaves the grid neutral rather than guessing. Server rejection is still
+surfaced by the calling screen's existing inline error.
+
+Its popover is checked for clipping in the audit, because a popover that opens
+off-screen is clipped rather than scrolled and therefore never widens the
+document — the horizontal-overflow gate is blind to it.
 
 ### 5.7 Accessibility (non-negotiable)
 
@@ -511,7 +655,7 @@ shared a declaration block with the empty-state cell:
 So the row the operator had just opened inherited the empty state's 140px, its
 muted `--ink-3` and its centred text — **2.6× the other rows, the palest text in
 the ledger, and the only row whose columns did not line up**. Selection now
-takes the champagne spine every other ledger entry on this surface takes. While
+takes the accent spine every other ledger entry on this surface takes. While
 fixing it: `--h-row` is 52px by decision, but `.rowOpen` re-declared the 44px
 touch floor as its own `min-height` and 6px of cell padding sat on top, so every
 row came out 57px — a declared token quietly overridden. The floor stays on the
@@ -682,7 +826,7 @@ carried by waveform and amplitude, in the ladder clinical alarm systems use
 
 | Tier | Phase | Rhythm | Light |
 |---|---|---|---|
-| `low` | 来店15分前 | one slow swell, 2.4s, floor 0.32 | 2px stem, 14px spill, champagne |
+| `low` | 来店15分前 | one slow swell, 2.4s, floor 0.32 | 2px stem, 14px spill, accent |
 | `medium` | 延長確認（利用終了15分前） | double pulse, 1.8s, floor 0.30 | 2px stem, 14px spill, warn |
 | `high` | 未着 / 解放超過 | beacon — hard strike, long decay, 900ms, floor 0.26 | 3px stem, 20px spill, alert |
 
@@ -769,7 +913,7 @@ the loudest band on the chart also the hardest one to read. The status keeps its
 rule weight, its pattern and its printed word — the discriminator this section
 already relies on — and gives up only the hue.
 
-**Selection is the ledger spine, not a ring.** A champagne outline floating one
+**Selection is the ledger spine, not a ring.** An accent outline floating one
 pixel outside a coloured frame is the same picture-frame artefact by another
 name, and it made `scheduled` — the calmest phase on the chart — its loudest
 object. A band is a ledger entry and takes the mark every other ledger entry on
@@ -887,8 +1031,8 @@ and a failed connection.
 **The loader is the product's own loop, not a borrowed spinner.** Four records
 sit on a ledger rule. The queue advances one slot at a time on `--ease-enter`,
 and the record that reaches the head is lifted off the rule, carried back over
-the queue in champagne, and filed at the tail. One cycle is 1760ms, so the
-champagne moment occurs at ≈0.57 Hz — under a fifth of the WCAG 2.3.1 threshold
+the queue in the accent, and filed at the tail. One cycle is 1760ms, so the
+accent moment occurs at ≈0.57 Hz — under a fifth of the WCAG 2.3.1 threshold
 — and the accent window is narrower than the 25% that separates two slots, so
 exactly one record is ever the accent.
 
@@ -908,7 +1052,7 @@ worth keeping in mind for anything else on this surface:
   to 1 under `reduce`, house-wide and with `!important`. An earlier revision
   tried to walk the accent at half speed; measured, it rendered as four grey
   dots with no accent at all. The still state is the loop's phase 0 — records on
-  their slots, the head record champagne — and the status line carries the
+  their slots, the head record in the accent — and the status line carries the
   progress. **On this surface, no reduced-motion fallback may rely on an
   animation still running.**
 
@@ -924,8 +1068,8 @@ npm run ci   # lint · typecheck · unit+contract+PII · build · maintenance ·
 
 | Gate | Pins |
 |---|---|
-| `tests/contract/operator-light-ui.test.mjs` | The design itself: OKLCH light tokens, no revived dark aliases, no hex, M PLUS 2 400/500/600/700 + explicit weight roles + tabular figures, six-step scale, two-zone wizard with all eight steps, Basic-only access with no secondary credential field, two-column shell, hidden idle live region, full-colour floor plan with ≥52×44 nodes, chart rows filling height, no coloured side tabs, no `backdrop-filter`, no radius ≥12px |
-| `npm run test:a11y` | Required-state and viewport counts come from `scripts/light-ui-qa-manifest.mjs`; the harness currently captures the 45 required states plus one date-unavailable fixture state per viewport. Gate: axe 0 · horizontal overflow 0 · controls <44px 0 · **text controls <16px 0** · legacy purple 0 · console errors 0 · 5xx 0. Viewports carrying `touch: true` are driven with `hasTouch`/`isMobile` at `deviceScaleFactor: 2`, so `hover`/`pointer` media resolve the way they do on the device. Read counts from artifacts, never this prose. |
+| `tests/contract/operator-light-ui.test.mjs` | The design itself: OKLCH light tokens on a white ground, no revived dark aliases, no hex, the Instrument Sans + Noto Sans JP pairing with variable weight roles, the optical tracking curve, tabular figures, six-step scale, the accent as a mark and never a fill, the contact shadow only on sticky content, the authored business-date control, two-zone wizard with all eight steps, Basic-only access with no secondary credential field, two-column shell, hidden idle live region, full-colour floor plan with ≥52×44 nodes, chart rows filling height, no coloured side tabs, no `backdrop-filter`, no radius ≥12px |
+| `npm run test:a11y` | Required-state and viewport counts come from `scripts/light-ui-qa-manifest.mjs`; the harness currently captures 52 required states plus one date-unavailable fixture state per viewport, across 13 configured viewports. Gate: axe 0 · horizontal overflow 0 · controls <44px 0 · **text controls <16px 0** · legacy purple 0 · console errors 0 · 5xx 0. Viewports carrying `touch: true` are driven with `hasTouch`/`isMobile` at `deviceScaleFactor: 2`, so `hover`/`pointer` media resolve the way they do on the device. WebKit that cannot launch is recorded as `notRun` and is never counted as passed. Read counts from artifacts, never this prose. |
 | `tests/contract/source-of-truth-guard.test.mjs` | The legacy website admin surface is never treated as this app's UI |
 | `tests/unit/inspector-accessibility.test.mjs`, `timeline-state`, `ghost-operating-hours`, `workspace-route-sync` | Focus order, timeline state model, the 22:00–翌05:00 window, URL/state sync |
 | `npm run test:maintenance` | The maintenance anchor still renders |
@@ -999,7 +1143,7 @@ Each verified to fail when violated before being kept.
 | Drawn controls (§5.7b) | **No test.** A new `appearance`-less select or a `background:` shorthand on one regresses it silently |
 | No explanatory subtitle / decorative eyebrow (§5.7c) | **No test.** This is the rule the surface drifts back toward first |
 | Chrome budget ≤108px / ≤156px (§6) | Measured during the rebuild; **not asserted** |
-| Stylesheet split guardrail (§5.2) | **No test.** A split that leaves the contract test reading the old path disarms the whole gate silently. **The file is now ~3,090 lines — past the ~3,000 line trigger.** The 2026-08-01 pass deliberately did not split it: doing so mid-change would have moved every pinned rule in the same commit that rewrote the responsive tiers, which is exactly the condition under which a disarmed gate goes unnoticed. This is owed work, and it is the next structural task on this file |
+| Stylesheet split guardrail (§5.2) | **No test.** A split that leaves the contract test reading the old path disarms the whole gate silently. **The workspace file is now ~3,710 lines — past the ~3,000 line trigger.** The 2026-08-01 pass deliberately did not split it: doing so mid-change would have moved every pinned rule in the same commit that rewrote the responsive tiers, which is exactly the condition under which a disarmed gate goes unnoticed. This remains owed structural work. New self-contained surfaces must use the co-located-module allowance instead of extending the debt; `shell/BusinessDateField.module.css` does so. |
 | Touch: hover stays in §12b (§6.1) | **No test.** A new unguarded `:hover` outside §12b latches on tap on the venue iPad and the audit will not fail — hover state is not something the harness asserts on |
 | Touch: press feedback exists (§6.1) | **No test.** `-webkit-tap-highlight-color` is cleared globally, so a control added without an `:active` state has *no* acknowledgement on the device |
 | Type scale adherence (§4.2) | Only hex is machine-checked; an off-scale `px` font-size still passes |
@@ -1009,6 +1153,61 @@ Each verified to fail when violated before being kept.
 WebKit `1194×834` is part of the gate and needs system libraries
 (`libwoff2dec`, `libenchant-2`, `libhyphen`, `libsecret-1`) that a bare Linux
 container lacks. Report it as **not run**, never as passed.
+
+### 8.1f Guards added 2026-08-16
+
+The pass that changed L1's ground, L2's accent, L3's type and L5's elevation
+added the guards that keep each of them from drifting back, plus three that
+exist because the pass itself produced the defect:
+
+| Guard | Fails when |
+|---|---|
+| Ground is white and neutral | `--paper` lightness < 0.97, or its hue falls back into the warm band |
+| Accent is the violet ramp | `--accent` / `--accent-ink` / `--accent-line` leave the measured values, or the retired champagne value returns |
+| **Accent may mark, never fill** | `background: var(--accent)` appears on anything that is not a pseudo-element |
+| Type is the authored pairing | `Instrument_Sans` or `Noto_Sans_JP` is missing from the font import, or a rejected face is imported |
+| **Font variables sit on `<html>`** | they are declared on `<body>`, which makes `--font-ui` unresolvable in `:root` and silently drops the surface to serif |
+| Optical tracking exists and is monotonic | any step from `--track-body` to `--track-display` is non-negative or fails to tighten further than the step above it; or `--track-micro` tightens |
+| Weight roles are the variable ladder | the roles leave 400 / 460 / 560 / 620 |
+| **Contact shadow is for sticky content** | `--lift-pane` appears on a rule that is not `position: sticky` or `fixed` |
+| Elevation budget is three steps | a fourth non-`none` `--lift-*` token appears |
+| Business dates use the authored control | any component outside the personal-date exception renders `type="date"` |
+| The calendar meets the touch floor | `.dateCell` stops sizing to `--h-control`. The floor is declared on **both** axes for every control in the popover: the `本日` button shipped at 43.86px wide because only its height was pinned, and above 1280px the reading scale drops back to the desk register and narrows the label |
+| **Durations are never bare minutes** | the timeline interpolates a raw minute count instead of `formatElapsedMinutes` |
+| **The masthead never runs out of width** | any two painted controls in the service ribbon overlap (see below) |
+| The calendar popover is not clipped | the popover's box leaves the viewport on any side |
+
+Three of those — the `<html>` guard, the accent-fill guard and the contact-shadow
+guard — exist because this pass shipped the defect first and only then wrote the
+test. That is the honest order, and it is why the guard is worth more than the
+fix: the fix was one line each time.
+
+**Two of them are worth reading before touching the masthead or a popover**,
+because both failures are invisible to the gates that already existed:
+
+- **Masthead overlap.** The business-date field is `position: relative` so it
+  can host its popover, which puts it in the positioned paint layer above its
+  non-positioned siblings. When the ribbon runs out of width, the field is
+  squeezed below its own content width and its *trigger* paints outside the
+  parent box, over the counters to its right — while the parent boxes never
+  overlap. So the horizontal-overflow gate sees nothing, and axe reports only
+  "partially obscured" without naming a cause. The gate measures the painted
+  controls and names both sides with the overlap in pixels. The date field is
+  therefore `flex: 0 0 auto`; the ribbon takes its slack from the operator
+  identity, because a truncated operator name still identifies the session and a
+  truncated counter or date does not.
+- **Popover clipping.** A popover that opens off-screen is clipped, not
+  scrolled, so it never widens the document and the horizontal-overflow gate is
+  blind to it. The audit asserts the popover's own box against the viewport.
+  This is what forced the calendar to stop being a popover on phones: seven 44px
+  touch cells is 308px of a 320–390px viewport, the cells cannot shrink (L10),
+  so anchoring the grid to its trigger puts it past the right edge. Below 768px
+  it becomes a sheet centred on the viewport instead.
+
+`scripts/verify-palette-contrast.mjs` is a separate, runnable proof that every
+token clears its floor on all four grounds. It answers a question a rendered
+audit cannot: whether a token is *capable* of its job everywhere, rather than
+only where it currently happens to be painted.
 
 ---
 
@@ -1072,3 +1271,17 @@ an assertion in `operator-light-ui.test.mjs` changes only like this:
 
 Anything short of that is drift, and drift is what produced the surface this
 design replaced.
+
+### 10.1 Record of changes to locked decisions
+
+| Date | Decision | From → to | Evidence |
+|---|---|---|---|
+| 2026-08-16 | **L1** ground | warm beige `oklch(0.968 0.0035 85)` → white `oklch(0.977 0.0018 268)` | Owner instruction. The warm cast sat under every white pane, the accent and the attention washes, and read as unwashed rather than warm |
+| 2026-08-16 | **L2** accent | champagne → violet | Champagne measured **3.91:1 on white**, under the body-text floor; the replacement measures 7.53:1. Bake-off §3 |
+| 2026-08-16 | **L3** type | M PLUS 2 → Instrument Sans + Noto Sans JP | Instrument Sans sits **0.8pt** from Noto Sans JP's own digit height; M PLUS 2 carried **23% more digit ink width**. Bake-off §2. This also corrects the 2026-07-31 bake-off's central claim: it measured default digit spread only, and every Latin candidate is fully tabular under `tnum` |
+| 2026-08-16 | **L5** elevation | contact shadow anywhere that "floats" → only `position: sticky` / `fixed` | The step was being spent on two static bands that already carried hairlines |
+| 2026-08-16 | **L12** tracking | *(new)* | No negative tracking existed anywhere; all three reference systems tighten with size |
+
+Each row has a guard in §8.1f. The Owner opened L2 and L3 explicitly; L1's
+ground change was instructed directly; L5 and L12 followed from the same pass
+and are recorded here rather than left implicit.

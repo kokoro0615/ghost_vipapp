@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
+import path from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 
 import { QA_VIEWPORTS } from "../../scripts/light-ui-qa-manifest.mjs";
 
@@ -24,6 +26,29 @@ const [
   readFile(new URL("../../package.json", import.meta.url), "utf8"),
   readFile(new URL("../../middleware.ts", import.meta.url), "utf8"),
 ]);
+
+const [businessDateField, businessDateStyles, timelineState, ticketOperationsStyles] = await Promise.all([
+  readFile(new URL("../../src/components/admin/vip-floor-v2/shell/BusinessDateField.tsx", import.meta.url), "utf8"),
+  readFile(new URL("../../src/components/admin/vip-floor-v2/shell/BusinessDateField.module.css", import.meta.url), "utf8"),
+  readFile(new URL("../../src/components/admin/vip-floor-v2/chart/timelineState.ts", import.meta.url), "utf8"),
+  readFile(new URL("../../src/components/admin/vip-floor-v2/ticket-operations/TicketOperations.module.css", import.meta.url), "utf8"),
+]);
+
+const operatorStyleSheets = [workspaceStyles, businessDateStyles, ticketOperationsStyles];
+
+/* Every component on the operator surface, so a guard can assert across the
+ * whole tree rather than against a list that silently goes stale. */
+const componentRoot = fileURLToPath(new URL("../../src/components/admin/vip-floor-v2", import.meta.url));
+const componentSources = Object.fromEntries(await Promise.all(
+  (await readdir(componentRoot, { recursive: true, withFileTypes: true }))
+    .filter((entry) => entry.isFile() && entry.name.endsWith(".tsx"))
+    .map(async (entry) => {
+      const full = path.join(entry.parentPath ?? entry.path, entry.name);
+      return [path.relative(componentRoot, full), await readFile(full, "utf8")];
+    }),
+));
+assert.ok(Object.keys(componentSources).length > 15,
+  "the component sweep must actually find the operator components");
 
 const packageJson = JSON.parse(packageJsonSource);
 
@@ -60,12 +85,52 @@ function violetOklchOutsideFloorSection() {
 }
 
 test("VIP Manager keeps a white operator surface authored in OKLCH", () => {
-  assert.match(globals, /--paper:\s*oklch\(0\.968 0\.0035 85\)/u);
+  /* The ground is white and neutral. It was `oklch(0.968 0.0035 85)` — a warm
+   * beige — until 2026-08-16, which put a yellow cast under every white pane
+   * and under the accent, and read as unwashed rather than as warm. Hue is
+   * pinned away from the warm band so the ramp cannot drift back. */
+  const paperHue = Number(/--paper:\s*oklch\([\d.]+ [\d.]+ ([\d.]+)\)/u.exec(globals)?.[1]);
+  const paperLightness = Number(/--paper:\s*oklch\(([\d.]+)/u.exec(globals)?.[1]);
+  assert.ok(paperLightness >= 0.97, `the ground must read as white, got L=${paperLightness}`);
+  assert.ok(paperHue > 200, `the ground must not carry a warm cast, got hue=${paperHue}`);
   assert.match(globals, /--surface:\s*oklch\(1 0 0\)/u);
   assert.match(globals, /--canvas:\s*var\(--paper\)/u);
-  // Graphite ink and one champagne accent — never a SaaS blue or a purple.
-  assert.match(globals, /--action:\s*oklch\(0\.2\d+ 0\.0\d+ 70\)/u);
-  assert.match(globals, /--accent:\s*oklch\(0\.6\d+ 0\.0\d+ 76\)/u);
+
+  /* Graphite carries every action; the accent is never a fill the operator
+   * presses. One accent only — no SaaS blue, no second colour. */
+  assert.match(globals, /--action:\s*oklch\(0\.2\d+ 0\.0\d+ 2\d\d\)/u);
+  assert.match(globals, /--accent:\s*oklch\(0\.4\d+ 0\.19 30\d\)/u);
+  assert.match(globals, /--accent-ink:\s*oklch\(0\.4\d+ 0\.\d+ 30\d\)/u);
+  assert.match(globals, /--accent-line:\s*oklch\(0\.5\d+ 0\.\d+ 30\d\)/u);
+});
+
+test("the accent is a mark, never a surface the operator presses", () => {
+  /* The measured reason champagne was retired: `oklch(0.605 0.078 76)` is
+   * `#9d7b4a`, 3.91:1 on white, under the 4.5:1 body floor. The replacement is
+   * only defensible while it stays ink, an edge, a hairline and a low wash —
+   * the moment it becomes a button fill it is the generic SaaS purple this
+   * pass exists to remove. */
+  assert.doesNotMatch(globals, /--accent:\s*oklch\([\d.]+ 0\.0\d+ 7\d\)/u,
+    "the retired champagne accent must not return as the primary accent");
+  assert.match(globals, /--accent-wash:\s*color-mix\(in oklch, var\(--accent\) [1-9]%/u,
+    "the accent wash must stay in single digits so it reads as tinted paper");
+  assert.match(globals, /--action-text:\s*var\(--ink-inverse\)/u);
+
+  /* The accent may paint a mark — a 2px rule, a swatch glyph, a dot — but never
+   * a box the operator reads as a filled control. Mechanically: every
+   * `background: var(--accent)` must belong to a pseudo-element, which is what
+   * a mark is drawn with on this surface. */
+  const accentFillSelectors = [];
+  for (const sheet of operatorStyleSheets) {
+    for (const block of sheet.matchAll(/([^{}]+)\{([^{}]*)\}/gu)) {
+      const [, selector, body] = block;
+      if (!/background:\s*var\(--accent\)\s*;/u.test(body)) continue;
+      if (/::(before|after)/u.test(selector)) continue;
+      accentFillSelectors.push(selector.trim());
+    }
+  }
+  assert.deepEqual(accentFillSelectors, [],
+    "the accent may mark, never fill: use --accent-wash for a surface");
 });
 
 test("the surface is a real light system, not a renamed dark lacquer theme", () => {
@@ -78,27 +143,98 @@ test("the surface is a real light system, not a renamed dark lacquer theme", () 
   assert.doesNotMatch(workspaceStyles, /Georgia|Times New Roman/u);
 });
 
-test("type is one Japanese-first family with explicit roles and tabular figures", () => {
-  // M PLUS 2 is pinned because it was the only humane Japanese candidate that
-  // measured uniform digit advances AND an effective `tnum`. Zen Kaku Gothic
-  // New/Antique, Murecho and BIZ UDPGothic drift 15-19px across a ten-digit
-  // string, so a ledger column would jitter. BIZ UDPGothic also ships only
-  // 400/700. See docs/ui/VIP_MANAGER_LIGHT_RESERVATION_RESEARCH.md section 4.
-  assert.match(layout, /M_PLUS_2/u);
-  assert.match(layout, /weight:\s*\["400", "500", "600", "700"\]/u);
-  // The retired monospace face is what made the board read as a terminal.
-  assert.doesNotMatch(layout, /IBM_Plex_Mono/u);
-  assert.doesNotMatch(layout, /BIZ_UDPGothic|Noto_Sans_JP|Zen_Kaku|Murecho|Inter|Roboto/u);
-  // Figures stay a distinct register inside that one family, never a re-import.
+test("planes separate by hairline and value, not by an elevation stack", () => {
+  /* Both measured references for this class of light product UI are explicit:
+   * Stripe "avoids shadows entirely", Anthropic "don't use box-shadow for
+   * elevation". Running value steps, hairlines, contact shadows and coloured
+   * washes at once is what made the plane stack unreadable. Only things that
+   * genuinely float over scrolled content keep a shadow. */
+  /* A shadow states a z-relationship, and the only z-relationship on this
+   * surface is content passing *underneath* an element. So the contact step is
+   * legal exactly on rules that are sticky or fixed. Before this guard it was
+   * also being spent on two static bands that already carried hairlines. */
+  const contactShadowSelectors = [];
+  for (const sheet of operatorStyleSheets) {
+    for (const block of sheet.matchAll(/([^{}]+)\{([^{}]*)\}/gu)) {
+      const [, selector, body] = block;
+      if (!/box-shadow:\s*var\(--lift-pane\)/u.test(body)) continue;
+      if (/position:\s*(sticky|fixed)/u.test(body)) continue;
+      contactShadowSelectors.push(selector.trim().split("\n").pop().trim());
+    }
+  }
+  assert.deepEqual(contactShadowSelectors, [],
+    "--lift-pane is the contact step for sticky content; a static band separates "
+    + "by hairline and value");
+
+  /* Only three elevation steps exist at all, and the two long ones belong to
+   * things that float over the whole surface. */
+  const shadowTokens = [...globals.matchAll(/--lift-[a-z]+:([^;]*);/gu)]
+    .filter(([, value]) => value.trim() !== "none");
+  assert.equal(shadowTokens.length, 3,
+    `the elevation budget is contact + popover + dialog, found ${shadowTokens.length}`);
+});
+
+test("type is an authored pairing with optical tracking and tabular figures", () => {
+  /* The 2026-08-16 bake-off measured glyph ink boxes, not line boxes. Against
+   * Noto Sans JP's own digits: Instrument Sans +0.8pt, Onest -1.4pt, Inter
+   * Tight +2.2pt, Host Grotesk -8.5pt. M PLUS 2 carried 23% more digit ink
+   * width than Noto Sans JP, which is why the ledger read as inflated.
+   * docs/research/vip-manager-type-accent-bakeoff-2026-08-16.md */
+  assert.match(layout, /Instrument_Sans/u);
+  assert.match(layout, /Noto_Sans_JP/u);
+  assert.doesNotMatch(layout, /M_PLUS_2/u, "the retired single family must not return");
+  assert.doesNotMatch(layout, /IBM_Plex_Mono/u, "a terminal face must never carry figures");
+  /* Scoped to the import, so the bake-off note may name the faces it rejected. */
+  const fontImport = /^import \{([^}]*)\} from "next\/font\/google";$/mu.exec(layout)?.[1] ?? "";
+  assert.doesNotMatch(fontImport, /BIZ_UDPGothic|Zen_Kaku|Murecho|Inter|Roboto|M_PLUS/u,
+    `a rejected face was imported: ${fontImport}`);
+
+  /* The font variables must be declared on <html>. `--font-ui` is composed from
+   * them in `:root`, and a custom property is only visible on the element that
+   * declares it and its descendants — declared on <body> the whole font-family
+   * declaration is invalid and the surface silently drops to the browser's
+   * default serif, which is exactly what shipped for one build of this pass. */
+  assert.match(layout, /<html lang="ja" className=\{`\$\{latinFont\.variable\} \$\{japaneseFont\.variable\}`\}>/u,
+    "font variables must sit on <html> or :root cannot resolve --font-ui");
+  assert.doesNotMatch(layout, /<body className=\{[^}]*Font\.variable/u);
+  assert.match(globals, /--font-ui:\s*var\(--font-operator-latin\), var\(--font-operator-jp\)/u);
+
+  // Figures stay a distinct register inside the pairing, never a re-import.
   assert.match(globals, /--font-figure:\s*var\(--font-ui\)/u);
   assert.match(globals, /:root \{[\s\S]*?font-variant-numeric:\s*tabular-nums lining-nums/u);
   assert.match(globals, /font-variant-numeric:\s*tabular-nums/u);
-  // The built M PLUS 2 face measured no palt width delta on the audited mixed
-  // Japanese labels. Keep the font default instead of declaring a false role.
   assert.doesNotMatch(globals, /font-feature-settings:[^;]*palt/u);
   assert.match(globals, /font-synthesis:\s*none/u);
+  assert.doesNotMatch(globals, /font-family:[^;]*monospace/u);
+
+  /* Optical tracking. Until this pass there was no negative tracking anywhere
+   * on the surface, so every size ran at the font's default reading spacing and
+   * headings and counters sat visibly loose — the single largest reason the
+   * board read as un-authored. The curve follows the measured references:
+   * Stripe -0.010em at 12px through -0.025em at 56px, Linear -0.011em body and
+   * -0.022em display. */
   assert.match(globals, /--track-caps:\s*0\.04em/u);
-  for (const role of ["--weight-body: 400", "--weight-ui: 500", "--weight-strong: 600", "--weight-display: 700"]) {
+  assert.match(globals, /:root \{[\s\S]*?letter-spacing:\s*var\(--track-body\)/u,
+    "the surface default must be the body tracking step, not the font default");
+  const trackSteps = ["--track-body", "--track-data", "--track-lead", "--track-figure", "--track-display"];
+  let previous = 0;
+  for (const step of trackSteps) {
+    const value = Number(new RegExp(`${step}:\\s*(-?[\\d.]+)em`, "u").exec(globals)?.[1]);
+    assert.ok(Number.isFinite(value), `${step} must be declared in em`);
+    assert.ok(value < 0, `${step} must tighten, got ${value}em`);
+    assert.ok(value < previous, `${step} must tighten further than the step above it`);
+    previous = value;
+  }
+  /* Small labels are the one place tightening costs legibility, so the micro
+   * step stays at or above zero. */
+  const micro = Number(/--track-micro:\s*(-?[\d.]+)em/u.exec(globals)?.[1]);
+  assert.ok(micro >= 0, `--track-micro must not tighten small labels, got ${micro}em`);
+
+  /* Four weight roles on a variable axis. The previous 400/500/600/700 ladder
+   * made almost every label semibold or bolder; the measured references let
+   * size, tracking and ink carry hierarchy instead (Stripe sets 56px display at
+   * weight 300, Linear uses 510/590). */
+  for (const role of ["--weight-body: 400", "--weight-ui: 460", "--weight-strong: 560", "--weight-display: 620"]) {
     assert.match(globals, new RegExp(role, "u"));
   }
   assert.match(workspaceStyles, /font-weight:\s*var\(--weight-display\)/u);
@@ -108,12 +244,69 @@ test("type is one Japanese-first family with explicit roles and tabular figures"
   // Narrower visible tracking must not move the frozen content-sized controls.
   assert.match(workspaceStyles, /予約ステータス[^}]*padding-inline-end:\s*0\.25em/u);
   assert.match(workspaceStyles, /担当スタッフでFloorを絞り込み[^}]*padding-inline-end:\s*0\.1em/u);
-  assert.match(workspaceStyles, /\.ribbonControl > span \{[^}]*padding-inline-end:\s*0\.15em/u);
-  assert.doesNotMatch(globals, /font-family:[^;]*monospace/u);
   // Six-step scale, so component sizes are chosen from a system.
   for (const step of ["--t-micro", "--t-mini", "--t-body", "--t-data", "--t-lead", "--t-figure"]) {
     assert.match(globals, new RegExp(`${step}:`, "u"));
   }
+});
+
+test("the business date is an authored control, never the browser's", () => {
+  /* `<input type="date">` inherits the browser's locale, so a Japanese operator
+   * console printed `07/26/2026`. It also showed no weekday, drew a second
+   * calendar glyph beside the app's own, and could not honour the 44px floor. */
+  /* Business dates only. Personal dates (生年月日, 記念日) keep the native
+   * control on purpose: a month grid cannot reach 1985 in a usable number of
+   * taps, and iPadOS gives a locale-correct wheel for exactly that job. */
+  const businessDateScreens = Object.entries(componentSources)
+    .filter(([name]) => !name.endsWith("BusinessDateField.tsx")
+      && !name.endsWith("CustomerPanel.tsx"));
+  for (const [name, source] of businessDateScreens) {
+    assert.doesNotMatch(source, /type="date"/u,
+      `${name} must use BusinessDateField, not a native date input`);
+  }
+  assert.match(componentSources["customers/CustomerPanel.tsx"], /name="birthDate" type="date"/u,
+    "the personal-date exception must stay explicit, not drift into the sweep");
+  assert.match(businessDateField, /2026|WEEKDAY_LABELS/u);
+  assert.match(businessDateField, /\$\{p\.y\}\/\$\{String\(p\.m\)\.padStart\(2, "0"\)\}/u,
+    "the date must render year-first in the venue's order");
+  assert.match(businessDateField, /timeZone: "Asia\/Tokyo"/u,
+    "today must be the venue's today, not the device's");
+  assert.match(businessDateField, /Date\.UTC/u,
+    "date arithmetic must run through UTC so a business date cannot drift a day");
+  assert.match(businessDateStyles, /\.dateCell \{[\s\S]*?width: var\(--h-control\);[\s\S]*?height: var\(--h-control\);/u,
+    "every day cell must meet the touch floor");
+  assert.match(businessDateField, /aria-controls=\{popoverId\}/u,
+    "the date toggle must identify the popover it controls");
+  assert.match(businessDateField, /id=\{popoverId\}[\s\S]*?role="dialog"/u,
+    "the controlled id must belong to the date dialog");
+  assert.match(businessDateField, /onKeyDown=\{\(event\) => \{[\s\S]*?event\.key !== "Escape"[\s\S]*?close\(true\)/u,
+    "Escape must close the whole popover and restore trigger focus");
+
+  const dateHoverStart = businessDateStyles.indexOf("@media (hover: hover) and (pointer: fine)");
+  const datePhoneStart = businessDateStyles.indexOf("@media (max-width: 767px)");
+  assert.ok(dateHoverStart > 0 && datePhoneStart > dateHoverStart,
+    "the date control must keep pointer hover in its own capability guard");
+  assert.doesNotMatch(
+    businessDateStyles.slice(0, dateHoverStart) + businessDateStyles.slice(datePhoneStart),
+    /:hover/u,
+    "an unguarded date hover latches after a tap on the venue iPad",
+  );
+  for (const selector of [
+    ".dateFieldTrigger:active",
+    ".datePopoverHead button:active",
+    ".dateCell:active",
+    ".datePopoverFoot button:active",
+  ]) assert.ok(businessDateStyles.includes(selector), `${selector} must acknowledge touch`);
+});
+
+test("an elapsed duration is never printed as an unbounded minute count", () => {
+  /* The board reported `未着28952分` — twenty days stated in minutes, which
+   * reads as a broken counter rather than as a duration. */
+  assert.match(timelineState, /export function formatElapsedMinutes/u);
+  assert.doesNotMatch(timelineState, /`未着\$\{delay\}分`/u);
+  assert.doesNotMatch(timelineState, /`解放超過\$\{overtime\}分`/u);
+  assert.match(timelineState, /未着\$\{formatElapsedMinutes\(delay\)\}/u);
+  assert.match(timelineState, /解放超過\$\{formatElapsedMinutes\(overtime\)\}/u);
 });
 
 test("the reservation wizard keeps one dominant column and a persistent record", () => {
@@ -281,7 +474,7 @@ test("every pre-ledger frame renders the one boot screen", async () => {
   assert.match(workspaceStyles, /\.bootShell \{[^}]*box-sizing: border-box/u);
 
   // The loop stays on the compositor: the dots may only translate and scale,
-  // and the champagne head is an opacity crossfade over a graphite dot rather
+  // and the violet head is an opacity crossfade over a graphite dot rather
   // than an animated colour.
   const bootFrames = [...workspaceStyles.matchAll(/@keyframes bootQueue[A-Za-z]+ \{([\s\S]*?)\n\}/gu)];
   assert.equal(bootFrames.length, 2, "boot keyframes: advance and lead");

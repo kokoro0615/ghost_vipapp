@@ -18,6 +18,7 @@ import type {
   UiReservation,
 } from "../contract/uiTypes";
 import { useDemoMode } from "../demo/DemoMode";
+import { BusinessDateField, formatBusinessDateWithWeekday } from "../shell/BusinessDateField";
 import { BusinessTimeFields } from "./BusinessTimeFields";
 import styles from "../VipFloorWorkspace.module.css";
 import { useTrialMode } from "../TrialMode";
@@ -318,7 +319,12 @@ export function ReservationWizard({
       <dl className={styles.wizardSummaryBar} aria-label="入力済みの予約内容">
         <div>
           <dt>日付</dt>
-          <dd className="tabular-nums">{board.businessDay.businessDate}</dd>
+          {/* The venue's order with its weekday, matching the control the
+            * operator just used. An ISO string beside a picker that reads
+            * 2026/07/31(金) is two spellings of the same night. */}
+          <dd className="tabular-nums">
+            {formatBusinessDateWithWeekday(board.businessDay.businessDate)}
+          </dd>
         </div>
         <div>
           <dt>時刻</dt>
@@ -343,19 +349,20 @@ export function ReservationWizard({
             <legend>予約日を選ぶ</legend>
             {reservation ? (
               <p className={styles.wizardLockedValue}>
-                <span className="tabular-nums">{board.businessDay.businessDate}</span>
+                <span className="tabular-nums">
+                  {formatBusinessDateWithWeekday(board.businessDay.businessDate)}
+                </span>
               </p>
             ) : (
-              <label className={styles.wizardDateControl}>
-                予約日
-                <input
-                  type="date"
+              <div className={styles.wizardDateControl}>
+                <BusinessDateField
+                  label="予約日"
                   value={options.businessDay.businessDate}
                   disabled={pending || datePending}
-                  aria-describedby={`reservation-date-hint${dateError ? " reservation-date-error" : ""}`}
-                  onChange={(event) => void changeBusinessDate(event.target.value)}
+                  describedBy={`reservation-date-hint${dateError ? " reservation-date-error" : ""}`}
+                  onChange={(next) => void changeBusinessDate(next)}
                 />
-              </label>
+              </div>
             )}
             <p id="reservation-date-hint" className={styles.wizardHint}>
               {reservation
@@ -592,7 +599,7 @@ export function ReservationWizard({
           <div className={styles.wizardConfirm}>
             <h3>この内容で{reservation ? "更新" : "作成"}します</h3>
             <dl>
-              <div><dt>営業日</dt><dd className="tabular-nums">{board.businessDay.businessDate}</dd></div>
+              <div><dt>営業日</dt><dd className="tabular-nums">{formatBusinessDateWithWeekday(board.businessDay.businessDate)}</dd></div>
               <div>
                 <dt>時刻</dt>
                 <dd className="tabular-nums">

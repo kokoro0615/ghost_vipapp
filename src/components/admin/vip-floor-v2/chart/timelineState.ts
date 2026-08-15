@@ -177,10 +177,10 @@ export function getTimelinePhase({
     const delay = minutesSince(startMs, nowMs);
     return phase(
       "arrival_overdue",
-      delay === 0 ? "到着確認" : `未着${delay}分`,
+      delay === 0 ? "到着確認" : `未着${formatElapsedMinutes(delay)}`,
       delay === 0
         ? "予約開始時刻です。到着を確認してください"
-        : `予約開始時刻を${delay}分過ぎています。到着を確認してください`,
+        : `予約開始時刻を${formatElapsedMinutes(delay)}過ぎています。到着を確認してください`,
       DELAY_RECORDED_STATUSES.has(status),
     );
   }
@@ -189,10 +189,10 @@ export function getTimelinePhase({
     const overtime = minutesSince(endMs, nowMs);
     return phase(
       "overdue",
-      overtime === 0 ? "終了時刻" : `解放超過${overtime}分`,
+      overtime === 0 ? "終了時刻" : `解放超過${formatElapsedMinutes(overtime)}`,
       overtime === 0
         ? "利用終了時刻です。延長または退店を確認してください"
-        : `利用終了時刻を${overtime}分超過しています。延長または退店を確認してください`,
+        : `利用終了時刻を${formatElapsedMinutes(overtime)}超過しています。延長または退店を確認してください`,
       SETTLING_STATUSES.has(status),
     );
   }
@@ -209,6 +209,28 @@ export function getTimelinePhase({
   }
 
   return phase("active", "接客中", `予約終了まで${minutesUntil(endMs, nowMs)}分です`);
+}
+
+/*
+ * A duration an operator can read at a glance.
+ *
+ * The band and the lane plate used to print raw minutes with no ceiling, so a
+ * reservation nobody closed reported `未着28952分`. That is twenty days, and
+ * nobody parses it as twenty days — it reads as a broken counter, which is
+ * exactly how it looked on the board. Past an hour the figure is restated in
+ * the unit the floor actually thinks in.
+ */
+export function formatElapsedMinutes(minutes: number): string {
+  if (!Number.isFinite(minutes) || minutes < 0) return "0分";
+  if (minutes < 60) return `${minutes}分`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) {
+    const rest = minutes % 60;
+    return rest === 0 ? `${hours}時間` : `${hours}時間${rest}分`;
+  }
+  const days = Math.floor(hours / 24);
+  const restHours = hours % 24;
+  return restHours === 0 ? `${days}日` : `${days}日${restHours}時間`;
 }
 
 export function getClosingWindowPercent(startAt: string, endAt: string) {

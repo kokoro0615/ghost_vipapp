@@ -1,11 +1,12 @@
 /*
  * GHOST VIP Manager — "OPERATIONS PAPER" design tokens.
  *
- * Direction: a precision instrument printed on warm paper. Planes separate by
- * VALUE and one hairline, never by shadow clouds, blur or colored side tabs.
- * Ink is graphite, never pure black. Exactly one brand accent (champagne)
- * marks "the thing you are working on". Status is carried by a typographic
- * column (glyph + word), never by pill chips that read as buttons.
+ * Direction: a precision instrument printed on white. Planes separate by a
+ * hairline and one value step, never by shadow clouds, blur or colored side
+ * tabs. Ink is graphite, never pure black. Exactly one accent — the venue's
+ * violet — marks "the thing you are working on", and it is only ever ink, a
+ * rule, or a low-percentage wash. Status is carried by a typographic column
+ * (glyph + word), never by pill chips that read as buttons.
  *
  * Every colour is authored in OKLCH and states are derived with color-mix so
  * the ramp stays perceptually honest. Verified against WCAG 2.2 AA.
@@ -16,80 +17,113 @@
 
   /* ---- Surface stack (value separation, lightest → most sunken) ----
    *
-   * The ground is the warm GHOST translation of the measured #f5f5f7 solid
-   * canvas. White panes remain distinct through value plus the structural
-   * hairline; the desk does not need to become a heavy beige field. Every step
-   * stays warm white; none is a generic blue-grey.
+   * The ground is white. Not "warm white", not paper-coloured — white, with a
+   * single 2.3% value step below the panes so a pane still reads as something
+   * laid on a desk rather than as a hole cut in it.
+   *
+   * Until 2026-08-16 the ground was `oklch(0.968 0.0035 85)` — a warm beige at
+   * hue 85. On its own that is a defensible "aged paper" idea; in practice it
+   * put a yellow cast under every white pane, under the champagne accent and
+   * under the pink attention washes, and the surface read as unwashed rather
+   * than as warm. The measured references for this class of light product UI
+   * (Stripe `#ffffff / #f8fafd / #e5edf5`, Anthropic `#faf9f5` cards on
+   * `#f0eee6`, Linear's light tier) all separate planes with a hairline over a
+   * near-neutral ground and let the panes be genuinely white.
+   *
+   * Hue 268 at chroma ≤0.0025 is neutral to the eye with the faintest cool
+   * cast, which keeps the graphite ink from reading brown.
    */
-  --paper: oklch(0.968 0.0035 85); /* application ground — #f5f4f2 */
-  --surface: oklch(1 0 0); /* working pane */
+  --paper: oklch(0.977 0.0018 268); /* application ground — #f7f7f8 */
+  --surface: oklch(1 0 0); /* working pane — pure white */
   --surface-raised: oklch(1 0 0); /* popovers, dialogs */
-  --surface-quiet: oklch(0.984 0.0025 85); /* zebra / inset rows */
-  /* A header band has to read as a band. SmartHR separates its table head at
-   * #edebe8 against a white pane; GHOST sat at 0.952, close enough to white
-   * that column headers dissolved into the rows beneath them. */
-  --surface-sunken: oklch(0.943 0.005 85); /* pane headers, rails */
-  --surface-hover: oklch(0.962 0.004 85);
-  --surface-active: oklch(0.936 0.006 85);
+  --surface-quiet: oklch(0.988 0.0012 268); /* zebra / inset rows */
+  /* A header band still has to read as a band. On a white pane the step has to
+   * be carried entirely by value, so it is larger than it was over beige. */
+  --surface-sunken: oklch(0.9655 0.0022 268); /* pane headers, rails, toolbar */
+  --surface-hover: oklch(0.978 0.0018 268);
+  --surface-active: oklch(0.956 0.0026 268);
 
   /* Legacy alias kept so route-level shells resolve to the same ground. */
   --canvas: var(--paper);
 
-  /* ---- Ink ---- */
-  --ink: oklch(0.215 0.006 70); /* 15.2:1 on white */
-  --ink-2: oklch(0.435 0.006 70); /* 7.6:1 on white */
-  --ink-3: oklch(0.52 0.005 70); /* 5.5:1 on white, 4.8:1 on the sunken rail */
+  /* ---- Ink ----
+   *
+   * Lightness values are carried over unchanged from the audited warm ramp —
+   * they were contrast-verified — and only the hue moves to neutral. Every
+   * value improves slightly because the ground beneath them got lighter.
+   */
+  --ink: oklch(0.215 0.006 268); /* 17.6:1 on white */
+  --ink-2: oklch(0.435 0.006 268); /* 7.9:1 on white */
+  --ink-3: oklch(0.52 0.005 268); /* 5.5:1 on white, 5.0:1 on the sunken rail */
   --ink-inverse: oklch(0.995 0 0);
   --text-primary: var(--ink);
   --text-secondary: var(--ink-2);
   --text-tertiary: var(--ink-3);
 
-  /* ---- Rules (hairlines carry structure, so only two weights exist) ----
+  /* ---- Rules ----
    *
-   * These carry every plane edge, every column rule and every table divider on
-   * a surface that has no shadows to fall back on — so when they are too light
-   * the whole board reads as an unfinished wireframe rather than as an
-   * instrument, which is exactly the complaint this pass answers.
-   *
-   * Reference point: SmartHR's design system, the closest well-measured
-   * Japanese business-UI system, sets its BORDER at #d6d3d0 (≈ oklch 0.868) on
-   * a #f8f7f6 ground. GHOST previously sat at 0.92 — light enough that a table
-   * header did not read as a header. It moves most of the way there and stops
-   * short, because this board carries more rules per screen than SmartHR's
-   * forms do and the full step would read as a grid rather than as structure.
+   * With the ground at white and the elevation budget cut to almost nothing,
+   * hairlines are now the only thing separating most planes, so they carry more
+   * of the structure than they did and are set one step darker than the beige
+   * era needed.
    */
-  --rule: oklch(0.893 0.004 82);
-  --rule-strong: oklch(0.79 0.005 82);
+  --rule: oklch(0.912 0.0025 268);
+  --rule-strong: oklch(0.835 0.004 268);
   /* Control boundaries must clear WCAG 2.2 1.4.11 (3:1) on every surface. */
-  --rule-control: oklch(0.635 0.005 82);
+  --rule-control: oklch(0.635 0.005 268);
   --border: var(--rule);
   --border-strong: var(--rule-strong);
 
-  /* ---- Brand accent: champagne. One accent, ≤8% of any screen. ---- */
-  --accent: oklch(0.605 0.078 76);
-  --accent-ink: oklch(0.442 0.062 72); /* 7.0:1 on white — safe for text */
-  --accent-line: oklch(0.655 0.085 78); /* 3.2:1 — safe as a meaningful rule */
-  --accent-wash: color-mix(in oklch, var(--accent) 12%, var(--surface));
-  --champagne: var(--accent);
-  --champagne-soft: var(--accent-wash);
+  /* ---- Brand accent: the venue's violet. One accent, ≤8% of any screen. ----
+   *
+   * Champagne is retired from this surface. It was never wrong as an idea —
+   * GHOST's metal trim is champagne — but it was measured on white and failed
+   * the job: `oklch(0.605 0.078 76)` resolves to `#9d7b4a` at **3.91:1**, under
+   * the 4.5:1 body-text floor, and on a white ground it reads as dull mustard
+   * rather than as metal. Champagne is a *material* that needs a dark lacquer
+   * behind it to become metal; on paper it is only a brown.
+   *
+   * The violet is the venue's other signal — the LED — and it survives the
+   * translation to a light surface, measured on white:
+   *
+   *   --accent-ink   #6b139e   9.5:1   text, icons, active labels
+   *   --accent       #7530ae   7.5:1   marks, edges, the "you are here" bar
+   *   --accent-line  #9751d7   4.7:1   rules and the focus ring (needs 3:1)
+   *
+   * Re-measured at the shipped values by scripts/verify-palette-contrast.mjs.
+   *
+   * The discipline that keeps this from becoming generic SaaS purple, which is
+   * the single most recognisable machine-generated look and the exact complaint
+   * this pass answers:
+   *
+   *   - it is deep and magenta-leaning (hue ~305), not the blue-violet ~275 of
+   *     every generated dashboard;
+   *   - it is only ever ink, a 2–3px edge, a hairline, or a ≤7% wash. It is
+   *     never a button fill, never a gradient, never a glow, never a surface;
+   *   - every action stays graphite. Nothing the operator presses is violet.
+   */
+  --accent: oklch(0.47 0.19 305);
+  --accent-ink: oklch(0.42 0.20 308); /* 9.5:1 on white — safe for text */
+  --accent-line: oklch(0.58 0.20 305); /* 4.7:1 — safe as a rule and the focus ring */
+  --accent-wash: color-mix(in oklch, var(--accent) 7%, var(--surface));
 
-  /* ---- Action: graphite, not blue. ---- */
-  --action: oklch(0.245 0.007 70);
-  --action-hover: oklch(0.318 0.008 70);
-  --action-press: oklch(0.19 0.006 70);
+  /* ---- Action: graphite, not the accent. ---- */
+  --action: oklch(0.245 0.007 268);
+  --action-hover: oklch(0.318 0.008 268);
+  --action-press: oklch(0.19 0.006 268);
   --action-text: var(--ink-inverse);
-  --focus: oklch(0.44 0.09 74);
+  --focus: var(--accent-line);
 
   /* ---- Status: meaning only. Each pairs with a word and a glyph. ---- */
-  --alert: oklch(0.487 0.176 27); /* 6.4:1 on white */
-  --alert-line: oklch(0.588 0.184 27);
-  --alert-wash: color-mix(in oklch, var(--alert) 8%, var(--surface));
-  --warn: oklch(0.492 0.104 66); /* 6.2:1 on white */
-  --warn-line: oklch(0.652 0.126 72);
-  --warn-wash: color-mix(in oklch, var(--warn) 10%, var(--surface));
-  --live: oklch(0.452 0.096 158); /* 6.5:1 on white */
-  --live-line: oklch(0.572 0.108 158);
-  --live-wash: color-mix(in oklch, var(--live) 9%, var(--surface));
+  --alert: oklch(0.505 0.185 27); /* 6.5:1 on white */
+  --alert-line: oklch(0.60 0.19 27);
+  --alert-wash: color-mix(in oklch, var(--alert) 6%, var(--surface));
+  --warn: oklch(0.515 0.115 62); /* 5.8:1 on white */
+  --warn-line: oklch(0.66 0.13 68);
+  --warn-wash: color-mix(in oklch, var(--warn) 8%, var(--surface));
+  --live: oklch(0.47 0.10 158); /* 6.5:1 on white */
+  --live-line: oklch(0.58 0.11 158);
+  --live-wash: color-mix(in oklch, var(--live) 7%, var(--surface));
   --danger: var(--alert);
   --danger-soft: var(--alert-wash);
   --warning: var(--warn);
@@ -115,21 +149,48 @@
    * iPad with `body { overflow: hidden }`, so that zoom strands the operator in
    * a panned board with no scroll affordance to get back — mid-service, one tap
    * into a search field. Every input, select and textarea therefore renders at
-   * `--t-field` or larger. Measured before the fix: search 13px, toolbar select
-   * 13px, wizard fields 13px, wizard date 15px, ribbon 12px (11px on phones) —
-   * every text-entry control on the surface except the login field. */
+   * `--t-field` or larger. */
+
+  /* ---- Optical tracking ----
+   *
+   * The single largest reason the surface read as un-authored: until
+   * 2026-08-16 there was no negative tracking anywhere on it. Every size ran at
+   * the font's default spacing, which is drawn for text at reading size, so
+   * headings, counters and the date lockup all sat visibly loose.
+   *
+   * Every measured reference tightens as size grows, by roughly a constant
+   * optical amount: Stripe runs -0.12px at 12px through -1.4px at 56px
+   * (≈ -0.010em → -0.025em); Linear runs -0.011em on body and -0.022em on
+   * display. This scale follows the same curve. Small text stays at or just
+   * above zero, because tightening 11px labels costs legibility and is itself a
+   * recognisable slop tell.
+   */
+  --track-micro: 0.005em; /* 11–13px labels — effectively neutral */
+  --track-body: -0.006em; /* 13–15px reading text */
+  --track-data: -0.012em; /* 15–17px values and codes */
+  --track-lead: -0.018em; /* 18–20px pane titles */
+  --track-figure: -0.024em; /* 22–26px counters */
+  --track-display: -0.03em; /* display copy */
+  --track-caps: 0.04em; /* functional uppercase labels */
+  --track-brand: 0.13em; /* the GHOST OSAKA lockup only */
 
   --lh-tight: 1.15;
   --lh-ui: 1.35;
   --lh-prose: 1.7;
-  --track-caps: 0.04em;
 
-  /* Four deliberate registers. Semibold carries controls and section titles;
-   * bold is a scarce display accent, not the default way to make UI legible. */
+  /* Four deliberate registers, set on a variable axis.
+   *
+   * The previous 400/500/600/700 ladder made almost every label on the surface
+   * semibold or bolder, which is what "everything is shouting" looks like at
+   * 2x on a light panel. The measured references go the other way — Stripe sets
+   * even 56px display copy at weight 300, Linear uses 510/590 — and let size,
+   * tracking and ink colour carry hierarchy instead. These roles keep four
+   * distinct steps and move the top two down, which is only possible because
+   * both faces now load as variable fonts. */
   --weight-body: 400;
-  --weight-ui: 500;
-  --weight-strong: 600;
-  --weight-display: 700;
+  --weight-ui: 460;
+  --weight-strong: 560;
+  --weight-display: 620;
 
   /* ---- Spacing (4px rhythm) ---- */
   --s-1: 2px;
@@ -147,8 +208,7 @@
    *
    * 2–3px is not "restrained", it is brittle: at the venue's 2x density those
    * corners resolve to four hard pixels and every control reads as a wireframe
-   * box rather than as a made object. SmartHR uses 4 / 6 / 8 for exactly this
-   * class of dense business UI, and that is the register adopted here.
+   * box rather than as a made object.
    *
    * The ban that still holds is the one that matters: nothing reaches 12px, so
    * the surface never becomes a pile of soft SaaS cards.
@@ -156,19 +216,44 @@
   --r-chip: 3px;
   --r-control: 6px;
   --r-pane: 8px;
+  --r-round: 50%;
+
+  /* ---- Layer order ---- */
+  --z-popover: 60;
+  --z-sheet: 90;
+
+  /* ---- Bounded shell widths ---- */
+  --w-pulse-item: 68px;
+  --w-operator-name: 104px;
 
   /* ---- Elevation ----
    *
-   * Value and a hairline still carry the plane stack; this is not a licence for
-   * shadow clouds. What was missing is the shortest step of all — the contact
-   * shadow that says a pane sits *on* the desk rather than being printed into
-   * it. SmartHR's LAYER1 (`0 1px 2px`) is that step, and `--lift-pane` is its
-   * GHOST equivalent: one layer, warm, and almost subliminal.
+   * Almost none, on purpose. Both measured references are explicit about this:
+   * Stripe "avoids shadows entirely — depth is created through background tint
+   * progression", Anthropic "don't use box-shadow for elevation; this system
+   * elevates through surface tone and 1px borders only".
+   *
+   * Until 2026-08-16 this surface ran four separation systems at once — value
+   * steps, hairlines, contact shadows and coloured washes — and they competed.
+   * Panes now separate by hairline and value alone.
+   *
+   * Those references are marketing sites, where nothing scrolls beneath sticky
+   * chrome. This is an operator console, and a shadow still earns its place in
+   * exactly one situation: content passing *underneath* an element. A sticky
+   * ledger header with rows sliding beneath it is a z-relationship, and a
+   * hairline cannot state one. So `--lift-pane` survives as the contact step,
+   * and the contract test restricts it to rules that are actually sticky or
+   * fixed — it was being spent on two static bands that already had hairlines.
+   *
+   * Popovers and modal dialogs float over the whole surface and keep one soft
+   * long shadow under a hairline.
    */
-  --lift-pane: 0 1px 2px 0 oklch(0.3 0.01 70 / 0.07);
-  --lift-raised: 0 1px 2px -1px oklch(0.3 0.01 70 / 0.1), 0 8px 20px -16px oklch(0.3 0.01 70 / 0.22);
-  --lift-dialog: 0 1px 0 oklch(0.3 0.01 70 / 0.05), 0 28px 64px -30px oklch(0.28 0.012 70 / 0.32);
-  --scrim: oklch(0.26 0.012 70 / 0.44);
+  --lift-pane: 0 1px 2px -1px oklch(0.22 0.01 268 / 0.14);
+  --lift-raised: 0 1px 2px -1px oklch(0.22 0.01 268 / 0.06),
+    0 10px 24px -18px oklch(0.22 0.01 268 / 0.18);
+  --lift-dialog: 0 1px 0 oklch(0.22 0.01 268 / 0.04),
+    0 32px 72px -34px oklch(0.2 0.012 268 / 0.26);
+  --scrim: oklch(0.24 0.012 268 / 0.4);
 
   /* ---- Motion ---- */
   --ease-ui: cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -185,16 +270,18 @@
   --h-toolbar: 56px;
   --h-row: 52px;
 
-  /* One family carries text and figures. The figure role stays a distinct
-   * register through weight, tabular numerals and tracking (see .tabular-nums)
-   * rather than through a monospace face, which read as a terminal. */
-  --font-ui: var(--font-operator), "Hiragino Sans", "Hiragino Kaku Gothic ProN",
-    "Yu Gothic UI", "Meiryo", sans-serif;
+  /* Two faces, one voice. The Latin instrument face carries codes and figures,
+   * which is most of the ledger's texture; the Japanese face carries labels.
+   * See src/app/layout.tsx for the bake-off that chose them. */
+  --font-ui: var(--font-operator-latin), var(--font-operator-jp),
+    "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", "Meiryo",
+    sans-serif;
   --font-figure: var(--font-ui);
 
   background: var(--paper);
   color: var(--ink);
   font-family: var(--font-ui);
+  letter-spacing: var(--track-body);
   /* The whole operator surface is data-bearing. Applying the numeric feature
    * at the root closes mixed runs such as `VIP-1 7名`; the utility adds only
    * the figure role's tighter tracking. */
@@ -233,6 +320,7 @@ input,
 select,
 textarea {
   font: inherit;
+  letter-spacing: inherit;
 }
 
 /* ---- Touch is the primary input on this surface ----
@@ -240,7 +328,7 @@ textarea {
  * The venue device is an iPad, so every control is pressed by a finger. Two
  * browser defaults have to be replaced rather than inherited:
  *
- *  - iOS paints a grey flash box on tap. On 2–3px radius controls it reads as a
+ *  - iOS paints a grey flash box on tap. On small-radius controls it reads as a
  *    rendering fault, and it fires even where the press is rejected. The app
  *    draws its own `:active` feedback instead.
  *  - Double-tap-to-zoom makes the first tap of a fast double-press wait ~300ms
@@ -265,16 +353,17 @@ input:not([type="checkbox"]):not([type="radio"]),
 select,
 textarea {
   font-size: var(--t-field);
+  letter-spacing: var(--track-data);
 }
 
 /* Figures never reflow a column: one rule, applied everywhere numbers live.
- * M PLUS 2's built output has no effective `palt` delta for the audited mixed
- * Japanese labels, so spacing stays at the font default instead of pretending
- * to enable an unsupported role. `tnum` remains the ledger invariant. */
+ * The Latin face has proportional digits by default and an effective `tnum`,
+ * so this — together with the root declaration — is what holds the ledger
+ * column still. */
 .tabular-nums {
   font-family: var(--font-figure);
   font-variant-numeric: tabular-nums lining-nums;
-  letter-spacing: 0.005em;
+  letter-spacing: var(--track-data);
 }
 
 .sr-only {

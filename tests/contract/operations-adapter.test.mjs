@@ -39,8 +39,14 @@ test("Owner operation adapters expose only canonical Walk-in and block routes", 
   assert.match(operationCenter, /block_cancel/u);
   assert.doesNotMatch(operationCenter, /name="reason"/u);
 
-  assert.match(reservationWizard, /type="date"/u);
-  assert.match(reservationWizard, />\s*予約日\s*</u);
+  /* The wizard's date step is the authored calendar as of 2026-08-16; the
+   * native control it replaced could not show a weekday, could not mark the
+   * nights the venue is open, and did not honour the touch floor. */
+  assert.match(reservationWizard, /<BusinessDateField/u);
+  assert.doesNotMatch(reservationWizard, /type="date"/u);
+  /* The label moved from bare markup text into the control's `label` prop, so
+   * assert on the prop the accessible name is now built from. */
+  assert.match(reservationWizard, /<BusinessDateField[\s\S]{0,200}?label="予約日"/u);
   assert.match(reservationWizard, /onBusinessDateChange\(nextBusinessDate\)/u);
   assert.match(workspace, /loadOperationOptions\(nextBusinessDate\)/u);
   assert.match(workspace, /await setBusinessDate\(nextBusinessDate\)/u);

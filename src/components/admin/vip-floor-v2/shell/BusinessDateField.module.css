@@ -1,0 +1,316 @@
+/* ============================================================================
+ * Business date — the authored calendar (2026-08-16)
+ *
+ * Replaces `<input type="date">` everywhere the operator picks a night. The
+ * native control printed `07/26/2026` (browser locale, not document locale),
+ * showed no weekday, drew a second calendar glyph next to the app's own, and
+ * opened a popover that could not honour the 44px touch floor. See
+ * shell/BusinessDateField.tsx for the full note.
+ * ========================================================================== */
+
+.dateField {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  /* Never shrinks. As a flex child it would otherwise be squeezed below its
+     own content width while the trigger inside keeps its intrinsic size — so
+     the button paints outside its parent box, over whatever sits to its right.
+     The parent boxes never overlap in that failure, which is why it has to be
+     prevented rather than detected. The ribbon takes its slack from the
+     operator identity instead. */
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+.dateField[data-variant="field"] {
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--s-2);
+  font-size: var(--t-mini);
+  letter-spacing: var(--track-micro);
+  color: var(--ink-2);
+}
+
+.dateFieldLabel {
+  flex: none;
+  font-size: var(--t-mini);
+  letter-spacing: var(--track-micro);
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+
+.dateFieldTrigger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-3);
+  min-height: var(--h-control);
+  padding: 0 var(--s-4);
+  border: 1px solid var(--rule-control);
+  border-radius: var(--r-control);
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease-ui), color var(--dur-fast) var(--ease-ui);
+}
+
+.dateFieldTrigger > svg { color: var(--ink-3); flex: none; }
+.dateFieldTrigger:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.dateFieldTrigger:active { background: var(--surface-active); }
+
+.dateField[data-disabled] .dateFieldTrigger {
+  background: var(--surface-sunken);
+  color: var(--ink-3);
+  border-color: var(--rule);
+  cursor: not-allowed;
+}
+
+.dateFieldValue {
+  display: inline-flex;
+  align-items: baseline;
+  gap: calc(var(--s-1) / 2);
+  font-size: var(--t-field);
+  font-weight: var(--weight-ui);
+  letter-spacing: var(--track-data);
+}
+
+.dateFieldValue i {
+  font-style: normal;
+  font-size: var(--t-mini);
+  letter-spacing: var(--track-micro);
+  color: var(--ink-2);
+}
+
+/* The popover is the only new surface this pass introduces that appears over
+   content, so it takes the house entrance: a short rise on transform and
+   opacity only, on the enter easing every other panel uses. The global
+   reduced-motion reset in globals.css collapses it to 1ms, and the settled
+   state is the authored one — nothing is only legible mid-animation. */
+@keyframes datePopoverIn {
+  from { opacity: 0; transform: translateY(calc(var(--s-2) * -1)); }
+  to { opacity: 1; transform: none; }
+}
+
+.datePopover {
+  animation: datePopoverIn var(--dur-fast) var(--ease-enter);
+  position: absolute;
+  top: calc(100% + var(--s-2));
+  left: 0;
+  z-index: var(--z-popover);
+  width: max-content;
+  padding: var(--s-4);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--r-pane);
+  background: var(--surface-raised);
+  box-shadow: var(--lift-raised);
+}
+
+/* The masthead's date field sits at the LEFT of the ribbon, so the popover
+   opens rightward from it. Anchoring it to the field's right edge — which is
+   what an earlier revision did — extended it leftward off the viewport, where
+   it was clipped rather than scrolled. The horizontal-overflow gate cannot see
+   that, because clipping does not widen the document; the audit asserts the
+   popover's own box instead. */
+.dateField[data-variant="ribbon"] .datePopover { left: 0; right: auto; }
+
+.datePopoverHead {
+  display: grid;
+  grid-template-columns: var(--h-control) 1fr var(--h-control);
+  align-items: center;
+  gap: var(--s-2);
+  margin-bottom: var(--s-3);
+}
+
+.datePopoverHead strong {
+  text-align: center;
+  font-size: var(--t-data);
+  font-weight: var(--weight-strong);
+  letter-spacing: var(--track-data);
+  color: var(--ink);
+}
+
+.datePopoverHead button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--h-control);
+  height: var(--h-control);
+  border: 1px solid transparent;
+  border-radius: var(--r-control);
+  background: none;
+  color: var(--ink-2);
+  cursor: pointer;
+}
+
+.datePopoverHead button:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+.datePopoverHead button:active { background: var(--surface-active); color: var(--ink); }
+
+.dateWeekdays,
+.dateWeek {
+  display: grid;
+  grid-template-columns: repeat(7, var(--h-control));
+}
+
+.dateWeekdays {
+  margin-bottom: var(--s-2);
+  border-bottom: 1px solid var(--rule);
+  padding-bottom: var(--s-2);
+}
+
+.dateWeek > span { display: block; }
+
+.dateWeekdays span {
+  text-align: center;
+  font-size: var(--t-micro);
+  letter-spacing: var(--track-micro);
+  color: var(--ink-3);
+}
+
+.dateWeekdays span[data-weekend="sun"] { color: var(--alert); }
+.dateWeekdays span[data-weekend="sat"] { color: var(--accent-ink); }
+
+.dateBlank { display: block; height: var(--h-control); }
+
+.dateCell {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--h-control);
+  height: var(--h-control);
+  border: 1px solid transparent;
+  border-radius: var(--r-control);
+  background: none;
+  color: var(--ink);
+  font-size: var(--t-body);
+  font-weight: var(--weight-ui);
+  letter-spacing: var(--track-data);
+  cursor: pointer;
+}
+
+.dateCell[data-weekend="sun"] { color: var(--alert); }
+.dateCell[data-weekend="sat"] { color: var(--accent-ink); }
+.dateCell:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+.dateCell:active { background: var(--surface-active); }
+
+/* Today is stated by a rule under the figure, not by a filled disc, so it can
+ * never be confused with selection. */
+.dateCell[data-today]::after {
+  content: "";
+  position: absolute;
+  inset: auto var(--s-4) var(--s-3);
+  height: var(--s-1);
+  border-radius: calc(var(--s-1) / 2);
+  background: var(--ink-3);
+}
+
+/* A known reservation-taking night. Additive: absent when the caller has no
+ * business-day data, rather than guessed. */
+.dateCell[data-open]::before {
+  content: "";
+  position: absolute;
+  top: var(--s-3);
+  right: var(--s-3);
+  width: var(--s-3);
+  height: var(--s-3);
+  border-radius: var(--r-round);
+  background: var(--accent-line);
+}
+
+.dateCell[data-selected] {
+  border-color: var(--accent);
+  background: var(--accent-wash);
+  color: var(--accent-ink);
+  font-weight: var(--weight-strong);
+}
+
+.dateCell[data-selected][data-today]::after { background: var(--accent); }
+
+.datePopoverFoot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-4);
+  margin-top: var(--s-3);
+  padding-top: var(--s-3);
+  border-top: 1px solid var(--rule);
+}
+
+.datePopoverFoot button {
+  /* Both floors, like every other control here. Height alone is not enough:
+     at >=1280px the reading scale drops back to the desk register, the 本日
+     label narrows, and the button's intrinsic width landed at 43.86px — 0.14px
+     under the touch minimum. The gate caught it; the token states it. */
+  min-width: var(--h-control);
+  min-height: var(--h-control);
+  padding: 0 var(--s-4);
+  border: 1px solid var(--rule-control);
+  border-radius: var(--r-control);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: var(--t-body);
+  font-weight: var(--weight-ui);
+  letter-spacing: var(--track-body);
+  cursor: pointer;
+}
+
+.datePopoverFoot button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.datePopoverFoot button:active { border-color: var(--ink-3); background: var(--surface-active); }
+
+.dateLegend {
+  font-size: var(--t-micro);
+  letter-spacing: var(--track-micro);
+  color: var(--accent-ink);
+}
+
+/* Stated as a word, not as a red asterisk: an asterisk is a symbol the operator
+ * has to have been taught, and it carries no meaning to a screen reader. */
+.dateFieldRequired {
+  margin-left: var(--s-2);
+  font-style: normal;
+  font-size: var(--t-micro);
+  letter-spacing: var(--track-caps);
+  color: var(--alert);
+}
+
+/* Pointer affordances are capability-scoped. On iPadOS an unguarded hover
+   latches after a tap and reads as a second selected date. */
+@media (hover: hover) and (pointer: fine) {
+  .dateFieldTrigger:hover { border-color: var(--ink-3); }
+  .datePopoverHead button:hover { background: var(--surface-hover); color: var(--ink); }
+  .dateCell:hover { background: var(--surface-hover); }
+  .datePopoverFoot button:hover { border-color: var(--ink-3); }
+}
+
+/* On a phone the month grid is nearly the whole viewport: seven 44px touch
+   cells is 308px of the 320–390px available, and the cells cannot be smaller
+   because 44px is the floor a finger actually needs (L10). Anchored to its
+   trigger the popover therefore runs off the right edge — clipped, not
+   scrolled, which is why the audit checks its box directly.
+
+   So on phones it stops being a popover anchored to a control and becomes a
+   sheet centred on the viewport, where it always fits. `margin-inline: auto`
+   between `left: 0` and `right: 0` does the centring without a transform, so
+   the entrance animation keeps the translate axis to itself. */
+@media (max-width: 767px) {
+  .datePopover {
+    position: fixed;
+    z-index: var(--z-sheet);
+    top: calc(var(--h-masthead) + var(--s-2));
+    right: 0;
+    left: 0;
+    width: max-content;
+    max-width: calc(100vw - var(--s-2));
+    margin-inline: auto;
+  }
+
+  .dateField[data-variant="ribbon"] .datePopover { right: 0; left: 0; }
+}
+
+/* At 320px the seven cells plus the popover's own side padding exceed the
+   viewport, so the padding is what gives way — never the cell. */
+@media (max-width: 359px) {
+  .datePopover { padding-inline: 0; }
+  .datePopoverHead,
+  .datePopoverFoot { padding-inline: var(--s-3); }
+}

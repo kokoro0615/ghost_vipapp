@@ -191,15 +191,18 @@ export default function ChartView({ board, reservations, selectedReservationId, 
         </div>
       </div>
 
+      {/* The group is named for assistive technology and not on the surface: a
+          visible "運行帯" heading in front of seven swatches that are already
+          miniatures of the bands beside them is the interface explaining itself
+          (DESIGN.md §5.7c). Phases standing at zero are muted rather than
+          hidden, so the key still teaches the language while the eye goes to
+          the one phase that is actually on the board. */}
       <div className={styles.timelineLegend} aria-label="予約帯ステータス">
-        <strong>運行帯</strong>
-        {/* The swatch is a miniature of the real band — the phase frame with
-            its light on the same edge the chart puts it on — so the key teaches
-            where to look instead of naming a colour. */}
         {TIMELINE_PHASE_ORDER.map((phase) => (
           <span
             key={phase}
             data-phase={phase}
+            data-zero={phaseCounts[phase] === 0 || undefined}
             data-signal={TIMELINE_PHASE_META[phase].signal}
             data-edge={TIMELINE_PHASE_META[phase].edge ?? undefined}
           >

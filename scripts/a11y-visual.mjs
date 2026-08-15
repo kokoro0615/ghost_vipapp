@@ -97,23 +97,33 @@ async function main() {
             ...(webkitExecutablePath ? { executablePath: webkitExecutablePath } : {}),
           }));
         } catch (error) {
-          /* Playwright reports a host without the WebKit runtime two different
-           * ways: its own dependency probe, and — when the probe passes but a
-           * library is gone — the browser process dying on a dynamic link
-           * error, which surfaces only as "browser has been closed". Both are
-           * the same condition and both must land in `notRunViewports`, which
-           * is never counted as a pass. Before this, the second form crashed
-           * the whole run after all ten Chromium viewports had been audited,
-           * throwing away their results. */
+          /* Playwright reports a host that cannot run WebKit three different
+           * ways: its own dependency probe; the browser process dying on a
+           * dynamic link error once the probe passes but a library is gone;
+           * and the browser revision simply never having been downloaded,
+           * which is what a `playwright-core` bump produces on a host where
+           * only Chromium was ever installed.
+           *
+           * All three are the same condition — this machine cannot start
+           * WebKit — and all three must land in `notRunViewports`, which is
+           * recorded explicitly and never counted as a pass. What must NOT
+           * land there is a WebKit that starts and then fails the audit; that
+           * is a real defect and still throws.
+           *
+           * Each form has crashed a full run in turn, after every Chromium
+           * viewport had already been audited, throwing away those results. */
           const message = error instanceof Error ? error.message : String(error);
           const missingRuntime = message.includes("Host system is missing dependencies to run browsers");
           const missingLibrary = /error while loading shared libraries: (\S+)/u.exec(message);
-          if (!missingRuntime && !missingLibrary) throw error;
+          const missingBinary = /Executable doesn't exist at (\S+)/u.exec(message);
+          if (!missingRuntime && !missingLibrary && !missingBinary) throw error;
           notRunViewports.push({
             viewport: `${viewport.browser}-${viewport.width}x${viewport.height}`,
             reason: missingRuntime
               ? "host-system-missing-dependencies"
-              : `host-system-missing-shared-library:${missingLibrary[1].replace(/:$/u, "")}`,
+              : missingLibrary
+                ? `host-system-missing-shared-library:${missingLibrary[1].replace(/:$/u, "")}`
+                : `host-system-missing-browser-binary:${missingBinary[1]}`,
           });
           continue;
         }
@@ -234,6 +244,32 @@ async function auditViewport(context, viewport) {
   await capture(phasePage, "chart-phases");
   await closeQaPage(phasePage);
 
+  /* The authored calendar is interactive UI with its own grid semantics and a
+     44px cell floor, so it is audited open rather than only in its closed
+     trigger state. */
+  await goToWorkspace(page, "list");
+  await businessDateTrigger(page, "営業日").click();
+  const datePopover = page.getByRole("dialog", { name: "営業日を選ぶ" });
+  await datePopover.waitFor();
+  /* A popover that opens off-screen is clipped, not scrolled, so it never
+     widens the document and the horizontal-overflow gate cannot see it. Assert
+     the popover's own box against the viewport. */
+  const popoverBox = await datePopover.evaluate((node) => {
+    const rect = node.getBoundingClientRect();
+    return {
+      left: Math.round(rect.left), top: Math.round(rect.top),
+      right: Math.round(rect.right), bottom: Math.round(rect.bottom),
+      viewportWidth: window.innerWidth, viewportHeight: window.innerHeight,
+    };
+  });
+  assert.ok(popoverBox.left >= 0 && popoverBox.right <= popoverBox.viewportWidth,
+    `the business-date popover is clipped horizontally: ${JSON.stringify(popoverBox)}`);
+  assert.ok(popoverBox.top >= 0 && popoverBox.bottom <= popoverBox.viewportHeight,
+    `the business-date popover is clipped vertically: ${JSON.stringify(popoverBox)}`);
+  await capture(page, "business-date-picker");
+  await page.keyboard.press("Escape");
+  await page.getByRole("dialog", { name: "営業日を選ぶ" }).waitFor({ state: "detached" });
+
   await goToWorkspace(page, "list");
   await capture(page, "queue");
   await openReservationDetail(page, viewport);
@@ -261,20 +297,25 @@ async function auditViewport(context, viewport) {
   for (let step = 1; step <= 8; step += 1) {
     await page.getByLabel(new RegExp(`予約作成 ${step}/8`, "u")).waitFor();
     if (step === 1) {
-      await page.getByLabel("予約日").fill(unavailableBusinessDate);
+      await pickBusinessDate(page, "予約日", unavailableBusinessDate);
       await page.getByRole("alert").filter({ hasText: "この日は予約受付対象外です。" }).waitFor();
       assert.equal(
-        await page.getByLabel("営業日").inputValue(),
+        await readBusinessDate(page, "営業日"),
         board.businessDay.businessDate,
         "an unavailable reservation date must not change the workspace business date",
       );
       await capture(page, "reservation-date-unavailable");
-      await page.getByLabel("予約日").fill(alternateBusinessDate);
+      await pickBusinessDate(page, "予約日", alternateBusinessDate);
       await page.waitForFunction((expectedDate) => {
-        const reservationDate = document.querySelector('input[aria-describedby^="reservation-date-hint"]');
-        const workspaceDate = document.querySelector('input[aria-label="営業日"]');
-        return reservationDate?.value === expectedDate
-          && workspaceDate?.value === expectedDate
+        const shown = (label) => {
+          const heading = [...document.querySelectorAll("span")]
+            .find((node) => node.textContent?.trim() === label);
+          const text = heading?.closest("div")?.textContent ?? "";
+          const match = /(\d{4})\/(\d{2})\/(\d{2})/u.exec(text);
+          return match ? `${match[1]}-${match[2]}-${match[3]}` : null;
+        };
+        return shown("予約日") === expectedDate
+          && shown("営業日") === expectedDate
           && new URL(window.location.href).searchParams.get("date") === expectedDate;
       }, alternateBusinessDate);
     }
@@ -618,10 +659,10 @@ async function auditOperationDateRecovery(context, capture) {
     "true",
     "a phone-reservation recovery state must not advertise Walk-in as the active task",
   );
-  await dialog.getByLabel("予約・受付日").waitFor({ timeout: QA_RECOVERY_TIMEOUT_MS });
+  await businessDateTrigger(dialog, "予約・受付日").waitFor({ timeout: QA_RECOVERY_TIMEOUT_MS });
   await capture(page, "operation-date-recovery");
-  await dialog.getByLabel("予約・受付日").fill(alternateBusinessDate, { timeout: QA_RECOVERY_TIMEOUT_MS });
-  await dialog.getByText(`${alternateBusinessDate} / 22:00–翌05:00`).waitFor({
+  await pickBusinessDate(dialog, "予約・受付日", alternateBusinessDate, { timeout: QA_RECOVERY_TIMEOUT_MS });
+  await dialog.getByText(`${formatJpBusinessDate(alternateBusinessDate)} / 22:00–翌05:00`).waitFor({
     timeout: QA_RECOVERY_TIMEOUT_MS,
   });
   assert.equal(
@@ -637,7 +678,7 @@ async function auditOperationDateRecovery(context, capture) {
     "phone-reservation recovery must land on the reservation workflow",
   );
   assert.equal(
-    await page.getByLabel("営業日").inputValue(),
+    await readBusinessDate(page, "営業日"),
     alternateBusinessDate,
     "phone reservation recovery must load the selected canonical business day",
   );
@@ -860,6 +901,65 @@ async function assertTimelinePhases(page) {
       `the ${tier} tier must render both a blinking and a handled band`,
     );
   }
+}
+
+
+/*
+ * The business date is picked, not typed. `<input type="date">` was replaced on
+ * 2026-08-16 by an authored calendar (it printed US month-first order, showed
+ * no weekday, and drew a second calendar glyph inside the ribbon), so the audit
+ * drives the control the way the operator does: open the popover, walk to the
+ * month, tap the day. A harness that kept calling `.fill()` would be testing a
+ * control that no longer exists.
+ */
+const JP_WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
+
+/* Mirrors formatBusinessDateWithWeekday: the surface states a business date in
+ * the venue's order with its weekday, so the audit asserts on that and not on
+ * the wire format. */
+function formatJpBusinessDate(value) {
+  const [y, m, d] = value.split("-").map(Number);
+  const weekday = JP_WEEKDAYS[new Date(Date.UTC(y, m - 1, d)).getUTCDay()];
+  return `${y}/${String(m).padStart(2, "0")}/${String(d).padStart(2, "0")}(${weekday})`;
+}
+
+function businessDateTrigger(scope, label) {
+  return scope.getByRole("button", { name: new RegExp(`^${label}`, "u") });
+}
+
+async function readBusinessDate(scope, label) {
+  const text = await businessDateTrigger(scope, label).innerText();
+  const match = /(\d{4})\/(\d{2})\/(\d{2})/u.exec(text);
+  assert.ok(match, `could not read a business date from ${label}: ${JSON.stringify(text)}`);
+  return `${match[1]}-${match[2]}-${match[3]}`;
+}
+
+async function pickBusinessDate(scope, label, value, options = {}) {
+  const timeout = options.timeout ?? 10_000;
+  const [year, month, day] = value.split("-").map(Number);
+  const trigger = businessDateTrigger(scope, label);
+  await trigger.waitFor({ timeout });
+  await trigger.click({ timeout });
+  const popover = scope.getByRole("dialog", { name: `${label}を選ぶ` });
+  await popover.waitFor({ timeout });
+
+  /* Walk months rather than assuming a starting point, so the helper works from
+   * whatever date the screen happened to be on. */
+  for (let guard = 0; guard < 36; guard += 1) {
+    const heading = await popover.locator("strong").first().innerText();
+    const seen = /(\d{4})年(\d{1,2})月/u.exec(heading);
+    assert.ok(seen, `unreadable calendar heading: ${JSON.stringify(heading)}`);
+    const delta = (year - Number(seen[1])) * 12 + (month - Number(seen[2]));
+    if (delta === 0) break;
+    await popover.getByRole("button", { name: delta > 0 ? "次の月" : "前の月" }).click({ timeout });
+    assert.ok(guard < 35, `could not reach ${value} from ${heading}`);
+  }
+
+  const weekday = JP_WEEKDAYS[new Date(Date.UTC(year, month - 1, day)).getUTCDay()];
+  await popover
+    .getByRole("gridcell", { name: new RegExp(`^${month}月${day}日 ${weekday}曜日`, "u") })
+    .click({ timeout });
+  await popover.waitFor({ state: "detached", timeout });
 }
 
 async function newQaPage(context, scenario = {}) {
@@ -1228,6 +1328,51 @@ async function auditPage(page, { state, viewport }) {
   // deterministic on slower CI/font-shard loads.
   await page.evaluate(() => document.fonts.ready);
   await page.addScriptTag({ path: axePath });
+  /*
+   * The masthead is a flex row of fixed-size controls, and one of them — the
+   * business-date field — is `position: relative` so it can host its popover.
+   * That puts it in the positioned paint layer, above its non-positioned
+   * siblings. So when the row runs out of width, the failure is not a visible
+   * overflow the horizontal-overflow gate would catch: later siblings slide
+   * underneath the date control and get painted over, which reaches the
+   * operator as a counter they cannot tap. axe reports it as "partially
+   * obscured" without naming the cause. This measures the cause directly.
+   */
+  const ribbonOverlaps = await page.evaluate(() => {
+    const ribbon = document.querySelector('header[class*="serviceRibbon"]');
+    if (!ribbon) return [];
+    /* Measure the painted controls, not the wrapper boxes. A flex child that is
+       squeezed below its content width still reports a narrow box while its
+       button paints outside it, so comparing wrappers finds nothing. */
+    const children = [...ribbon.querySelectorAll("button, a[href], input, select, [role='button']")]
+      .filter((node) => node.getBoundingClientRect().width > 0)
+      .map((node) => ({
+        name: `${node.tagName.toLowerCase()}.${(node.className || "").split(" ")[0] || "(none)"}`,
+        rect: node.getBoundingClientRect(),
+      }));
+    const found = [];
+    for (let a = 0; a < children.length; a += 1) {
+      for (let b = a + 1; b < children.length; b += 1) {
+        const x = Math.min(children[a].rect.right, children[b].rect.right)
+          - Math.max(children[a].rect.left, children[b].rect.left);
+        const y = Math.min(children[a].rect.bottom, children[b].rect.bottom)
+          - Math.max(children[a].rect.top, children[b].rect.top);
+        if (x > 0.5 && y > 0.5) {
+          found.push({
+            a: children[a].name, b: children[b].name,
+            overlapX: Math.round(x * 10) / 10, overlapY: Math.round(y * 10) / 10,
+            aLeft: Math.round(children[a].rect.left), aRight: Math.round(children[a].rect.right),
+            bLeft: Math.round(children[b].rect.left), bRight: Math.round(children[b].rect.right),
+            ribbonWidth: Math.round(ribbon.getBoundingClientRect().width),
+          });
+        }
+      }
+    }
+    return found;
+  });
+  assert.deepEqual(ribbonOverlaps, [],
+    `masthead controls overlap in ${label} — the ribbon has run out of width`);
+
   const report = await page.evaluate(async () =>
     window.axe.run(document, {
       runOnly: {
@@ -1261,6 +1406,26 @@ async function auditPage(page, { state, viewport }) {
           disabled: element instanceof HTMLButtonElement || element instanceof HTMLInputElement
             ? element.disabled
             : null,
+          /* axe reports "partially obscured" without naming the element on top,
+             which leaves the reader guessing at exactly the moment they need a
+             name. Sample the target's own box and report anything painted above
+             it, so the failure is actionable from the log alone. */
+          obscuredBy: rect && element
+            ? [...new Set(
+                [
+                  [rect.x + 4, rect.y + rect.height / 2],
+                  [rect.x + rect.width / 2, rect.y + rect.height / 2],
+                  [rect.x + rect.width - 4, rect.y + rect.height / 2],
+                ].flatMap(([x, y]) => {
+                  const stack = document.elementsFromPoint(x, y);
+                  const index = stack.indexOf(element);
+                  const above = index === -1 ? stack : stack.slice(0, index);
+                  return above
+                    .filter((node) => !node.contains(element))
+                    .map((node) => `${node.tagName.toLowerCase()}.${node.className || "(none)"}`);
+                }),
+              )]
+            : [],
         };
       }), actionableTargets)
     : [];

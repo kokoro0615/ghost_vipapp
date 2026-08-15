@@ -10,6 +10,7 @@ import {
 } from "@/lib/ghostOperatingHours";
 
 import styles from "../VipFloorWorkspace.module.css";
+import { formatBusinessDateWithWeekday } from "../shell/BusinessDateField";
 
 type TimeValue = {
   startAt: string;
@@ -96,7 +97,7 @@ export function BusinessTimeFields({
         </label>
       </div>
       <p id="ghost-business-time-hint" className={styles.businessTimeHint}>
-        営業日 <span className="tabular-nums">{businessDate}</span> の
+        営業日 <span className="tabular-nums">{formatBusinessDateWithWeekday(businessDate)}</span> の
         <strong className="tabular-nums"> 22:00〜翌05:00</strong>だけを15分単位で表示
       </p>
       {intervalValid ? null : (

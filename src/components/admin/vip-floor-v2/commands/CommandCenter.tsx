@@ -15,6 +15,7 @@ import type {
 import { DemoCue, useDemoMode } from "../demo/DemoMode";
 import { isStandardServiceTransition } from "../contract/statusModel";
 import styles from "../VipFloorWorkspace.module.css";
+import { formatBusinessDateWithWeekday } from "../shell/BusinessDateField";
 
 const commandLabels: Record<CommandKind, string> = {
   service_status: "接客状態を変更",
@@ -370,7 +371,7 @@ export function CommandCenter({
                   ))}
                 </select>
                 <small className={styles.syntheticInputHint}>
-                  営業日 {board.businessDay.businessDate} / 15分単位 / 未来時刻は除外
+                  営業日 {formatBusinessDateWithWeekday(board.businessDay.businessDate)} / 15分単位 / 未来時刻は除外
                 </small>
               </label>
             ) : null}
