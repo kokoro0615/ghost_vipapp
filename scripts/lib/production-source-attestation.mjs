@@ -12,6 +12,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { setTimeout as delay } from "node:timers/promises";
 
 const VERCEL_API_ORIGIN = "https://api.vercel.com";
 
@@ -289,39 +290,65 @@ export async function readVercelToken() {
   return value.token;
 }
 
-export async function vercelApi(
-  pathname,
-  { token, teamId },
-  {
-    fetchImpl = fetch,
-    apiOrigin = VERCEL_API_ORIGIN,
-    waitImpl = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds)),
-  } = {},
-) {
+export async function vercelApi(pathname, { token, teamId }, {
+  timeoutMs = 120_000,
+  fetchImpl = fetch,
+  apiOrigin = VERCEL_API_ORIGIN,
+  timeoutSignal = (ms) => AbortSignal.timeout(ms),
+  waitImpl = (ms, signal) => delay(ms, undefined, { signal }),
+  nowMs = () => performance.now(),
+} = {}) {
   if (typeof token !== "string" || token.length === 0) throw new Error("vercel_token_unavailable");
+  if (!Number.isInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 600_000) {
+    throw new Error("vercel_api_timeout_invalid");
+  }
   const url = new URL(pathname, apiOrigin);
   if (teamId) url.searchParams.set("teamId", teamId);
+  // All attempts and backoff share one budget; a large blob gets at most ten
+  // minutes total rather than a fresh ten minutes on every retry.
+  const deadline = nowMs() + timeoutMs;
+  const signal = timeoutSignal(timeoutMs);
   for (let attempt = 0; attempt < 6; attempt += 1) {
+    signal.throwIfAborted();
+    if (nowMs() >= deadline) throw new DOMException("Vercel API deadline exceeded", "TimeoutError");
     let response;
+    let delayMs = 250 * 2 ** attempt;
     try {
       response = await fetchImpl(url, {
         headers: { Authorization: `Bearer ${token}` },
         redirect: "error",
-        signal: AbortSignal.timeout(120_000),
+        signal,
       });
+      if (response.status === 429 || response.status >= 500) {
+        const retryAfter = Number(response.headers.get("retry-after") ?? 0);
+        if (Number.isFinite(retryAfter) && retryAfter > 0) {
+          delayMs = Math.min(retryAfter * 1000, 30_000);
+        }
+      } else {
+        if (!response.ok) throw new Error(`vercel_api_${response.status}:${pathname}`);
+        // Await inside the attempt so body transport failures can retry while
+        // budget remains. The signal covers headers and body consumption.
+        return await response.json();
+      }
     } catch (error) {
-      if (attempt === 5) throw error;
-      await waitImpl(250 * 2 ** attempt);
-      continue;
+      signal.throwIfAborted();
+      const transient = error instanceof TypeError && (
+          error.message === "fetch failed"
+          || error.message === "terminated"
+          || ["ECONNRESET", "ECONNREFUSED", "ETIMEDOUT", "EAI_AGAIN", "UND_ERR_SOCKET"]
+            .includes(error.cause?.code)
+        );
+      if (!transient || attempt === 5) throw error;
+    } finally {
+      // Unread error responses must not retain sockets across backoff/retry.
+      if (response?.body && !response.bodyUsed) {
+        await response.body.cancel().catch(() => {});
+      }
     }
-    if (response.status === 429 || response.status >= 500) {
-      const retryAfter = Number(response.headers.get("retry-after") ?? 0);
-      await response.body?.cancel().catch(() => {});
-      await waitImpl(retryAfter > 0 ? retryAfter * 1000 : 250 * 2 ** attempt);
-      continue;
+    if (attempt < 5) {
+      if (delayMs >= deadline - nowMs()) break;
+      await waitImpl(delayMs, signal);
     }
-    if (!response.ok) throw new Error(`vercel_api_${response.status}:${pathname}`);
-    return response.json();
   }
   throw new Error(`vercel_api_retries_exhausted:${pathname}`);
 }
@@ -367,6 +394,7 @@ async function fetchDeploymentBlob(deploymentId, uid, auth, api) {
   const value = await api(
     `/v8/deployments/${encodeURIComponent(deploymentId)}/files/${encodeURIComponent(uid)}`,
     auth,
+    { timeoutMs: 600_000 },
   );
   if (typeof value?.data !== "string") throw new Error(`content_envelope_invalid:${uid}`);
   const body = Buffer.from(value.data, "base64");
