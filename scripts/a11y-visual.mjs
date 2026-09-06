@@ -1041,11 +1041,16 @@ async function waitForServer() {
 }
 
 async function installSyntheticRoutes(page, scenario = {}) {
-  if (scenario.fixedNow) {
+  // Demo fixtures have a fixed availability window. Keep both browser expiry
+  // checks and mock lease responses inside it, regardless of the CI run date.
+  // Explicit clocks still exercise near-expiry and other temporal scenarios.
+  const fixedNow = scenario.fixedNow
+    ?? (scenario.demoMode ? "2026-07-30T21:00:00+09:00" : null);
+  if (fixedNow) {
     await page.addInitScript((fixedNow) => {
       const fixedTime = Date.parse(fixedNow);
       Date.now = () => fixedTime;
-    }, scenario.fixedNow);
+    }, fixedNow);
   }
   await page.addInitScript(({ eventMode }) => {
     window.EventSource = class SyntheticEventSource {
@@ -1086,7 +1091,7 @@ async function installSyntheticRoutes(page, scenario = {}) {
     expiresAt: "2026-08-27T23:59:59+09:00",
     leaseIntervalMs: 60_000,
   };
-  const demoServerNow = scenario.fixedNow ?? new Date().toISOString();
+  const demoServerNow = fixedNow ?? new Date().toISOString();
   const demoLeaseExpiresAt = new Date(Date.parse(demoServerNow) + 60_000).toISOString();
   await page.route("**/api/admin/session", async (route) => {
     /* Holding the session probe open is the only way to observe the boot

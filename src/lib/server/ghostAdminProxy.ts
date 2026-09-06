@@ -11,6 +11,8 @@ import { assertVipCanaryBackendUrl } from "./ticketCanaryRuntimeGuard";
 const SESSION_COOKIE = "ghost_vipapp_admin_session";
 const BACKEND_ORIGIN = (process.env.GHOST_ADMIN_API_ORIGIN ?? "https://ghost-ruby-one.vercel.app").replace(/\/$/u, "");
 const PRODUCTION_WEBSITE_ORIGINS = new Set(["https://ghost-ruby-one.vercel.app"]);
+const BACKEND_READ_TIMEOUT_MS = 10_000;
+const BACKEND_MUTATION_TIMEOUT_MS = 20_000;
 
 export type AdminSessionPayload = {
   ok?: boolean;
@@ -62,11 +64,27 @@ export async function ghostAdminFetch(path: string, init: RequestInit = {}, toke
     headers.set("x-ghost-ticket-canary-run-id", canaryAuthority.runId);
   }
 
-  return fetch(backendUrl, { ...init, headers, cache: "no-store", redirect: "error" });
+  const method = (init.method ?? "GET").toUpperCase();
+  // Keep the deadline active through response-body consumption. A mutation
+  // timeout is an unknown outcome; callers retain their idempotency key and
+  // this transport never retries the command.
+  const deadline = AbortSignal.timeout(
+    method === "GET" || method === "HEAD"
+      ? BACKEND_READ_TIMEOUT_MS
+      : BACKEND_MUTATION_TIMEOUT_MS,
+  );
+  const signal = init.signal ? AbortSignal.any([init.signal, deadline]) : deadline;
+  return fetch(backendUrl, { ...init, headers, signal, cache: "no-store", redirect: "error" });
 }
 
 export function copyJson(response: Response) {
-  return response.json().catch(() => ({}));
+  return response.json().catch((error: unknown) => {
+    // An interrupted successful response must not become an empty success.
+    if (error instanceof Error && (error.name === "AbortError" || error.name === "TimeoutError")) {
+      throw error;
+    }
+    return {};
+  });
 }
 
 export function loginBasicOwnerSession() {

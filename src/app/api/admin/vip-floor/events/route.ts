@@ -44,17 +44,26 @@ export async function GET(request: Request) {
   let pollTimer: ReturnType<typeof setTimeout> | null = null;
   let lifetimeTimer: ReturnType<typeof setTimeout> | null = null;
   let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+  const upstream = new AbortController();
+  let closeStream = () => {};
+  const onAbort = () => closeStream();
+  const cleanup = () => {
+    closed = true;
+    if (pollTimer) clearTimeout(pollTimer);
+    if (lifetimeTimer) clearTimeout(lifetimeTimer);
+    if (heartbeatTimer) clearInterval(heartbeatTimer);
+    request.signal.removeEventListener("abort", onAbort);
+    upstream.abort();
+  };
 
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
       const close = () => {
         if (closed) return;
-        closed = true;
-        if (pollTimer) clearTimeout(pollTimer);
-        if (lifetimeTimer) clearTimeout(lifetimeTimer);
-        if (heartbeatTimer) clearInterval(heartbeatTimer);
+        cleanup();
         controller.close();
       };
+      closeStream = close;
 
       const poll = async () => {
         if (closed || request.signal.aborted) {
@@ -65,10 +74,11 @@ export async function GET(request: Request) {
         try {
           const response = await ghostAdminFetch(
             `/api/admin/v2/vip-floor/revision?businessDate=${encodeURIComponent(businessDate)}`,
-            {},
+            { signal: upstream.signal },
             token,
           );
           const payload = await copyJson(response) as Record<string, unknown>;
+          if (closed) return;
           const revision = payload.revision;
 
           if (!response.ok) {
@@ -138,6 +148,7 @@ export async function GET(request: Request) {
             ));
           }
         } catch {
+          if (closed) return;
           controller.enqueue(encoder.encode(
             `event: unavailable\ndata: ${JSON.stringify({ status: 503 })}\n\n`,
           ));
@@ -151,16 +162,17 @@ export async function GET(request: Request) {
       heartbeatTimer = setInterval(() => {
         if (!closed) controller.enqueue(encoder.encode(": heartbeat\n\n"));
       }, 10_000);
-      request.signal.addEventListener("abort", close, { once: true });
+      request.signal.addEventListener("abort", onAbort, { once: true });
+      if (request.signal.aborted) {
+        close();
+        return;
+      }
       controller.enqueue(encoder.encode("retry: 1000\n\n"));
-      void poll();
       lifetimeTimer = setTimeout(close, 25_000);
+      void poll();
     },
     cancel() {
-      closed = true;
-      if (pollTimer) clearTimeout(pollTimer);
-      if (lifetimeTimer) clearTimeout(lifetimeTimer);
-      if (heartbeatTimer) clearInterval(heartbeatTimer);
+      cleanup();
     },
   });
 
