@@ -417,3 +417,24 @@ test("BFF responses project a PII-safe allowlist and never relay upstream JSON w
   assert.doesNotMatch(proxy, /rawEmail|admissionCode|otpCode|sessionToken|challengeToken/u);
   assert.doesNotMatch(proxy, /NextResponse\.json\(\s*await copyJson|return\s+payload\s*;/u);
 });
+
+test('all four entry recovery commands match the actual Website contract and reject authority overreach',{
+ skip:backendContractAvailable?false:'ticket-wallet backend worktree is unavailable',
+},async()=>{
+ await import(pathToFileURL(path.join(backendRoot,'scripts/lib/server-only-shim.mjs')).href);
+ const {readTicketManagerCommand}=await import(pathToFileURL(backendManagerOperations).href);
+ const {readTicketOperationCommand,ticketOperationCommandBody}=await loadProxy();
+ const key='86000000-0000-4000-8000-000000000001';
+ for(const action of ['entry_rotate','entry_revoke','entry_resend','entry_exception']){
+  const body={orderPublicCode:'GT-123456789A',environment:'test',expectedVersion:3,expectedGeneration:action==='entry_exception'?null:1,reason:'全員の本人確認と原記録を照合しました',
+   originalOperationId:action==='entry_exception'?'86000000-0000-4000-8000-000000000003':null,guestCount:action==='entry_exception'?4:null,confirmation:action==='entry_exception'?'4名全員の集合・写真付き身分証・誤操作の原記録を確認しました':null};
+  const request=b=>new Request('https://vip.invalid',{method:'POST',headers:{'content-type':'application/json','idempotency-key':key},body:JSON.stringify(b)});
+  const vip=await readTicketOperationCommand(request(body),action);assert.equal(vip.ok,true,action);
+  const website=await readTicketManagerCommand(request(ticketOperationCommandBody(vip.command)),action);
+  assert.deepEqual(JSON.parse(JSON.stringify(website.command)),{action,...body});
+  for(const patch of [{recipient:'another@example.test'},{reset:true},{secret:'forbidden'},{expectedVersion:0},...(action==='entry_exception'?[{guestCount:0},{confirmation:null},{originalOperationId:null}]:[{guestCount:1}])]){
+   assert.equal((await readTicketOperationCommand(request({...body,...patch}),action)).ok,false,action+JSON.stringify(patch));
+   await assert.rejects(readTicketManagerCommand(request({...body,...patch}),action));
+  }
+ }
+});

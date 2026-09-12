@@ -95,6 +95,7 @@ export const QA_REQUIRED_STATES = Object.freeze([
   "conflict",
   "read-only",
   "ticket-operations-legacy-incomplete",
+  "ticket-entry-unused", "ticket-entry-assist-confirm", "ticket-entry-resend-confirm", "ticket-entry-rotate-confirm", "ticket-entry-revoke-confirm", "ticket-entry-exception-confirm", "ticket-entry-exception-recorded",
 ]);
 
 export const QA_MAJOR_SURFACE_SELECTORS = Object.freeze([

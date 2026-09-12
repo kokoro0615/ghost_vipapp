@@ -194,7 +194,7 @@ test("type is an authored pairing with optical tracking and tabular figures", ()
    * declares it and its descendants — declared on <body> the whole font-family
    * declaration is invalid and the surface silently drops to the browser's
    * default serif, which is exactly what shipped for one build of this pass. */
-  assert.match(layout, /<html lang="ja" className=\{`\$\{latinFont\.variable\} \$\{japaneseFont\.variable\}`\}>/u,
+  assert.match(layout, /<html\s+lang="ja"\s+className=\{`\$\{latinFont\.variable\} \$\{japaneseFont\.variable\}`\}[\s\S]*?>/u,
     "font variables must sit on <html> or :root cannot resolve --font-ui");
   assert.doesNotMatch(layout, /<body className=\{[^}]*Font\.variable/u);
   assert.match(globals, /--font-ui:\s*var\(--font-operator-latin\), var\(--font-operator-jp\)/u);

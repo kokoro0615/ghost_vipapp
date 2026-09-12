@@ -367,7 +367,14 @@ export async function resolveProductionDeploymentId(hostname, auth, { api = verc
 }
 
 function flattenDeploymentTree(nodes, prefix = "", output = []) {
-  for (const node of nodes ?? []) {
+  if (!Array.isArray(nodes)) throw new Error("deployment_source_tree_invalid");
+  const names = new Set();
+  for (const node of nodes) {
+    if (typeof node?.name !== "string" || !node.name || /[/\\\0]/u.test(node.name)
+      || [".", ".."].includes(node.name) || names.has(node.name)) {
+      throw new Error("deployment_source_path_invalid");
+    }
+    names.add(node.name);
     const name = prefix ? `${prefix}/${node.name}` : node.name;
     if (node.type === "directory") flattenDeploymentTree(node.children, name, output);
     else output.push({ path: name, uid: node.uid, type: node.type });
@@ -429,18 +436,24 @@ function validateTarEntries(tarball) {
 export async function restoreDeploymentSource(
   deploymentId,
   auth,
-  { api = vercelApi } = {},
+  { api = vercelApi, temporaryParent = tmpdir() } = {},
 ) {
   const treeValue = await api(`/v6/deployments/${encodeURIComponent(deploymentId)}/files`, auth);
   const nodes = Array.isArray(treeValue) ? treeValue : treeValue?.files;
   if (!Array.isArray(nodes)) throw new Error("deployment_source_tree_invalid");
-  const tree = flattenDeploymentTree(nodes);
-  const temporaryRoot = mkdtempSync(path.join(tmpdir(), "ghost-vip-source-attestation-"));
+  // Vercel v6 separates uploaded input (src) from generated output (out).
+  // Restore exactly one input namespace; a repository's own src stays nested.
+  const sources = nodes.filter((node) => node?.name === "src");
+  if (sources.length !== 1 || sources[0].type !== "directory") {
+    throw new Error("deployment_source_namespace_invalid");
+  }
+  const tree = flattenDeploymentTree(sources[0].children);
+  const temporaryRoot = mkdtempSync(path.join(temporaryParent, "ghost-vip-source-attestation-"));
   const cleanup = async () => rmSync(temporaryRoot, { recursive: true, force: true });
 
   try {
     const archiveParts = tree
-      .filter((entry) => /^src\/\.vercel\/source\.tgz\.part\d+$/u.test(entry.path))
+      .filter((entry) => /^\.vercel\/source\.tgz\.part\d+$/u.test(entry.path))
       .sort((left, right) => {
         const leftPart = Number(left.path.match(/part(\d+)$/u)?.[1]);
         const rightPart = Number(right.path.match(/part(\d+)$/u)?.[1]);

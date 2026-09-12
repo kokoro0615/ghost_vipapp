@@ -44,7 +44,7 @@ async function main() {
       ...process.env,
       VIPAPP_BASIC_USER: "a11y",
       VIPAPP_BASIC_PASSWORD: "synthetic-only",
-      ...(targetedState === null || targetedState === "ticket-operations"
+      ...(targetedState === null || targetedState === "ticket-operations" || targetedState === "ticket-entry"
         ? {
             FEATURE_TICKET_MANAGER_OPERATIONS_ENABLED: "true",
             FEATURE_TICKET_REFUND_REVIEW_ENABLED: "true",
@@ -165,8 +165,8 @@ async function main() {
       ? {
           ...summary,
           ok: targetedState
-            ? results.some((result) => targetedState === "ticket-operations"
-                ? result.state.startsWith("ticket-operations-")
+            ? results.some((result) => ["ticket-operations", "ticket-entry"].includes(targetedState)
+                ? result.state.startsWith(targetedState + "-")
                 : result.state === targetedState)
             : summary.missingStates.length === 0,
           ...(targetedViewport ? { targetedViewport } : {}),
@@ -209,6 +209,8 @@ async function auditViewport(context, viewport) {
       await auditOperationDateRecovery(context, capture);
     } else if (targetedState === "chart-empty-grid") {
       await auditMissingEventChart(context, capture);
+    } else if (targetedState === "ticket-entry") {
+      await auditTicketOrderEntry(context, capture);
     } else if (targetedState === "ticket-operations") {
       await auditTicketOperations(context, capture);
     } else {
@@ -626,6 +628,7 @@ async function auditViewport(context, viewport) {
   await closeQaPage(demoExpiredPage);
 
   await auditTicketOperationsLegacyIncomplete(context, capture);
+  await auditTicketOrderEntry(context, capture);
 
   return results;
 }
@@ -835,6 +838,50 @@ async function auditTicketOperations(context, capture) {
   }).waitFor();
   await capture(page, "ticket-operations-offline");
   await auditTicketOperationsLegacyIncomplete(context, capture);
+  await auditTicketOrderEntry(context, capture);
+}
+
+async function auditTicketOrderEntry(context, capture) {
+  const fixture = structuredClone(ticketOperationsOrderFixture);
+  fixture.order.entry = { admissionPolicy: "order_together_v1", originalCount: 4,
+    currentLink: { id: "83000000-0000-4000-8000-000000000001", generation: 1, revokedAt: null, expiresAt: "2026-08-11T20:30:00Z" },
+    committedOperationId: null, exception: null };
+  fixture.order.admissions = Array.from({length:4},(_,index)=>({ admissionId: `83000000-0000-4000-8000-${String(index+10).padStart(12,"0")}`,
+    serial:index+1,label:index===3?"FAST ENTRY・長い日英券種名":"一般入場 GENERAL ADMISSION",status:"issued",admittedAt:null }));
+  const page = await newQaPage(context,{ticketOperations:true,ticketOperationsOrder:fixture});
+  const panel = await openTicketOperations(page);
+  await panel.getByRole("button",{name:/GT-QA20260811/u}).first().click();
+  await panel.getByText("注文リンク・誤使用の救済",{exact:true}).waitFor();
+  assert.equal(await panel.getByRole("checkbox").count(),0,"new group order must never expose per-ticket selection");
+  await capture(page,"ticket-entry-unused");
+  await panel.getByRole("button",{name:"補助入場を確認",exact:true}).click();
+  let dialog=page.getByRole("alertdialog");await assertLeastDestructiveFocus(dialog);
+  await dialog.getByRole("button",{name:"全員4名の入場を確定",exact:true}).waitFor();
+  await capture(page,"ticket-entry-assist-confirm");await dialog.getByRole("button",{name:"戻る",exact:true}).click();
+  for(const [button,state] of [["登録先へ再送","resend"],["漏えい時の交換","rotate"],["リンクを失効","revoke"]]){
+    await panel.getByRole("button",{name:button,exact:true}).click();dialog=page.getByRole("alertdialog");await assertLeastDestructiveFocus(dialog);
+    await capture(page,"ticket-entry-"+state+"-confirm");await dialog.getByRole("button",{name:"戻る",exact:true}).click();
+  }
+  fixture.order.entry.committedOperationId="83000000-0000-4000-8000-000000000030";
+  fixture.order.admissions.forEach(a=>{a.status="admitted";a.admittedAt="2026-08-11T13:04:00Z";});
+  await panel.getByRole("button",{name:"注文詳細を再読込",exact:true}).click();
+  await panel.getByRole("button",{name:"誤使用の例外受付を確認",exact:true}).click();
+  dialog=page.getByRole("alertdialog");await assertLeastDestructiveFocus(dialog);
+  const confirm=dialog.getByRole("button",{name:"一回の例外受付を記録",exact:true});assert.equal(await confirm.isDisabled(),true);
+  await dialog.getByLabel("理由（8文字以上・監査履歴へ記録）").fill("全員の誤操作申告と原記録を確認しました");
+  assert.equal(await confirm.isDisabled(),true);
+  await dialog.getByLabel("4名全員の集合・身分証・誤使用の確認内容（8文字以上）").fill("4名全員の集合と写真付き身分証、元の使用記録を確認しました");
+  await capture(page,"ticket-entry-exception-confirm");
+  let commands=0;
+  await page.route("**/api/admin/vip-floor/tickets/entry/exception",async route=>{
+    commands++;const body=route.request().postDataJSON();assert.equal(body.guestCount,4);assert.equal(body.originalOperationId,fixture.order.entry.committedOperationId);
+    fixture.order.entry.exception={originalOperationId:body.originalOperationId,admittedCount:4,createdAt:"2026-08-11T13:06:00Z",auditLogId:"83000000-0000-4000-8000-000000000040"};
+    await route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({ok:true,action:"entry_exception",entityVersion:8,auditLogId:fixture.order.entry.exception.auditLogId,reused:false,serverNow:"2026-08-11T13:06:00Z"})});
+  });
+  await confirm.click();await panel.getByText(/誤使用の例外受付を記録済み/u).waitFor();assert.equal(commands,1);
+  assert.equal(await panel.getByRole("button",{name:"誤使用の例外受付を確認",exact:true}).count(),0);
+  await capture(page,"ticket-entry-exception-recorded");
+  await closeQaPage(page);
 }
 
 async function auditTicketOperationsLegacyIncomplete(context, capture) {

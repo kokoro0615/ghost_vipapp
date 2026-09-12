@@ -138,6 +138,7 @@ export type TicketAuditEvent = {
 };
 
 export type TicketOperationsOrder = {
+  entry?: TicketOrderEntryState;
   publicCode: string;
   maskedEmail: string;
   environment: TicketEnvironment;
@@ -149,6 +150,19 @@ export type TicketOperationsOrder = {
   emailJobs: TicketEmailJob[];
   timeline: TicketAuditEvent[];
   safeRecoveryInstruction: string;
+};
+
+export type TicketOrderEntryState = {
+  admissionPolicy: "order_together_v1"; originalCount: number;
+  currentLink: { id: string; generation: number; revokedAt: string | null; expiresAt: string } | null;
+  committedOperationId: string | null;
+  exception: { originalOperationId: string; admittedCount: number; createdAt: string; auditLogId: string } | null;
+};
+export type TicketEntryRecoveryAction = "entry_rotate" | "entry_revoke" | "entry_resend" | "entry_exception";
+export type TicketEntryRecoveryCommand = {
+  action: TicketEntryRecoveryAction; orderPublicCode: string; environment: TicketEnvironment;
+  expectedVersion: number; expectedGeneration: number | null; reason: string;
+  originalOperationId: string | null; guestCount: number | null; confirmation: string | null;
 };
 
 export type TicketOperationsOrderResponse = {
@@ -164,6 +178,7 @@ export type TicketRefundResolution =
   | "dismiss_no_money_moved";
 
 export type TicketOperationAction =
+  | TicketEntryRecoveryAction
   | "session_revoke"
   | "assisted_admission"
   | "refund_resolve"
@@ -207,6 +222,7 @@ export type TicketEmailRetryCommand = {
 };
 
 export type TicketOperationCommand =
+  | TicketEntryRecoveryCommand
   | TicketSessionRevokeCommand
   | TicketAssistedAdmissionCommand
   | TicketRefundResolveCommand

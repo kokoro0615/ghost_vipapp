@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { readdir, readFile } from 'node:fs/promises';
+import { readdir, readFile, mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -8,7 +8,7 @@ import { restoreDeploymentSource, vercelApi } from '../../scripts/lib/production
 
 const auth = { token: 'synthetic-token', teamId: 'synthetic-team' };
 const json = value => new Response(JSON.stringify(value));
-const roots = async () => (await readdir(tmpdir())).filter(name => name.startsWith('ghost-vip-source-attestation-'));
+
 
 async function withFetch(fetchImpl, run) {
   const original = globalThis.fetch;
@@ -33,14 +33,15 @@ function delayedJson(value, signal, delayMs) {
   }));
 }
 
-test('failed restore removes its temporary root and still rejects a wrong SHA-1', async () => {
-  const before = await roots();
+test('failed restore removes its temporary root and still rejects a wrong SHA-1', async t => {
+  const parent = await mkdtemp(path.join(tmpdir(), 'ghost-vip-restore-test-'));
+  t.after(() => rm(parent, { recursive: true, force: true }));
   await withFetch(async url => String(url).includes('/v6/')
-    ? json([{ name: 'fixture.txt', type: 'file', uid: '0000000000000000000000000000000000000000' }])
+    ? json([{ name: 'src', type: 'directory', children: [{ name: 'fixture.txt', type: 'file', uid: '0000000000000000000000000000000000000000' }] }])
     : json({ data: Buffer.from('fixture').toString('base64') }), async () => {
-    await assert.rejects(restoreDeploymentSource('fixture', auth), /content_digest_mismatch/);
+    await assert.rejects(restoreDeploymentSource('fixture', auth, { temporaryParent: parent }), /content_digest_mismatch/);
   });
-  assert.deepEqual(await roots(), before);
+  assert.deepEqual(await readdir(parent), []);
 });
 
 test('ordinary JSON keeps the default deadline through streamed body consumption', async () => {
@@ -67,7 +68,7 @@ test('blob gets a longer finite budget and retains verified source bytes', async
     api: (pathname, credentials, options) => vercelApi(pathname, credentials, {
       ...options,
       fetchImpl: async (url, { signal }) => String(url).includes('/v6/')
-        ? json([{ name: 'fixture.txt', type: 'file', uid }])
+        ? json([{ name: 'src', type: 'directory', children: [{ name: 'fixture.txt', type: 'file', uid }] }])
         : delayedJson({ data: body.toString('base64') }, signal, 25),
       timeoutSignal(ms) { budgets.push(ms); return AbortSignal.timeout(ms === 600_000 ? 500 : 5); },
       waitImpl: async () => {},

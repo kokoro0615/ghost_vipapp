@@ -302,7 +302,7 @@ export function applyDemoTicketOperation(
       ));
     }
     appendDemoAudit(store, idempotencyKey, "返金確認を解決", command.reason);
-  } else {
+  } else if (command.action === "email_retry") {
     store.order.order.emailJobs = store.order.order.emailJobs.map((job) => (
       job.emailJobId === command.emailJobId
         ? { ...job, status: "queued", retryable: false, nextAttemptAt: nowIso() }
@@ -312,6 +312,7 @@ export function applyDemoTicketOperation(
       ? "復旧メールを合成キューへ追加"
       : "メールを合成キューへ再投入", command.reason);
   }
+  if (command.action.startsWith("entry_")) throw new Error("order_entry_requires_server_demo");
 
   store.order.order.expectedVersion = nextVersion;
   store.order.serverNow = nowIso();

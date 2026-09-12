@@ -118,6 +118,10 @@ export async function loadTicketOperationsOrder(
 }
 
 const MUTATION_PATHS = {
+  entry_rotate: "/api/admin/vip-floor/tickets/entry/rotate",
+  entry_revoke: "/api/admin/vip-floor/tickets/entry/revoke",
+  entry_resend: "/api/admin/vip-floor/tickets/entry/resend",
+  entry_exception: "/api/admin/vip-floor/tickets/entry/exception",
   session_revoke: "/api/admin/vip-floor/tickets/sessions/revoke",
   assisted_admission: "/api/admin/vip-floor/tickets/admissions/assist",
   refund_resolve: "/api/admin/vip-floor/tickets/refund-reviews/resolve",

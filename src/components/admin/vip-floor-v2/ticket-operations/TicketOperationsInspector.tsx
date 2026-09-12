@@ -124,6 +124,9 @@ export function TicketOperationsInspector({
 }: Props) {
   const order = response?.order ?? null;
   const [selectedAdmissionIds, setSelectedAdmissionIds] = useState<string[]>([]);
+  const wholeOrder = order?.entry?.admissionPolicy === "order_together_v1";
+  const effectiveAdmissionIds = wholeOrder ? (order?.admissions.filter(a => a.status === "issued").map(a => a.admissionId) ?? []) : selectedAdmissionIds;
+  const groupEligible = !wholeOrder || Boolean(order && !order.refundReview && order.admissions.every(a => a.status === "issued" || a.status === "void"));
   const [selectedRefundAdmissionIds, setSelectedRefundAdmissionIds] = useState<string[]>(
     () => order?.refundReview?.selectedAdmissionIds ?? [],
   );
@@ -316,12 +319,14 @@ export function TicketOperationsInspector({
               </header>
               <fieldset className={styles.admissionList} disabled={pending}>
                 <legend className="sr-only">Owner補助入場の対象券</legend>
+                {wholeOrder && <p className={styles.emptyLine}>注文の全有効券を同時に受付します。全員の集合と身分証を確認してください。購入{order.entry?.originalCount}枚・取消{order.admissions.filter(a => a.status === "void").length}枚・有効{effectiveAdmissionIds.length}名。分割入場はできません。</p>}
                 {order.admissions.map((admission) => {
                   const selectable = admission.status === "issued";
-                  const checked = selectedAdmissionIds.includes(admission.admissionId);
+                  const checked = effectiveAdmissionIds.includes(admission.admissionId);
+                  const Row = wholeOrder ? "div" : "label";
                   return (
-                    <label key={admission.admissionId} data-disabled={!selectable || undefined}>
-                      <input
+                    <Row key={admission.admissionId} data-order-entry-row={wholeOrder || undefined} data-disabled={!selectable || undefined}>
+                      {!wholeOrder && <input
                         type="checkbox"
                         checked={checked}
                         disabled={!selectable}
@@ -330,39 +335,63 @@ export function TicketOperationsInspector({
                             ? [...current, admission.admissionId]
                             : current.filter((id) => id !== admission.admissionId)
                         ))}
-                      />
+                      />}
+                      {wholeOrder && <span aria-label={selectable ? "全員同時受付の対象" : "受付対象外"}>{selectable ? "対象" : "—"}</span>}
                       <span className="tabular-nums">#{admission.serial}</span>
                       <strong>{admission.label}</strong>
                       <span className={styles.statusLabel} data-tone={statusTone(admission.status)}><span aria-hidden />{ADMISSION_LABELS[admission.status]}</span>
                       <small className="tabular-nums">{admission.admittedAt ? formatJst(admission.admittedAt) : "—"}</small>
-                    </label>
+                    </Row>
                   );
                 })}
               </fieldset>
               <div className={styles.sectionAction}>
-                <span>{order.eventSession.state === "open" ? "入場枠内" : "入場枠外"} · {selectedAdmissionIds.length}枚選択</span>
+                <span>{order.eventSession.state === "open" ? "入場枠内" : "入場枠外"} · {effectiveAdmissionIds.length}枚{wholeOrder ? "全員対象" : "選択"}</span>
                 <button
                   type="button"
                   className={styles.primaryButton}
-                  disabled={pending || order.eventSession.state !== "open" || selectedAdmissionIds.length === 0}
+                  disabled={pending || order.eventSession.state !== "open" || effectiveAdmissionIds.length === 0 || !groupEligible}
                   onClick={() => onPrepare({
                     command: {
                       action: "assisted_admission",
                       orderPublicCode: order.publicCode,
                       environment: order.environment,
                       eventSessionId: order.eventSession.eventSessionId,
-                      admissionIds: selectedAdmissionIds,
+                      admissionIds: effectiveAdmissionIds,
                       expectedVersion: order.expectedVersion,
                       reason: "",
                     },
                     title: "Owner補助入場を確定しますか",
-                    confirmLabel: "選択券を入場済みにする",
+                    confirmLabel: wholeOrder ? `全員${effectiveAdmissionIds.length}名の入場を確定` : "選択券を入場済みにする",
                   })}
                 >
                   <UserCheck size={16} aria-hidden />補助入場を確認
                 </button>
               </div>
             </section>
+
+            {order.entry && <section className={styles.operationSection}>
+              <header className={styles.sectionRule}><h4>注文リンク・誤使用の救済</h4><span>全員同時入場</span></header>
+              <p className={styles.emptyLine}>{order.entry.currentLink ? `注文リンク v${order.entry.currentLink.generation} · ${order.entry.currentLink.revokedAt ? "失効済み" : "発行済み"} · 受付終了 ${formatJst(order.entry.currentLink.expiresAt)}` : "購入メールのリンクを発行待ちです。"}</p>
+              <div className={styles.sectionAction}>
+                {(["entry_resend", "entry_rotate", "entry_revoke"] as const).map(action => <button type="button" className={styles.secondaryButton} key={action}
+                  disabled={pending || !order.entry?.currentLink || (action !== "entry_rotate" && Boolean(order.entry.currentLink.revokedAt))}
+                  onClick={() => onPrepare({ command: { action, orderPublicCode: order.publicCode, environment: order.environment, expectedVersion: order.expectedVersion,
+                    expectedGeneration: order.entry?.currentLink?.generation ?? null, originalOperationId: null, guestCount: null, confirmation: null, reason: "" },
+                    title: action === "entry_resend" ? "登録先に同じリンクを再送" : action === "entry_rotate" ? "漏えいしたリンクを交換" : "注文リンクを失効",
+                    confirmLabel: action === "entry_resend" ? "再送を記録" : action === "entry_rotate" ? "失効・交換して送信" : "リンクを失効", danger: action !== "entry_resend" })}>
+                  {action === "entry_resend" ? "登録先へ再送" : action === "entry_rotate" ? "漏えい時の交換" : "リンクを失効"}
+                </button>)}
+              </div>
+              {order.entry.exception ? <p className={styles.emptyLine}>誤使用の例外受付を記録済み · {order.entry.exception.admittedCount}名 · {formatJst(order.entry.exception.createdAt)} · 再救済できません。</p> : <>
+                <p className={styles.emptyLine}>誤スワイプの申告は、全員の集合・身分証・元の使用記録を確認して一回だけ判断します。欠席者や転送先の先使用が疑われる場合は確定せず照会してください。</p>
+                <button type="button" className={styles.secondaryButton} disabled={pending || order.eventSession.state !== "open" || Boolean(order.refundReview)
+                  || !order.entry.committedOperationId || order.admissions.some(a => a.status === "issued") || !order.admissions.some(a => a.status === "admitted")}
+                  onClick={() => onPrepare({ command: { action: "entry_exception", orderPublicCode: order.publicCode, environment: order.environment, expectedVersion: order.expectedVersion,
+                    expectedGeneration: null, originalOperationId: order.entry?.committedOperationId ?? null, guestCount: order.admissions.filter(a => a.status === "admitted").length, confirmation: "", reason: "" },
+                    title: `誤使用を確認した全員${order.admissions.filter(a => a.status === "admitted").length}名の例外受付`, confirmLabel: "一回の例外受付を記録" })}>誤使用の例外受付を確認</button>
+              </>}
+            </section>}
 
             <section className={styles.operationSection}>
               <header className={styles.sectionRule}>

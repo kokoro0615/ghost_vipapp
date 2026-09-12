@@ -474,7 +474,7 @@ test("Vercel source restoration verifies every content-addressed deployment blob
     uid: createHash("sha1").update(body).digest("hex"),
   }));
   const api = async (pathname) => {
-    if (pathname.endsWith("/files") && !pathname.includes("/files/")) return nodes;
+    if (pathname.endsWith("/files") && !pathname.includes("/files/")) return [{ name: "src", type: "directory", children: [nodes[0], { name: "src", type: "directory", children: [{ ...nodes[1], name: "app.txt" }] }] }];
     const uid = pathname.split("/").at(-1);
     const body = [...bodies.values()].find(
       (candidate) => createHash("sha1").update(candidate).digest("hex") === uid,
@@ -510,7 +510,7 @@ test("deployment archives reject links before extraction", async (t) => {
   const uid = createHash("sha1").update(body).digest("hex");
   const api = async (pathname) => {
     if (pathname.endsWith("/files") && !pathname.includes("/files/")) {
-      return [{ name: "src/.vercel/source.tgz.part0", type: "file", uid }];
+      return [{ name: "src", type: "directory", children: [{ name: ".vercel", type: "directory", children: [{ name: "source.tgz.part0", type: "file", uid }] }] }];
     }
     return { data: body.toString("base64") };
   };

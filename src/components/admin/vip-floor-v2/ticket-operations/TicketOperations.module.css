@@ -833,7 +833,7 @@
   border: 1px solid var(--rule);
 }
 
-.admissionList > label {
+.admissionList > :is(label, [data-order-entry-row]) {
   display: grid;
   grid-template-columns: auto auto minmax(0, 1fr) auto auto;
   align-items: center;
@@ -844,11 +844,11 @@
   cursor: pointer;
 }
 
-.admissionList > label:last-child {
+.admissionList > :is(label, [data-order-entry-row]):last-child {
   border-bottom: 0;
 }
 
-.admissionList > label[data-disabled] {
+.admissionList > :is(label, [data-order-entry-row])[data-disabled] {
   color: var(--ink-3);
   background: var(--surface-sunken);
   cursor: default;
@@ -1379,7 +1379,7 @@
     flex: 1 1 0;
   }
 
-  .admissionList > label {
+  .admissionList > :is(label, [data-order-entry-row]) {
     grid-template-columns: auto auto minmax(0, 1fr) auto;
   }
 

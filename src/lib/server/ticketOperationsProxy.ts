@@ -8,6 +8,8 @@ import type {
   TicketCapabilityReadiness,
   TicketEmailJob,
   TicketEnvironment,
+  TicketEntryRecoveryAction,
+  TicketOrderEntryState,
   TicketEventSessionRail,
   TicketOperationAction,
   TicketOperationCommand,
@@ -67,6 +69,7 @@ const REFUND_OBSERVATION_HISTORY_STATES = new Set<TicketRefundReview["observatio
 const EMAIL_PURPOSES = new Set<TicketEmailJob["purpose"]>(["otp", "wallet_access", "recovery"]);
 const EMAIL_STATES = new Set<TicketEmailJob["status"]>(["queued", "retry", "sent", "dead", "suppressed"]);
 const MUTATION_ACTIONS = new Set<TicketOperationAction>([
+  "entry_rotate", "entry_revoke", "entry_resend", "entry_exception",
   "session_revoke",
   "assisted_admission",
   "refund_resolve",
@@ -93,6 +96,7 @@ const TICKET_OPERATIONS_READ_PATHS = new Set([
   "/api/admin/v2/tickets/queue?scope=refund",
 ]);
 const TICKET_OPERATIONS_MUTATION_PATHS = new Set([
+  "/api/admin/v2/tickets/entry/rotate", "/api/admin/v2/tickets/entry/revoke", "/api/admin/v2/tickets/entry/resend", "/api/admin/v2/tickets/entry/exception",
   "/api/admin/v2/tickets/search",
   "/api/admin/v2/tickets/sessions/revoke",
   "/api/admin/v2/tickets/admissions/assist",
@@ -403,6 +407,7 @@ function projectOrder(value: unknown): TicketOperationsOrder {
     expectedVersion: integer(source.expectedVersion, 1, 2_147_483_647),
     eventSession: projectEventSession(source.eventSession),
     wallet: projectWallet(source.wallet),
+    ...(source.entry === undefined ? {} : { entry: projectEntry(source.entry) }),
     admissions: array(source.admissions, (entry) => {
       const admission = record(entry);
       return {
@@ -428,6 +433,17 @@ export function projectTicketOperationsOrder(value: unknown): TicketOperationsOr
     health: projectHealth(source.health),
     order: projectOrder(source.order),
   };
+}
+
+function projectEntry(value: unknown): TicketOrderEntryState {
+  const source = record(value);
+  if (source.admissionPolicy !== "order_together_v1") throw new TicketOperationsProjectionError();
+  const link = source.currentLink === null ? null : record(source.currentLink);
+  const exception = source.exception === null ? null : record(source.exception);
+  return { admissionPolicy: "order_together_v1", originalCount: integer(source.originalCount, 1, 20),
+    currentLink: link === null ? null : { id: uuid(link.id), generation: integer(link.generation, 1, 2_147_483_647), revokedAt: optionalIso(link.revokedAt), expiresAt: iso(link.expiresAt) },
+    committedOperationId: source.committedOperationId === null ? null : uuid(source.committedOperationId),
+    exception: exception === null ? null : { originalOperationId: uuid(exception.originalOperationId), admittedCount: integer(exception.admittedCount, 1, 20), createdAt: iso(exception.createdAt), auditLogId: uuid(exception.auditLogId) } };
 }
 
 export function projectTicketOperationMutation(value: unknown): TicketOperationMutationResponse {
@@ -627,6 +643,18 @@ export async function readTicketOperationCommand(
   }
 
   let command: TicketOperationCommand | null = null;
+  if (action.startsWith("entry_") && MUTATION_ACTIONS.has(action) && onlyKeys(body, ["orderPublicCode", "environment", "expectedVersion", "expectedGeneration", "reason", "originalOperationId", "guestCount", "confirmation"])) {
+    const orderPublicCode = commandPublicCode(body.orderPublicCode);
+    const environment = body.environment === "live" || body.environment === "test" ? body.environment : null;
+    const exception = action === "entry_exception";
+    const originalOperationId = exception ? commandUuid(body.originalOperationId) : null;
+    const generation = exception ? null : commandVersion(body.expectedGeneration);
+    const count = exception && Number.isSafeInteger(body.guestCount) && (body.guestCount as number) >= 1 && (body.guestCount as number) <= 20 ? body.guestCount as number : null;
+    const confirmation = exception && typeof body.confirmation === "string" && body.confirmation.trim().length >= 8 && body.confirmation.trim().length <= 400 ? body.confirmation.trim() : null;
+    if (orderPublicCode && environment && (exception ? originalOperationId && count && confirmation && body.expectedGeneration === null : generation && body.originalOperationId === null && body.guestCount === null && body.confirmation === null)) {
+      command = { action: action as TicketEntryRecoveryAction, orderPublicCode, environment, expectedVersion, expectedGeneration: generation, reason, originalOperationId, guestCount: count, confirmation };
+    }
+  }
   if (action === "session_revoke" && onlyKeys(body, ["orderPublicCode", "sessionId", "expectedVersion", "reason"])) {
     const orderPublicCode = commandPublicCode(body.orderPublicCode);
     const sessionId = commandUuid(body.sessionId);
