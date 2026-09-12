@@ -122,8 +122,17 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
      * `var(--font-operator-latin)` resolves to nothing inside `:root`, which
      * makes the whole `font-family` declaration invalid and silently drops the
      * surface to the browser's default serif. */
-    <html lang="ja" className={`${latinFont.variable} ${japaneseFont.variable}`}>
-      <body>{children}</body>
+    <html
+      lang="ja"
+      className={`${latinFont.variable} ${japaneseFont.variable}`}
+      data-ticket-test={process.env.GHOST_TICKET_CANARY_RUN_ID ? "true" : undefined}
+    >
+      <body>
+        {process.env.GHOST_TICKET_CANARY_RUN_ID ? (
+          <p className="ticket-test-notice" role="status">TEST · テスト販売 / 実請求なし</p>
+        ) : null}
+        {children}
+      </body>
     </html>
   );
 }

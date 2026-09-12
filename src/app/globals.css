@@ -416,3 +416,24 @@ textarea {
     transition-duration: 1ms !important;
   }
 }
+/* Isolated ticket canary only; rendered by the server when its run is bound. */
+html[data-ticket-test="true"] {
+  --ticket-test-offset: 37px;
+}
+
+.ticket-test-notice {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  height: var(--ticket-test-offset);
+  margin: 0;
+  padding: 6px 12px;
+  color: var(--ink);
+  background: var(--paper);
+  border-bottom: 1px solid var(--rule);
+  font-size: 12px;
+  line-height: 24px;
+}

@@ -197,6 +197,7 @@ export function TicketOperationsPanel({
             data-has-selection={Boolean(operations.selectedPublicCode)}
           >
             <TicketOperationsQueue
+              mode={mode}
               queue={operations.queue}
               capabilities={operations.capabilities}
               selectedPublicCode={operations.selectedPublicCode}

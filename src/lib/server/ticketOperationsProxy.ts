@@ -93,6 +93,7 @@ const TICKET_OPERATIONS_READ_PATHS = new Set([
   "/api/admin/v2/tickets/queue?scope=refund",
 ]);
 const TICKET_OPERATIONS_MUTATION_PATHS = new Set([
+  "/api/admin/v2/tickets/search",
   "/api/admin/v2/tickets/sessions/revoke",
   "/api/admin/v2/tickets/admissions/assist",
   "/api/admin/v2/tickets/refund-reviews/resolve",
@@ -559,7 +560,7 @@ function commandPublicCode(value: unknown) {
   return typeof value === "string" && ORDER_PUBLIC_CODE_PATTERN.test(value) ? value : null;
 }
 
-async function readBoundedCommandBody(request: Request) {
+export async function readBoundedCommandBody(request: Request) {
   const declaredLength = Number(request.headers.get("content-length"));
   if (Number.isFinite(declaredLength) && declaredLength > MAX_COMMAND_BODY_BYTES) return null;
   if (!request.body) return null;

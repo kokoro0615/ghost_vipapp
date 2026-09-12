@@ -7,7 +7,7 @@
 
 .panelBackdrop {
   position: fixed;
-  inset: 0;
+  inset: var(--ticket-test-offset, 0px) 0 0;
   z-index: 80;
   display: grid;
   padding: var(--s-5);
@@ -1440,3 +1440,31 @@
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   }
 }
+
+.orderSearch {
+  padding: var(--s-5);
+  border-bottom: 1px solid var(--rule);
+}
+.orderSearch summary {
+  min-height: var(--h-control);
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+.orderSearch form,
+.orderSearch label {
+  display: grid;
+  gap: var(--s-4);
+}
+.orderSearch form { padding-block: var(--s-5); }
+.orderSearch input,
+.orderSearch select {
+  min-width: 0;
+  width: 100%;
+  min-height: var(--h-control);
+  font-size: var(--t-field);
+}
+.orderSearch p { color: var(--ink-2); }
+
+.orderSearch summary:focus-visible { outline: 3px solid var(--focus); outline-offset: var(--s-1); }
+.orderSearch summary:active { background: var(--surface-active); }

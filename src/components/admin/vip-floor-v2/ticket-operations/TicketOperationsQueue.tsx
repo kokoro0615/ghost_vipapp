@@ -1,5 +1,6 @@
 "use client";
 
+import { TicketOrderSearch } from "./TicketOrderSearch";
 import { RefreshCw, Search } from "lucide-react";
 
 import type {
@@ -43,6 +44,7 @@ function priorityTone(priority: TicketOperationQueueItem["priority"]) {
 }
 
 type Props = {
+  mode: "production" | "demo";
   queue: TicketOperationsQueueResponse | null;
   capabilities: TicketOperationsCapabilities;
   selectedPublicCode: string | null;
@@ -56,6 +58,7 @@ type Props = {
 };
 
 export function TicketOperationsQueue({
+  mode,
   queue,
   capabilities,
   selectedPublicCode,
@@ -92,11 +95,11 @@ export function TicketOperationsQueue({
       >
         <label>
           <Search size={16} aria-hidden />
-          <span className="sr-only">公開注文番号、メールの一部、イベント、入場状態で検索</span>
+          <span className="sr-only">表示中の対応を絞り込み、または公開注文番号で開く</span>
           <input
             type="search"
             value={query}
-            placeholder="注文番号 / メール / イベント / 状態"
+            placeholder="表示中を絞り込む / 注文番号"
             autoComplete="off"
             onChange={(event) => onQuery(event.target.value)}
           />
@@ -119,6 +122,7 @@ export function TicketOperationsQueue({
       </div>
 
       <div className={styles.queueScroll}>
+        {capabilities.managerOperationsEnabled ? <TicketOrderSearch mode={mode} onSelect={onSelect} /> : null}
         {items.length === 0 ? (
           <div className={styles.queueEmpty}>
             <strong>{query ? "一致する対応はありません" : "現在の対応はありません"}</strong>

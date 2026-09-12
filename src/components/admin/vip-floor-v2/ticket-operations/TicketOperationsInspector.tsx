@@ -380,9 +380,10 @@ export function TicketOperationsInspector({
                 {order.emailJobs.map((job) => (
                   <li key={job.emailJobId}>
                     <div>
-                      <strong>{job.purpose === "otp" ? "OTP" : job.purpose === "wallet_access" ? "Wallet案内" : "復旧メール"}</strong>
+                      <strong>{job.purpose === "otp" ? "OTP" : job.purpose === "wallet_access" ? "購入案内" : "復旧メール"}</strong>
                       <span className={styles.statusLabel} data-tone={statusTone(job.status)}><span aria-hidden />{job.status} · {job.attemptCount}回</span>
                     </div>
+                    {job.purpose === "wallet_access" ? <p className={styles.warningLine}>購入案内は自動で再送されます。配信停止・受付不明の場合は送信記録を確認し、本人認証によるチケット再取得をご案内ください。</p> : null}
                     <div className={styles.inlineActions}>
                       <button
                         type="button"

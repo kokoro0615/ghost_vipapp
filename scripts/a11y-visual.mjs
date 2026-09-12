@@ -728,7 +728,7 @@ async function auditTicketOperations(context, capture) {
   await capture(page, "ticket-operations-queue");
 
   const search = panel.getByRole("searchbox", {
-    name: "公開注文番号、メールの一部、イベント、入場状態で検索",
+    name: "表示中の対応を絞り込み、または公開注文番号で開く",
   });
   await search.fill("該当なし");
   await panel.getByText("一致する対応はありません", { exact: true }).waitFor();
@@ -781,8 +781,32 @@ async function auditTicketOperations(context, capture) {
     ticketOperationStatus: 409,
   });
   const conflictPanel = await openTicketOperations(conflictPage);
+  let searchPage = 0;
+  await conflictPage.route("**/api/admin/vip-floor/tickets/search", async route => {
+    const query = route.request().postDataJSON();
+    assert.equal(query.email, "synthetic@example.test");
+    searchPage += 1;
+    const hasMore = searchPage === 1;
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({
+      ok: true, orders: [{ publicCode: "GT-QA20260811", eventDate: "2026-08-11", eventTitle: "GHOST QA · 長いイベント名と複数候補の照会", status: "fulfilled", quantity: 2 }],
+      hasMore, nextCursor: hasMore ? { id: "a0000000-0000-4000-8000-000000000001", createdAt: "2026-08-01T00:00:00Z" } : null,
+      auditId: "a0000000-0000-4000-8000-000000000002",
+    }) });
+  });
+  await conflictPanel.getByText("メールと営業日で注文を探す", { exact: true }).click();
+  await conflictPanel.getByLabel("購入時のメールアドレス", { exact: true }).fill("synthetic@example.test");
+  await capture(conflictPage, "ticket-operations-full-search-form");
+  await conflictPanel.getByRole("button", { name: "全注文から検索", exact: true }).click();
+  await conflictPanel.getByText("1件表示・続きがあります", { exact: true }).waitFor();
+  await capture(conflictPage, "ticket-operations-full-search-results");
+  await conflictPanel.getByRole("button", { name: "次の25件", exact: true }).click();
+  await conflictPanel.getByText("1件表示・この条件の最終ページです", { exact: true }).waitFor();
+  await capture(conflictPage, "ticket-operations-full-search-last-page");
+  await conflictPanel.getByText("メールと営業日で注文を探す", { exact: true }).click();
   await conflictPanel.getByRole("button", { name: /GT-QA20260811/u }).first().click();
   await conflictPanel.getByRole("heading", { name: "GT-QA20260811", exact: true }).waitFor();
+  await conflictPanel.getByText("購入案内", { exact: true }).scrollIntoViewIfNeeded();
+  await capture(conflictPage, "ticket-operations-purchase-notice");
   await conflictPanel.getByRole("checkbox").first().check();
   await conflictPanel.getByRole("button", { name: "補助入場を確認", exact: true }).click();
   const conflictDialog = conflictPage.getByRole("alertdialog", {
@@ -1328,6 +1352,18 @@ async function installSyntheticRoutes(page, scenario = {}) {
 async function auditPage(page, { state, viewport }) {
   const viewportKey = `${viewport.browser}-${viewport.width}x${viewport.height}`;
   const label = `${viewportKey}:${state}`;
+  const testNoticeOverlap = await page.evaluate(() => {
+    const notice = document.querySelector(".ticket-test-notice");
+    const panel = document.querySelector("[data-ticket-operations-root]");
+    if (!notice || !panel) return null;
+    const noticeBottom = notice.getBoundingClientRect().bottom;
+    return [...panel.querySelectorAll("#ticket-operations-title, [aria-label='チケット対応を閉じる']")]
+      .filter((element) => element.getBoundingClientRect().top < noticeBottom)
+      .map((element) => element.id || element.getAttribute("aria-label"));
+  });
+  if (testNoticeOverlap !== null) {
+    assert.deepEqual(testNoticeOverlap, [], `TEST notice obscures ticket controls in ${label}`);
+  }
   // Screenshots and geometry must witness the self-hosted operator face, not a
   // transient fallback frame. This also makes before/after text signatures
   // deterministic on slower CI/font-shard loads.
@@ -1778,7 +1814,7 @@ const ticketOperationsOrderFixture = {
       admittedAt: null,
     }],
     refundReview: null,
-    emailJobs: [],
+    emailJobs: [{emailJobId:"81000000-0000-4000-8000-000000000009",purpose:"wallet_access",status:"dead",attemptCount:2,nextAttemptAt:null,expectedVersion:3,retryable:false}],
     timeline: [{
       auditId: "81000000-0000-4000-8000-000000000006",
       type: "wallet_verified",
