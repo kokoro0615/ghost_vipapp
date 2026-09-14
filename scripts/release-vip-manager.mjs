@@ -1,4 +1,7 @@
 #!/usr/bin/env node
+import { getGhostVercelTeam } from "./lib/vercel-team.mjs";
+
+const VERCEL_TEAM = getGhostVercelTeam();
 
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
@@ -20,10 +23,10 @@ import {
 
 export const RELEASE_CONFIG = Object.freeze({
   projectId: "prj_mchunQTOAeQMkn86A1zCtMapdVqp",
-  teamId: "team_VHoP9car1gK30q4ideCMW0g5",
+  teamId: VERCEL_TEAM.teamId,
   projectName: "ghost-vipapp",
   releaseBranch: "codex/vip-manager-production-light-ui-20260727",
-  scope: "projects-b6224582",
+  scope: VERCEL_TEAM.scope,
   productionHostname: "ghost-vipapp.vercel.app",
   backendOrigin: "https://ghost-ruby-one.vercel.app",
   websiteProjectId: "prj_ve4VBLGc7Ao5xqvepbEa06X7n8wM",
@@ -95,6 +98,7 @@ function vipCiEnvironment(source = process.env) {
 function vipVercelEnvironment(source = process.env) {
   return {
     ...baseChildEnvironment(source),
+    GHOST_VERCEL_TEAM_PROFILE: VERCEL_TEAM.profile,
     VERCEL_ORG_ID: RELEASE_CONFIG.teamId,
     VERCEL_PROJECT_ID: RELEASE_CONFIG.projectId,
   };

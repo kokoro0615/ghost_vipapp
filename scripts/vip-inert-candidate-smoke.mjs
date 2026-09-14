@@ -1,4 +1,7 @@
 #!/usr/bin/env node
+import { getGhostVercelTeam } from "./lib/vercel-team.mjs";
+
+const VERCEL_TEAM = getGhostVercelTeam();
 
 import { spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
@@ -21,8 +24,8 @@ import {
 } from "./lib/production-source-attestation.mjs";
 
 const PROJECT_ID = "prj_mchunQTOAeQMkn86A1zCtMapdVqp";
-const TEAM_ID = "team_VHoP9car1gK30q4ideCMW0g5";
-const SCOPE = "projects-b6224582";
+const TEAM_ID = VERCEL_TEAM.teamId;
+const SCOPE = VERCEL_TEAM.scope;
 const DEPLOYMENT_ID = /^dpl_[A-Za-z0-9]+$/u;
 const BASE_CHILD_ENV_KEYS = Object.freeze([
   "PATH", "HOME", "TMPDIR", "TEMP", "TMP", "LANG", "LC_ALL", "LC_CTYPE", "TERM",
