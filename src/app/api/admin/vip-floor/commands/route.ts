@@ -13,8 +13,17 @@ import {
   ghostAdminFetch,
   requireAdminOperation,
 } from "@/lib/server/ghostAdminProxy";
+import {
+  assertOperatorMutation,
+  isHttpBodyError,
+  readBoundedJsonObject,
+} from "@/lib/server/httpBoundary";
 
 export const runtime = "nodejs";
+
+// Command bodies are a small {kind, reservationId, expectedVersion, payload}
+// shape; 8 KiB matches the website's admin-RPC body ceiling and is generous.
+const COMMAND_BODY_MAX_BYTES = 8 * 1024;
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 const COMMANDS = {
@@ -294,6 +303,13 @@ function normalizeCommandFailurePayload(status: number, payload: Record<string, 
 }
 
 export async function POST(request: Request) {
+  // Cookie-backed mutation entry: reject cross-site/same-site-sibling browser
+  // contexts and non-JSON bodies before any session or payload work.
+  const boundary = assertOperatorMutation(request);
+  if (!boundary.ok) {
+    return NextResponse.json({ ok: false, error: boundary.error }, { status: boundary.status });
+  }
+
   const access = await requireAdminOperation(request);
   if (!access.ok) return access.response;
   const token = access.token;
@@ -303,8 +319,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "invalid_idempotency_key" }, { status: 400 });
   }
 
-  const body = await request.json().catch(() => null) as CommandBody | null;
-  if (!body?.kind || !ALLOWED_KINDS.has(body.kind) || !COMMANDS[body.kind] || !body.reservationId || !UUID_PATTERN.test(body.reservationId)) {
+  let body: CommandBody;
+  try {
+    body = (await readBoundedJsonObject(request, COMMAND_BODY_MAX_BYTES)) as CommandBody;
+  } catch (error) {
+    if (isHttpBodyError(error)) {
+      const tooLarge = error.code === "body_too_large" || error.code === "declared_length_too_large";
+      return NextResponse.json(
+        { ok: false, error: tooLarge ? "request_body_too_large" : "invalid_json_body" },
+        { status: tooLarge ? 413 : 400 },
+      );
+    }
+    throw error;
+  }
+  if (!body.kind || !ALLOWED_KINDS.has(body.kind) || !COMMANDS[body.kind] || !body.reservationId || !UUID_PATTERN.test(body.reservationId)) {
     return NextResponse.json({ ok: false, error: "unsupported_command" }, { status: 400 });
   }
 

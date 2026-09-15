@@ -11,8 +11,16 @@ import {
   ghostAdminFetch,
   requireAdminOperation,
 } from "@/lib/server/ghostAdminProxy";
+import {
+  assertOperatorMutation,
+  isHttpBodyError,
+  readBoundedJsonObject,
+} from "@/lib/server/httpBoundary";
 
 export const runtime = "nodejs";
+
+// Operation bodies are a small {kind, payload} shape; 8 KiB is generous.
+const OPERATION_BODY_MAX_BYTES = 8 * 1024;
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 const BUSINESS_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/u;
@@ -24,6 +32,11 @@ type OperationBody = {
 };
 
 export async function POST(request: Request) {
+  const boundary = assertOperatorMutation(request);
+  if (!boundary.ok) {
+    return NextResponse.json({ ok: false, error: boundary.error }, { status: boundary.status });
+  }
+
   const access = await requireAdminOperation(request, { ownerOnly: true });
   if (!access.ok) return access.response;
   const token = access.token;
@@ -34,9 +47,21 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "invalid_idempotency_key" }, { status: 400 });
   }
 
-  const body = await request.json().catch(() => null) as OperationBody | null;
+  let body: OperationBody;
+  try {
+    body = (await readBoundedJsonObject(request, OPERATION_BODY_MAX_BYTES)) as OperationBody;
+  } catch (error) {
+    if (isHttpBodyError(error)) {
+      const tooLarge = error.code === "body_too_large" || error.code === "declared_length_too_large";
+      return NextResponse.json(
+        { ok: false, error: tooLarge ? "request_body_too_large" : "invalid_json_body" },
+        { status: tooLarge ? 413 : 400 },
+      );
+    }
+    throw error;
+  }
 
-  if (!body?.kind || !body.payload) {
+  if (!body.kind || !body.payload) {
     return NextResponse.json({ ok: false, error: "invalid_operation" }, { status: 400 });
   }
 

@@ -5,8 +5,16 @@ import {
   ghostAdminFetch,
   requireAdminOperation,
 } from "@/lib/server/ghostAdminProxy";
+import {
+  assertOperatorMutation,
+  isHttpBodyError,
+  readBoundedJsonObject,
+} from "@/lib/server/httpBoundary";
 
 export const runtime = "nodejs";
+
+// Metric event bodies are tiny; 4 KiB is generous.
+const METRIC_BODY_MAX_BYTES = 4 * 1024;
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/u;
 
@@ -27,9 +35,26 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const boundary = assertOperatorMutation(request);
+  if (!boundary.ok) {
+    return NextResponse.json({ ok: false, error: boundary.error }, { status: boundary.status });
+  }
+
   const auth = await requireAdminOperation(request, { ownerOnly: true });
   if (!auth.ok) return auth.response;
-  const body = await request.json().catch(() => null) as Record<string, unknown> | null;
+  let body: Record<string, unknown>;
+  try {
+    body = await readBoundedJsonObject(request, METRIC_BODY_MAX_BYTES);
+  } catch (error) {
+    if (isHttpBodyError(error)) {
+      const tooLarge = error.code === "body_too_large" || error.code === "declared_length_too_large";
+      return NextResponse.json(
+        { ok: false, error: tooLarge ? "request_body_too_large" : "invalid_json_body" },
+        { status: tooLarge ? 413 : 400 },
+      );
+    }
+    throw error;
+  }
   const event = body?.event === "realtime_gap" || body?.event === "realtime_unavailable"
     ? body.event
     : null;

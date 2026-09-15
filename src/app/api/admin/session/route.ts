@@ -28,8 +28,16 @@ import {
   setAdminToken,
 } from "@/lib/server/ghostAdminProxy";
 import { normalizeVipAdminRole } from "@/lib/adminPermissions";
+import {
+  assertOperatorMutation,
+  isHttpBodyError,
+  readBoundedJsonObject,
+} from "@/lib/server/httpBoundary";
 
 export const runtime = "nodejs";
+
+// The unlock body is a {username, password} credential pair; 4 KiB is generous.
+const UNLOCK_BODY_MAX_BYTES = 4 * 1024;
 
 function accessConfiguration() {
   return {
@@ -254,16 +262,34 @@ function deleteDemoSession() {
 }
 
 async function unlockAccess(request: Request) {
+  // This route installs the basic-access cookie, so it must be a same-origin
+  // JSON mutation; a cross-site browser POST must not install a cookie.
+  const boundary = assertOperatorMutation(request);
+  if (!boundary.ok) {
+    return NextResponse.json(
+      { ok: false, error: boundary.error },
+      { status: boundary.status, headers: { "cache-control": "no-store" } },
+    );
+  }
   if (request.headers.get(TRUSTED_ACCESS_LOCK_HEADER) !== "1") {
     return NextResponse.json(
       { ok: false, error: "access_not_locked" },
       { status: 409, headers: { "cache-control": "no-store" } },
     );
   }
-  const payload = await request.json().catch(() => null) as {
-    username?: unknown;
-    password?: unknown;
-  } | null;
+  let payload: { username?: unknown; password?: unknown };
+  try {
+    payload = await readBoundedJsonObject(request, UNLOCK_BODY_MAX_BYTES);
+  } catch (error) {
+    if (isHttpBodyError(error)) {
+      const tooLarge = error.code === "body_too_large" || error.code === "declared_length_too_large";
+      return NextResponse.json(
+        { ok: false, error: tooLarge ? "request_body_too_large" : "invalid_json_body" },
+        { status: tooLarge ? 413 : 400, headers: { "cache-control": "no-store" } },
+      );
+    }
+    throw error;
+  }
   if (typeof payload?.username !== "string" || typeof payload.password !== "string") {
     return NextResponse.json(
       { ok: false, error: "invalid_credentials" },
