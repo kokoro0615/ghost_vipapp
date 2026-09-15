@@ -3,10 +3,16 @@ import { NextResponse } from "next/server";
 import { normalizeGhostBusinessDay } from "@/lib/ghostOperatingHours";
 import { VIP_FLOOR_SCHEMA_VERSION } from "@/lib/vipFloorV2Contract";
 import { copyJson, ghostAdminFetch, readAdminToken } from "@/lib/server/ghostAdminProxy";
+import { assertOperatorMutation } from "@/lib/server/httpBoundary";
 
 export const runtime = "nodejs";
 
 export async function GET(request: Request) {
+  // Cookie-authenticated board read: apply the fetch-metadata gate (no body).
+  const boundary = assertOperatorMutation(request, { requireJsonBody: false });
+  if (!boundary.ok) {
+    return NextResponse.json({ ok: false, error: boundary.error }, { status: boundary.status });
+  }
   const token = readAdminToken(request);
   if (!token) return NextResponse.json({ ok: false, error: "missing_admin_session" }, { status: 401 });
   const url = new URL(request.url);

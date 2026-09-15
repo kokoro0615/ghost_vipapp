@@ -22,11 +22,23 @@ try {
   backendContractAvailable = false;
 }
 
+async function loadBoundaryModule() {
+  const source = await read("src/lib/server/httpBoundary.ts");
+  const compiled = ts.transpileModule(source, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+  }).outputText;
+  const context = { exports: {}, module: { exports: {} }, TextDecoder, URL };
+  context.module.exports = context.exports;
+  vm.runInNewContext(compiled, context);
+  return context.module.exports;
+}
+
 async function loadProxy() {
   const source = await read("src/lib/server/ticketOperationsProxy.ts");
   const compiled = ts.transpileModule(source, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
   }).outputText;
+  const httpBoundary = await loadBoundaryModule();
   const context = {
     exports: {},
     module: { exports: {} },
@@ -45,6 +57,7 @@ async function loadProxy() {
         };
       }
       if (specifier === "./ghostAdminProxy") return { ghostAdminFetch() {} };
+      if (specifier === "./httpBoundary") return httpBoundary;
       if (specifier === "./ticketOperationsDisplayFlags") {
         return {
           readVipTicketOperationsDisplayCapabilities() {

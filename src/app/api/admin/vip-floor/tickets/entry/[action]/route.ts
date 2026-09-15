@@ -1,9 +1,12 @@
 import { copyJson, requireAdminOperation } from "@/lib/server/ghostAdminProxy";
+import { assertOperatorMutation } from "@/lib/server/httpBoundary";
 import { projectTicketOperationMutation, readTicketOperationCommand, requireVipTicketCapability, ticketOperationCommandBody, ticketOperationsContractFailure, ticketOperationsFetch, ticketOperationsJson, ticketOperationsUpstreamFailure } from "@/lib/server/ticketOperationsProxy";
 import type { TicketEntryRecoveryAction } from "@/lib/ticketOperationsContract";
 
 export const runtime = "nodejs";
 export async function POST(request: Request, context: { params: Promise<{ action: string }> }) {
+  const boundary = assertOperatorMutation(request);
+  if (!boundary.ok) return ticketOperationsJson({ ok: false, error: boundary.error }, boundary.status);
   const auth = await requireAdminOperation(request, { ownerOnly: true });
   if (!auth.ok) return ticketOperationsJson({ ok: false, error: "owner_session_required" }, auth.response.status);
   const part = (await context.params).action;

@@ -2,6 +2,7 @@ import {
   copyJson,
   requireAdminOperation,
 } from "@/lib/server/ghostAdminProxy";
+import { assertOperatorMutation } from "@/lib/server/httpBoundary";
 import {
   projectTicketOperationMutation,
   readTicketOperationCommand,
@@ -16,6 +17,12 @@ import {
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
+  // Cookie-backed mutation: reject cross-site/non-JSON requests before any
+  // session or command work (same-origin boundary, idempotency preserved).
+  const boundary = assertOperatorMutation(request);
+  if (!boundary.ok) {
+    return ticketOperationsJson({ ok: false, error: boundary.error }, boundary.status);
+  }
   const auth = await requireAdminOperation(request, { ownerOnly: true });
   if (!auth.ok) return ticketOperationsJson({ ok: false, error: "owner_session_required" }, auth.response.status);
   const gate = requireVipTicketCapability("refund");

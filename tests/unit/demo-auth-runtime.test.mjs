@@ -200,6 +200,11 @@ test("session route logout clears every access cookie and only explicit credenti
     "src/app/api/admin/session/route.ts",
     {
       "next/server": { NextResponse: RuntimeResponse },
+      "@/lib/server/httpBoundary": await loadTypeScriptModule(
+        "src/lib/server/httpBoundary.ts",
+        {},
+        { TextDecoder, URL },
+      ),
       "@/lib/demo/accessContract": access,
       "@/lib/demo/session.server": {
         clearDemoSessionCookie(response) {

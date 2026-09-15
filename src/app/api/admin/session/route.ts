@@ -327,6 +327,15 @@ async function unlockAccess(request: Request) {
 }
 
 export async function GET(request: Request) {
+  // Session reads can install owner/demo cookies, so they must not run from a
+  // cross-site browser context; no request body is expected.
+  const boundary = assertOperatorMutation(request, { requireJsonBody: false });
+  if (!boundary.ok) {
+    return NextResponse.json(
+      { ok: false, error: boundary.error },
+      { status: boundary.status, headers: { "cache-control": "no-store" } },
+    );
+  }
   if (request.headers.get(TRUSTED_ACCESS_LOCK_HEADER) === "1") return lockedResponse();
   const lane = request.headers.get(TRUSTED_ACCESS_LANE_HEADER);
   if (lane === "owner") return getOwnerSession(request);
@@ -335,6 +344,14 @@ export async function GET(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+  // Logout clears session cookies; apply the same body-less boundary.
+  const boundary = assertOperatorMutation(request, { requireJsonBody: false });
+  if (!boundary.ok) {
+    return NextResponse.json(
+      { ok: false, error: boundary.error },
+      { status: boundary.status, headers: { "cache-control": "no-store" } },
+    );
+  }
   if (request.headers.get(TRUSTED_ACCESS_LOCK_HEADER) === "1") return lockedResponse();
   const lane = request.headers.get(TRUSTED_ACCESS_LANE_HEADER);
   if (lane === "owner") return deleteOwnerSession(request);

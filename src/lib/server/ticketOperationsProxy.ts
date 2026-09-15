@@ -29,6 +29,7 @@ import type {
   TicketWalletState,
 } from "@/lib/ticketOperationsContract";
 import { ghostAdminFetch } from "./ghostAdminProxy";
+import { isHttpBodyError, readBoundedJsonObject } from "./httpBoundary";
 import { readVipTicketOperationsDisplayCapabilities } from "./ticketOperationsDisplayFlags";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
@@ -576,38 +577,15 @@ function commandPublicCode(value: unknown) {
   return typeof value === "string" && ORDER_PUBLIC_CODE_PATTERN.test(value) ? value : null;
 }
 
+// Command bodies share the reviewed httpBoundary reader (strict
+// Content-Length, streamed ceiling, fatal UTF-8, object-only JSON). Any
+// HttpBodyError maps to null so callers keep the invalid_request/400 contract.
 export async function readBoundedCommandBody(request: Request) {
-  const declaredLength = Number(request.headers.get("content-length"));
-  if (Number.isFinite(declaredLength) && declaredLength > MAX_COMMAND_BODY_BYTES) return null;
-  if (!request.body) return null;
-
-  const reader = request.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let byteLength = 0;
-  while (true) {
-    const result = await reader.read();
-    if (result.done) break;
-    byteLength += result.value.byteLength;
-    if (byteLength > MAX_COMMAND_BODY_BYTES) {
-      await reader.cancel();
-      return null;
-    }
-    chunks.push(result.value);
-  }
-
-  const bytes = new Uint8Array(byteLength);
-  let offset = 0;
-  for (const chunk of chunks) {
-    bytes.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
   try {
-    const value = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
-    return value && typeof value === "object" && !Array.isArray(value)
-      ? value as Record<string, unknown>
-      : null;
-  } catch {
-    return null;
+    return await readBoundedJsonObject(request, MAX_COMMAND_BODY_BYTES);
+  } catch (error) {
+    if (isHttpBodyError(error)) return null;
+    throw error;
   }
 }
 
