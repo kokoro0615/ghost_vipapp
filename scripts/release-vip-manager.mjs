@@ -30,9 +30,9 @@ export const RELEASE_CONFIG = Object.freeze({
   productionHostname: "ghost-vipapp.vercel.app",
   backendOrigin: "https://ghost-ruby-one.vercel.app",
   websiteProjectId: "prj_ve4VBLGc7Ao5xqvepbEa06X7n8wM",
-  websiteReleaseBranch: "codex/vip-manager-production-backend-20260727",
+  websiteReleaseBranch: "main",
   websiteProductionHostname: "ghost-ruby-one.vercel.app",
-  websiteCompatibilityContract: "ticket-wallet-inert-v1",
+  websiteCompatibilityContract: "ticket-wallet-active-v1",
   promotionLeaseKey: "GHOST_RELEASE_PROMOTION_LOCK",
   bootstrapBaselineCommit: "17a900051edfb892ddb4a22f7eb3da3ed5e41565",
 });
@@ -40,15 +40,15 @@ export const RELEASE_CONFIG = Object.freeze({
 const PROMOTION_LEASE_TTL_MS = 4 * 60 * 60 * 1000;
 const VERCEL_API_ORIGIN = "https://api.vercel.com";
 const WEBSITE_READINESS_PATH = "/api/internal/ticket-wallet/activation-readiness";
-const WEBSITE_INERT_CAPABILITIES = Object.freeze({
-  walletRead: false,
-  otpDelivery: false,
-  transactionalEmailDrain: false,
-  swipePrepare: false,
-  swipeCommit: false,
-  managerOperations: false,
+const WEBSITE_ACTIVE_CAPABILITIES = Object.freeze({
+  walletRead: true,
+  otpDelivery: true,
+  transactionalEmailDrain: true,
+  swipePrepare: true,
+  swipeCommit: true,
+  managerOperations: true,
   refundReview: true,
-  providerWebhook: false,
+  providerWebhook: true,
 });
 const BASE_CHILD_ENV_KEYS = Object.freeze([
   "PATH", "HOME", "TMPDIR", "TEMP", "TMP", "LANG", "LC_ALL", "LC_CTYPE", "TERM", "CI",
@@ -83,6 +83,13 @@ function copyChildPort(output, source, key) {
   output[key] = value;
 }
 
+function copyChildQaScope(output, source, key, pattern) {
+  const value = source[key]?.trim();
+  if (!value) return;
+  if (!pattern.test(value)) throw new Error(`release_child_env_invalid:${key}`);
+  output[key] = value;
+}
+
 function vipCiEnvironment(source = process.env) {
   const output = baseChildEnvironment(source);
   for (const key of [
@@ -92,6 +99,8 @@ function vipCiEnvironment(source = process.env) {
     "GHOST_VIPAPP_E2E_ENV_FILE",
   ]) copyAbsoluteChildPath(output, source, key);
   for (const key of ["A11Y_PORT", "MAINTENANCE_QA_PORT"]) copyChildPort(output, source, key);
+  copyChildQaScope(output, source, "GHOST_VIP_QA_VIEWPORT", /^[a-z]+-\d{3,4}x\d{3,4}$/u);
+  copyChildQaScope(output, source, "GHOST_VIP_QA_STATE", /^[a-z][a-z0-9-]{0,63}$/u);
   return output;
 }
 
@@ -577,7 +586,7 @@ function assertStagedCandidate(candidate, errorSuffix = "") {
 
 function createWebsiteCompatibilityBinding({ deploymentId, commit, ref }) {
   const source = "cli";
-  const capabilities = Object.entries(WEBSITE_INERT_CAPABILITIES)
+  const capabilities = Object.entries(WEBSITE_ACTIVE_CAPABILITIES)
     .map(([name, enabled]) => `${name}=${enabled}`)
     .join(",");
   const digest = createHash("sha256").update([
@@ -623,11 +632,11 @@ function assertWebsiteDeployment(deployment, expectedId) {
   return createWebsiteCompatibilityBinding({ deploymentId, commit, ref });
 }
 
-function assertWebsiteInertReadiness(readiness, binding, now) {
+function assertWebsiteActiveReadiness(readiness, binding, now) {
   const observedAt = Date.parse(readiness?.observedAt ?? "");
   const capabilities = readiness?.capabilities;
   if (
-    readiness?.ok !== false
+    readiness?.ok !== true
     || readiness?.websiteCommit !== binding.commit
     || readiness?.environment !== "live"
     || readiness?.trialMode !== false
@@ -637,13 +646,13 @@ function assertWebsiteInertReadiness(readiness, binding, now) {
     || now - observedAt > 5 * 60_000
     || capabilities === null
     || typeof capabilities !== "object"
-    || Object.keys(capabilities).length !== Object.keys(WEBSITE_INERT_CAPABILITIES).length
-    || Object.entries(WEBSITE_INERT_CAPABILITIES).some(([name, expected]) => capabilities[name] !== expected)
-  ) throw new Error("website_inert_compatibility_mismatch");
+    || Object.keys(capabilities).length !== Object.keys(WEBSITE_ACTIVE_CAPABILITIES).length
+    || Object.entries(WEBSITE_ACTIVE_CAPABILITIES).some(([name, expected]) => capabilities[name] !== expected)
+  ) throw new Error("website_active_compatibility_mismatch");
   return Object.freeze({
     ...binding,
     observedAt: readiness.observedAt,
-    capabilities: WEBSITE_INERT_CAPABILITIES,
+    capabilities: WEBSITE_ACTIVE_CAPABILITIES,
   });
 }
 
@@ -655,7 +664,7 @@ export async function readCanonicalWebsiteCompatibility({ auth }, runtime = crea
   const deployment = await runtime.getVercelDeployment(deploymentId, auth);
   const binding = assertWebsiteDeployment(deployment, deploymentId);
   const readiness = await runtime.readWebsiteReadiness();
-  const proof = assertWebsiteInertReadiness(readiness, binding, runtime.now());
+  const proof = assertWebsiteActiveReadiness(readiness, binding, runtime.now());
   const deploymentIdAfter = await runtime.resolveProductionDeploymentId(
     RELEASE_CONFIG.websiteProductionHostname,
     auth,
@@ -1186,7 +1195,7 @@ export async function promoteCandidate(
     env: vipCiEnvironment(),
   });
   await runtime.run("npm", [
-    "run", "e2e:staging:inert", "--", "--deployment-id", deploymentId,
+    "run", "e2e:staging:active", "--", "--deployment-id", deploymentId,
   ], {
     cwd: repoRoot,
     env: vipCiEnvironment(),

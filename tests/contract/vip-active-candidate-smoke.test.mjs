@@ -5,13 +5,13 @@ import path from "node:path";
 import test from "node:test";
 
 import {
-  runVipInertCandidateSmoke,
-} from "../../scripts/vip-inert-candidate-smoke.mjs";
+  runVipActiveCandidateSmoke,
+} from "../../scripts/vip-active-candidate-smoke.mjs";
 
-const deploymentId = "dpl_InertCandidate123";
+const deploymentId = "dpl_ActiveCandidate123";
 
 async function fixture(t) {
-  const root = await mkdtemp(path.join(tmpdir(), "ghost-vip-inert-smoke-test-"));
+  const root = await mkdtemp(path.join(tmpdir(), "ghost-vip-active-smoke-test-"));
   const envFile = path.join(root, "owner.env");
   await writeFile(envFile, [
     "VIPAPP_BASIC_USER=owner-user",
@@ -33,8 +33,8 @@ function responseFor(requestPath, method) {
     return JSON.stringify({
       ok: true,
       serverNow: "2026-08-11T09:00:00.000Z",
-      capabilities: { managerOperationsEnabled: false, refundReviewEnabled: true },
-      readiness: { managerOperations: "disabled", refundReview: "ready" },
+      capabilities: { managerOperationsEnabled: true, refundReviewEnabled: true },
+      readiness: { managerOperations: "ready", refundReview: "ready" },
     });
   }
   if (requestPath === "/api/admin/session" && method === "DELETE") {
@@ -80,8 +80,8 @@ function fakeRuntime(commands, { badCapabilities = false } = {}) {
       if (badCapabilities && requestPath.endsWith("/capabilities")) {
         body = JSON.stringify({
           ok: true,
-          capabilities: { managerOperationsEnabled: true, refundReviewEnabled: true },
-          readiness: { managerOperations: "ready", refundReview: "ready" },
+          capabilities: { managerOperationsEnabled: false, refundReviewEnabled: true },
+          readiness: { managerOperations: "disabled", refundReview: "ready" },
         });
       }
       return Promise.all([
@@ -99,12 +99,12 @@ function fakeRuntime(commands, { badCapabilities = false } = {}) {
   };
 }
 
-test("inert candidate smoke proves Owner session and refund-only capabilities without leaking secrets", async (t) => {
+test("active candidate smoke proves Owner session and active manager/refund capabilities without leaking secrets", async (t) => {
   const { envFile } = await fixture(t);
   const commands = [];
   const runtime = fakeRuntime(commands);
 
-  const result = await runVipInertCandidateSmoke({
+  const result = await runVipActiveCandidateSmoke({
     repoRoot: "/fixture/repo",
     deploymentId,
     envFile,
@@ -112,7 +112,7 @@ test("inert candidate smoke proves Owner session and refund-only capabilities wi
 
   assert.equal(result.ok, true);
   assert.equal(result.deploymentId, deploymentId);
-  assert.equal(result.managerOperationsEnabled, false);
+  assert.equal(result.managerOperationsEnabled, true);
   assert.equal(result.refundReviewEnabled, true);
   assert.equal(commands.length, 4);
   assert.deepEqual(commands.map(({ args }) => [args[3], args.includes("DELETE") ? "DELETE" : "GET"]), [
@@ -131,14 +131,14 @@ test("inert candidate smoke proves Owner session and refund-only capabilities wi
   assert.deepEqual(runtime.state(), { acquired: true, released: true });
 });
 
-test("inert candidate smoke revokes bypass and removes temporary files on capability drift", async (t) => {
+test("active candidate smoke revokes bypass and removes temporary files on capability drift", async (t) => {
   const { envFile } = await fixture(t);
   const commands = [];
   const runtime = fakeRuntime(commands, { badCapabilities: true });
 
   await assert.rejects(
-    runVipInertCandidateSmoke({ repoRoot: "/fixture/repo", deploymentId, envFile }, runtime),
-    /inert_candidate_capabilities_mismatch/u,
+    runVipActiveCandidateSmoke({ repoRoot: "/fixture/repo", deploymentId, envFile }, runtime),
+    /active_candidate_capabilities_mismatch/u,
   );
   assert.deepEqual(runtime.state(), { acquired: true, released: true });
   const tempRoot = commands[0].args[commands[0].args.indexOf("--config") + 1];

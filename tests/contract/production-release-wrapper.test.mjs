@@ -121,10 +121,10 @@ function websiteCompatibilityDigest({
     RELEASE_CONFIG.teamId,
     deploymentId,
     commit,
-    "codex/vip-manager-production-backend-20260727",
+    "main",
     "cli",
-    "ticket-wallet-inert-v1",
-    "walletRead=false,otpDelivery=false,transactionalEmailDrain=false,swipePrepare=false,swipeCommit=false,managerOperations=false,refundReview=true,providerWebhook=false",
+    "ticket-wallet-active-v1",
+    "walletRead=true,otpDelivery=true,transactionalEmailDrain=true,swipePrepare=true,swipeCommit=true,managerOperations=true,refundReview=true,providerWebhook=true",
   ].join("\0")).digest("hex");
 }
 
@@ -139,7 +139,7 @@ function websiteFixedDeployment(id = websiteDeploymentId, commit = websiteCommit
     alias: ["ghost-ruby-one-git-codex-vip-manager-production-backend.vercel.app"],
     meta: {
       gitCommitSha: commit,
-      gitCommitRef: "codex/vip-manager-production-backend-20260727",
+      gitCommitRef: "main",
       source: "cli",
     },
   };
@@ -147,20 +147,20 @@ function websiteFixedDeployment(id = websiteDeploymentId, commit = websiteCommit
 
 function websiteReadiness(overrides = {}) {
   return {
-    ok: false,
+    ok: true,
     websiteCommit,
     environment: "live",
     trialMode: false,
     observedAt: "2026-08-11T00:00:00.000Z",
     capabilities: {
-      walletRead: false,
-      otpDelivery: false,
-      transactionalEmailDrain: false,
-      swipePrepare: false,
-      swipeCommit: false,
-      managerOperations: false,
+      walletRead: true,
+      otpDelivery: true,
+      transactionalEmailDrain: true,
+      swipePrepare: true,
+      swipeCommit: true,
+      managerOperations: true,
       refundReview: true,
-      providerWebhook: false,
+      providerWebhook: true,
     },
     ...overrides,
   };
@@ -207,9 +207,9 @@ function releaseDeployment(id, {
       rollbackBindingSha256,
       websiteDeploymentId,
       websiteCommitSha: websiteCommit,
-      websiteCommitRef: "codex/vip-manager-production-backend-20260727",
+      websiteCommitRef: "main",
       websiteSource: "cli",
-      websiteCompatibilityContract: "ticket-wallet-inert-v1",
+      websiteCompatibilityContract: "ticket-wallet-active-v1",
       websiteCompatibilitySha256: websiteCompatibilityDigest(),
     },
   };
@@ -310,9 +310,9 @@ function baseReleaseRuntime(overrides = {}) {
       return {
         deploymentId: websiteDeploymentId,
         commit: websiteCommit,
-        ref: "codex/vip-manager-production-backend-20260727",
+        ref: "main",
         source: "cli",
-        contract: "ticket-wallet-inert-v1",
+        contract: "ticket-wallet-active-v1",
         digest: websiteCompatibilityDigest(),
         observedAt: "2026-08-11T00:00:00.000Z",
       };
@@ -603,7 +603,7 @@ test("release preflight pins the canonical Git line, Vercel identity, and fixed 
   ]);
 });
 
-test("Website compatibility proof attests exact fixed CLI source and canonical inert readiness", async () => {
+test("Website compatibility proof attests exact fixed CLI source and canonical active readiness", async () => {
   let fixedReads = 0;
   const runtime = {
     async resolveProductionDeploymentId(hostname) {
@@ -621,15 +621,16 @@ test("Website compatibility proof attests exact fixed CLI source and canonical i
   const proof = await readCanonicalWebsiteCompatibility({ auth: {} }, runtime);
   assert.equal(proof.deploymentId, websiteDeploymentId);
   assert.equal(proof.commit, websiteCommit);
-  assert.equal(proof.contract, "ticket-wallet-inert-v1");
+  assert.equal(proof.contract, "ticket-wallet-active-v1");
   assert.equal(proof.capabilities.refundReview, true);
-  assert.equal(proof.capabilities.managerOperations, false);
+  assert.equal(proof.capabilities.managerOperations, true);
   assert.equal(fixedReads, 2);
 
   for (const badReadiness of [
-    websiteReadiness({ ok: true, capabilities: {
+    websiteReadiness({ ok: false }),
+    websiteReadiness({ capabilities: {
       ...websiteReadiness().capabilities,
-      managerOperations: true,
+      managerOperations: false,
     } }),
     websiteReadiness({ websiteCommit: "9".repeat(40) }),
     websiteReadiness({ observedAt: "2026-08-10T23:00:00.000Z" }),
@@ -639,7 +640,7 @@ test("Website compatibility proof attests exact fixed CLI source and canonical i
         ...runtime,
         async readWebsiteReadiness() { return badReadiness; },
       }),
-      /website_inert_compatibility_mismatch/u,
+      /website_active_compatibility_mismatch/u,
     );
   }
 
@@ -864,9 +865,9 @@ test("candidate deploys the committed root aliaslessly, attaches metadata, and a
       return {
         deploymentId: websiteDeploymentId,
         commit: websiteCommit,
-        ref: "codex/vip-manager-production-backend-20260727",
+        ref: "main",
         source: "cli",
-        contract: "ticket-wallet-inert-v1",
+        contract: "ticket-wallet-active-v1",
         digest: websiteCompatibilityDigest(),
       };
     },
@@ -1312,9 +1313,9 @@ test("promotion runs every Gate, re-attests the exact candidate, and reads fixed
       return {
         deploymentId: websiteDeploymentId,
         commit: websiteCommit,
-        ref: "codex/vip-manager-production-backend-20260727",
+        ref: "main",
         source: "cli",
-        contract: "ticket-wallet-inert-v1",
+        contract: "ticket-wallet-active-v1",
         digest: websiteCompatibilityDigest(),
       };
     },
@@ -1331,7 +1332,7 @@ test("promotion runs every Gate, re-attests the exact candidate, and reads fixed
 
   assert.deepEqual(commands.map(({ command, args }) => [command, ...args]), [
     ["npm", "run", "ci"],
-    ["npm", "run", "e2e:staging:inert", "--", "--deployment-id", candidateDeployment],
+    ["npm", "run", "e2e:staging:active", "--", "--deployment-id", candidateDeployment],
     [
       "npx",
       "--no-install",
@@ -1392,7 +1393,7 @@ test("promotion fails closed when the provider-scoped promotion lease is already
   );
   assert.deepEqual(commands, [
     ["npm", "run", "ci"],
-    ["npm", "run", "e2e:staging:inert", "--", "--deployment-id", "dpl_VipCandidate"],
+    ["npm", "run", "e2e:staging:active", "--", "--deployment-id", "dpl_VipCandidate"],
   ]);
 });
 
@@ -1479,7 +1480,7 @@ test("promotion rechecks the fixed alias under its lease and refuses an interven
   );
   assert.deepEqual(commands, [
     ["npm", "run", "ci"],
-    ["npm", "run", "e2e:staging:inert", "--", "--deployment-id", "dpl_VipCandidate"],
+    ["npm", "run", "e2e:staging:active", "--", "--deployment-id", "dpl_VipCandidate"],
   ]);
   assert.equal(leaseReleased, true);
 });
@@ -1521,7 +1522,7 @@ test("promotion reruns source and sole-writer preflight under its lease", async 
     );
     assert.deepEqual(commands, [
       ["npm", "run", "ci"],
-      ["npm", "run", "e2e:staging:inert", "--", "--deployment-id", "dpl_VipCandidate"],
+      ["npm", "run", "e2e:staging:active", "--", "--deployment-id", "dpl_VipCandidate"],
     ]);
     assert.equal(leaseReleased, true);
   }
@@ -1566,13 +1567,13 @@ test("promotion rechecks aliasless candidate and READY rollback under its lease"
     );
     assert.deepEqual(commands, [
       ["npm", "run", "ci"],
-      ["npm", "run", "e2e:staging:inert", "--", "--deployment-id", "dpl_VipCandidate"],
+      ["npm", "run", "e2e:staging:active", "--", "--deployment-id", "dpl_VipCandidate"],
     ]);
     assert.equal(leaseReleased, true);
   }
 });
 
-test("promotion re-attests the sealed Website inert proof under the lease and refuses drift", async () => {
+test("promotion re-attests the sealed Website active proof under the lease and refuses drift", async () => {
   for (const scenario of ["stale-source", "readiness-drift"]) {
     let proofReads = 0;
     let leaseReleased = false;
@@ -1583,16 +1584,16 @@ test("promotion re-attests the sealed Website inert proof under the lease and re
         const proof = {
           deploymentId: websiteDeploymentId,
           commit: websiteCommit,
-          ref: "codex/vip-manager-production-backend-20260727",
+          ref: "main",
           source: "cli",
-          contract: "ticket-wallet-inert-v1",
+          contract: "ticket-wallet-active-v1",
           digest: websiteCompatibilityDigest(),
         };
         if (proofReads === 3 && scenario === "stale-source") {
           return { ...proof, deploymentId: "dpl_StaleWebsite" };
         }
         if (proofReads === 3 && scenario === "readiness-drift") {
-          throw new Error("website_inert_compatibility_mismatch");
+          throw new Error("website_active_compatibility_mismatch");
         }
         return proof;
       },
@@ -1607,12 +1608,12 @@ test("promotion re-attests the sealed Website inert proof under the lease and re
       promoteCandidate({ repoRoot: "/fixture/repo", deploymentId: "dpl_VipCandidate" }, runtime),
       scenario === "stale-source"
         ? /website_compatibility_binding_mismatch/u
-        : /website_inert_compatibility_mismatch/u,
+        : /website_active_compatibility_mismatch/u,
     );
     assert.equal(proofReads, 3);
     assert.deepEqual(commands, [
       ["npm", "run", "ci"],
-      ["npm", "run", "e2e:staging:inert", "--", "--deployment-id", "dpl_VipCandidate"],
+      ["npm", "run", "e2e:staging:active", "--", "--deployment-id", "dpl_VipCandidate"],
     ]);
     assert.equal(leaseReleased, true);
   }
