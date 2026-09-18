@@ -458,6 +458,7 @@ export function OperationCenter({
             reservation={editReservation}
             pending={pending}
             datePending={datePending}
+            failure={visibleConflict}
             onRun={onRun}
             onDone={closePanel}
             onBusinessDateChange={onBusinessDateChange}

@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useMemo, useState } from "react";
-import { ArrowLeft, ArrowRight, Check, Mail } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ArrowRight, Check, Mail } from "lucide-react";
 
 import {
   formatGhostTimeRange,
@@ -12,6 +12,7 @@ import {
 import type { VipFloorBoardV2, VipServiceStatus } from "@/lib/vipFloorV2Contract";
 
 import type {
+  CommandOutcome,
   OperationDraft,
   OperationOptions,
   StaffWorkspaceData,
@@ -20,6 +21,7 @@ import type {
 import { useDemoMode } from "../demo/DemoMode";
 import { BusinessDateField, formatBusinessDateWithWeekday } from "../shell/BusinessDateField";
 import { BusinessTimeFields } from "./BusinessTimeFields";
+import { occupancyLabel, tableOccupancy } from "./tableOccupancy";
 import styles from "../VipFloorWorkspace.module.css";
 import { useTrialMode } from "../TrialMode";
 
@@ -76,6 +78,10 @@ type Props = {
   reservation?: UiReservation | null;
   pending: boolean;
   datePending: boolean;
+  /** The last save failure. The wizard shows it itself: the page-level status
+   * line sits behind this dialog, so a rejected save used to look like a dead
+   * button. */
+  failure?: CommandOutcome | null;
   onRun: (draft: OperationDraft) => Promise<boolean>;
   onDone: () => void;
   onBusinessDateChange: (businessDate: string) => Promise<boolean>;
@@ -89,6 +95,7 @@ export function ReservationWizard({
   reservation = null,
   pending,
   datePending,
+  failure = null,
   onRun,
   onDone,
   onBusinessDateChange,
@@ -123,6 +130,9 @@ export function ReservationWizard({
       || initialOffering?.compatibleTableIds === undefined
       || initialOffering?.compatibleTableIds.includes(tableId));
   const [step, setStep] = useState(0);
+  // A failure stays on screen until the operator moves to fix it; a later
+  // failure is a new object and shows again.
+  const [acknowledgedFailure, setAcknowledgedFailure] = useState<CommandOutcome | null>(null);
   const [skippedOptionalSteps, setSkippedOptionalSteps] = useState(false);
   const [dateError, setDateError] = useState<string | null>(null);
   const [capacityOverrideConfirmed, setCapacityOverrideConfirmed] = useState(false);
@@ -160,11 +170,19 @@ export function ReservationWizard({
   const capacityShort = selectedTables.length > 0 && capacity < draft.guestCount;
   const capacityOverrideReady = !capacityShort
     || (capacityOverrideConfirmed && capacityOverrideReason.trim().length > 0);
+  const occupancy = useMemo(
+    () => tableOccupancy(board, draft.startAt, draft.endAt, reservation?.id ?? null),
+    [board, draft.startAt, draft.endAt, reservation?.id],
+  );
+  const occupiedSelection = selectedTables.filter((table) => occupancy.has(table.id));
   const canContinue = !datePending
     && !dateError
     && (step < 3 || !hasTableMismatch)
     && (step !== 3 && step !== 7 || capacityOverrideReady)
+    && (step !== 3 && step !== 7 || occupiedSelection.length === 0)
     && stepValid(step, draft, Boolean(reservation), options.businessDay.businessDate);
+  const visibleFailure = failure && !failure.ok && failure !== acknowledgedFailure ? failure : null;
+  const failureNeedsTableOrTime = visibleFailure !== null && TABLE_OR_TIME_FAILURES.has(visibleFailure.code);
 
   const phase = PHASES.find((entry) => step >= entry.firstStep && step <= entry.lastStep) ?? PHASES[0];
   const tableCodes = selectedTables.map((table) => table.displayCode).join("・");
@@ -172,6 +190,11 @@ export function ReservationWizard({
     .find((member) => member.id === draft.bookingStaffMemberId)?.displayName ?? null;
   const emailMissing = draft.notificationPreference === "email" && !reservation && !draft.email;
   const guestName = (reservation?.guestLabel ?? draft.displayName) || "匿名";
+
+  function goToStep(next: number) {
+    setAcknowledgedFailure(failure);
+    setStep(next);
+  }
 
   function patch(next: Partial<Draft>) {
     if (next.guestCount !== undefined || next.tableIds !== undefined || next.offeringId !== undefined) {
@@ -442,15 +465,20 @@ export function ReservationWizard({
             <div className={styles.checkGrid} role="group" aria-label="予約卓">
               {board.tables.map((table) => {
                 const compatible = compatibleTableIds === null || compatibleTableIds.has(table.id);
+                const occupied = occupancy.get(table.id);
+                const selected = draft.tableIds.includes(table.id);
                 return (
                 <label
                   key={table.id}
-                  data-selected={draft.tableIds.includes(table.id) || undefined}
-                  data-unavailable={!compatible || undefined}
+                  data-selected={selected || undefined}
+                  data-unavailable={!compatible || Boolean(occupied) || undefined}
+                  data-occupied={compatible && occupied ? true : undefined}
                 >
                   <input
                     type="checkbox"
-                    disabled={!compatible}
+                    // A table that became busy after it was picked stays
+                    // uncheckable, so the operator can clear it.
+                    disabled={!compatible || (Boolean(occupied) && !selected)}
                     checked={draft.tableIds.includes(table.id)}
                     onChange={(event) => patch({
                       tableIds: event.target.checked
@@ -460,15 +488,20 @@ export function ReservationWizard({
                   />
                   <span>{table.displayCode}</span>
                   <small className="tabular-nums">
-                    {table.capacityMax}名{compatible ? "" : " / プラン外"}
+                    {table.capacityMax}名{!compatible ? " / プラン外" : occupied ? ` / ${occupancyLabel(occupied)}` : ""}
                   </small>
                 </label>
                 );
               })}
             </div>
             <p className={styles.wizardHint}>
-              全卓を表示しています。選択中プランで登録できない卓は理由つきで無効になります。
+              全卓を表示しています。選択中プランで登録できない卓と、この時間帯に予約・受付ブロックがある卓は理由つきで無効になります。
             </p>
+            {occupiedSelection.length > 0 ? (
+              <p className={styles.wizardWarning} role="alert">
+                {occupiedSelection.map((table) => `${table.displayCode}は${occupancyLabel(occupancy.get(table.id)!)}`).join("、")}と重なっています。別の卓を選ぶか、時刻を変更してください。
+              </p>
+            ) : null}
             <p className={capacityShort ? styles.wizardWarning : styles.wizardHint}>
               選択 <span className="tabular-nums">{selectedTables.length}</span>卓 / 定員{" "}
               <span className="tabular-nums">{selectedTables.length > 0 ? capacity : "—"}</span>{selectedTables.length > 0 ? "名" : ""} / 予約{" "}
@@ -631,6 +664,11 @@ export function ReservationWizard({
               <label className={styles.choiceRow}><input type="radio" name="notify" checked={draft.notificationPreference === "email"} disabled={demoMode.enabled} onChange={() => patch({ notificationPreference: "email" })} /><Mail size={16} />{demoMode.enabled ? "DEMOでは外部送信なし" : "Eメール送信"}</label>
             </fieldset>
             {emailMissing ? <p className={styles.wizardFieldError} role="alert">Eメール送信には顧客Eメールが必要です。手順5でEメールを入力してください。</p> : null}
+            {occupiedSelection.length > 0 ? (
+              <p className={styles.wizardFieldError} role="alert">
+                {occupiedSelection.map((table) => `${table.displayCode}は${occupancyLabel(occupancy.get(table.id)!)}`).join("、")}と重なっているため作成できません。手順4で卓を選び直してください。
+              </p>
+            ) : null}
             <p className={styles.wizardHint}>
               保存時に版と席競合を再検証し、{reservation ? "予約変更" : "新規予約作成"}を監査へ記録します。
             </p>
@@ -656,14 +694,32 @@ export function ReservationWizard({
           </aside>
         )}
       </div>
+      {visibleFailure ? (
+        <div className={`${styles.conflictBox} ${styles.wizardFailure}`} role="alert">
+          <AlertTriangle size={18} aria-hidden />
+          <div>
+            <strong>{reservation ? "予約を更新できませんでした" : "予約を作成できませんでした"}</strong>
+            <p>{visibleFailure.message}</p>
+            <small>{visibleFailure.recovery}（{visibleFailure.code}）</small>
+            {failureNeedsTableOrTime ? (
+              <div className={styles.wizardFailureActions}>
+                <button type="button" className={styles.secondaryButton} disabled={pending} onClick={() => goToStep(3)}>
+                  卓を選び直す
+                </button>
+                <button type="button" className={styles.secondaryButton} disabled={pending} onClick={() => goToStep(1)}>
+                  時刻を変更
+                </button>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
       <footer className={styles.wizardFooter}>
         <button
           type="button"
           className={styles.secondaryButton}
           disabled={step === 0 || pending}
-          onClick={() => setStep((current) => (
-            current === 7 && skippedOptionalSteps ? 3 : current - 1
-          ))}
+          onClick={() => goToStep(step === 7 && skippedOptionalSteps ? 3 : step - 1)}
         >
           <ArrowLeft size={16} />戻る
         </button>
@@ -674,7 +730,7 @@ export function ReservationWizard({
             disabled={pending}
             onClick={() => {
               setSkippedOptionalSteps(false);
-              setStep(4);
+              goToStep(4);
             }}
           >
             任意項目を入力
@@ -690,23 +746,34 @@ export function ReservationWizard({
             onClick={() => {
               if (!reservation && step === 3) {
                 setSkippedOptionalSteps(true);
-                setStep(7);
+                goToStep(7);
                 return;
               }
-              setStep((current) => current + 1);
+              goToStep(step + 1);
             }}
           >
             {!reservation && step === 3 ? "確認へ進む" : "次へ"}<ArrowRight size={16} />
           </button>
         ) : (
           <button type="button" className={styles.primaryButton} disabled={!canContinue || pending} onClick={() => void save()}>
-            <Check size={16} />競合確認して{reservation ? "更新" : "作成"}
+            <Check size={16} />{pending ? "保存中…" : `競合確認して${reservation ? "更新" : "作成"}`}
           </button>
         )}
       </footer>
     </section>
   );
 }
+
+/* Error codes whose fix is a different table or window. */
+const TABLE_OR_TIME_FAILURES = new Set([
+  "TABLE_TIME_CONFLICT",
+  "BLOCK_CONFLICT",
+  "TABLE_LOCKED",
+  "VERSION_CONFLICT",
+  "OFFERING_TABLE_MISMATCH",
+  "SLOT_COMPATIBILITY_MISSING",
+  "outside_operating_hours",
+]);
 
 function stepValid(step: number, draft: Draft, editing: boolean, businessDate: string) {
   if (step === 1) return isGhostOperatingInterval(draft.startAt, draft.endAt, businessDate);

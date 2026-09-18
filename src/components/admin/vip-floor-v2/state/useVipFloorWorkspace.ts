@@ -968,23 +968,34 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
 
   const runOperation = useCallback(async (draft: OperationDraft) => {
     if (mutationBlocked || !operatorAuthorized) {
+      const switchedOff = !offline && mutationBlocked && !state.board.operations.adminMutationEnabled;
       dispatch({
         type: "commandOutcome",
         outcome: {
           ok: false,
           code: offline
             ? "OFFLINE"
-            : mutationBlocked
-              ? "STALE_READ_ONLY"
-              : "INSUFFICIENT_ROLE",
+            : switchedOff
+              ? "ADMIN_MUTATION_DISABLED"
+              : mutationBlocked
+                ? "STALE_READ_ONLY"
+                : "INSUFFICIENT_ROLE",
           message: offline
             ? "オフライン中は作成できません。"
-            : mutationBlocked
-              ? "台帳の連続性を確認できないため作成を停止しています。"
-              : "この操作はOwner専用です。",
+            : switchedOff
+              ? "更新スイッチが無効のため保存していません。"
+              : mutationBlocked
+                ? "台帳の連続性を確認できないため作成を停止しています。"
+                : "この操作はOwner専用です。",
+          // Each blocked reason names its own way out; a stale ledger is fixed
+          // by reloading it, not by signing in again.
           recovery: offline
             ? "接続復帰後に台帳を再読込してください。"
-            : "Ownerのユーザー名とパスワードでページを開き直してください。",
+            : switchedOff
+              ? "Owner設定の更新スイッチを確認してから再試行してください。"
+              : mutationBlocked
+                ? "画面上部の「台帳を再読込」で最新の台帳にしてから、もう一度保存してください。"
+                : "Ownerのユーザー名とパスワードでページを開き直してください。",
         },
       });
       return false;
@@ -1082,7 +1093,7 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
       });
       return false;
     }
-  }, [businessDate, loadBoard, mutationBlocked, offline, operatorAuthorized]);
+  }, [businessDate, loadBoard, mutationBlocked, offline, operatorAuthorized, state.board.operations.adminMutationEnabled]);
 
   const loadWaitlist = useCallback(async () => {
     if (offline || !operatorAuthorized) return null;

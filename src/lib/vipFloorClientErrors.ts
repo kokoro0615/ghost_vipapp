@@ -27,6 +27,36 @@ function readErrorCode(payload: ErrorRecord, status: number) {
   return `HTTP_${status}`;
 }
 
+const TOKYO_TIME = new Intl.DateTimeFormat("ja-JP", {
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+  timeZone: "Asia/Tokyo",
+});
+
+function readTime(value: unknown) {
+  if (typeof value !== "string") return null;
+  const time = Date.parse(value);
+  return Number.isFinite(time) ? TOKYO_TIME.format(time) : null;
+}
+
+/**
+ * Names the table, the other booking and its window when the server says which
+ * one collided (TABLE_TIME_CONFLICT / BLOCK_CONFLICT details), so the operator
+ * does not have to hunt for it on the board.
+ */
+function describeConflict(details: ErrorRecord, kind: "reservation" | "block") {
+  const table = typeof details.tableDisplayCode === "string" ? details.tableDisplayCode : null;
+  const start = readTime(details.conflictingStartAt);
+  const end = readTime(details.conflictingEndAt);
+  if (!table || !start || !end) return null;
+  if (kind === "block") return `${table}に ${start}–${end} の受付ブロック`;
+  const other = typeof details.conflictingReservationPublicCode === "string"
+    ? `予約${details.conflictingReservationPublicCode}`
+    : "別の予約";
+  return `${table}は ${start}–${end} の${other}`;
+}
+
 function readErrorDetails(payload: ErrorRecord) {
   if (isRecord(payload.details)) return payload.details;
   if (isRecord(payload.error) && isRecord(payload.error.details)) {
@@ -73,17 +103,23 @@ export function readVipOperationFailure(
   }
 
   if (code === "TABLE_TIME_CONFLICT") {
+    const where = describeConflict(details, "reservation");
     return {
       code,
-      message: "指定した時間帯は別の予約と重なっているため保存していません。",
+      message: where
+        ? `${where}と重なっているため保存していません。`
+        : "指定した時間帯は別の予約と重なっているため保存していません。",
       recovery: "最新台帳で卓と利用時間を選び直してください。",
     };
   }
 
   if (code === "BLOCK_CONFLICT") {
+    const where = describeConflict(details, "block");
     return {
       code,
-      message: "指定した卓または時間帯に受付ブロックがあるため保存していません。",
+      message: where
+        ? `${where}があるため保存していません。`
+        : "指定した卓または時間帯に受付ブロックがあるため保存していません。",
       recovery: "有効ブロックを確認し、別の卓・時間を選ぶかブロックを先に解除してください。",
     };
   }

@@ -117,11 +117,11 @@ test("the chart retains its true time grid when a day has no table payload", () 
 });
 
 test("the minimum reservation can skip optional details without deleting them", () => {
-  assert.match(wizard, /step === 3[\s\S]*?setSkippedOptionalSteps\(true\)[\s\S]*?setStep\(7\)/u);
+  assert.match(wizard, /step === 3[\s\S]*?setSkippedOptionalSteps\(true\)[\s\S]*?goToStep\(7\)/u);
   assert.match(wizard, /任意項目を入力/u);
   assert.match(wizard, /既定値を使用/u);
   assert.match(wizard, /board\.tables\.map/u);
-  assert.match(wizard, /disabled=\{!compatible\}/u);
+  assert.match(wizard, /disabled=\{!compatible \|\| \(Boolean\(occupied\) && !selected\)\}/u);
   assert.match(wizard, /プラン外/u);
   assert.match(wizard, /selectedTables\.length > 0 \? capacity : "—"/u);
 });
