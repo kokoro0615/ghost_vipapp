@@ -8,18 +8,28 @@ import vm from "node:vm";
 import ts from "typescript";
 
 const read = (path) => readFile(new URL(`../../${path}`, import.meta.url), "utf8");
+// GHOST_BACKEND_ROOT must point at the paired website worktree explicitly.
+// The former implicit sibling fallback could bind a stale backend checkout and
+// produce false contract failures; without an explicit binding the cross-repo
+// tests skip, matching GitHub CI (and canonical-v2-adapter.test.mjs).
 const backendRoot = process.env.GHOST_BACKEND_ROOT
   ? path.resolve(process.env.GHOST_BACKEND_ROOT)
-  : path.resolve(process.cwd(), "../ticket-wallet-production-backend");
-const backendManagerOperations = path.join(
-  backendRoot,
-  "src/lib/server/tickets/ticketManagerOperations.ts",
-);
+  : null;
+const backendManagerOperations = backendRoot
+  ? path.join(
+      backendRoot,
+      "src/lib/server/tickets/ticketManagerOperations.ts",
+    )
+  : null;
 let backendContractAvailable = true;
-try {
-  await access(backendManagerOperations);
-} catch {
+if (!backendManagerOperations) {
   backendContractAvailable = false;
+} else {
+  try {
+    await access(backendManagerOperations);
+  } catch {
+    backendContractAvailable = false;
+  }
 }
 
 async function loadBoundaryModule() {
