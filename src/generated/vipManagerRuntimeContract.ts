@@ -74,7 +74,38 @@ export const VIP_MANAGER_RUNTIME_CONTRACT = {
     "CAPACITY_WARNING_REQUIRES_OVERRIDE",
     "SLOT_COMPATIBILITY_MISSING",
     "OFFERING_TABLE_MISMATCH"
-  ]
+  ],
+  "businessDayEnsure": {
+    "method": "POST",
+    "backendPath": "/api/admin/v2/vip-floor/business-days",
+    "consumerPath": "/api/admin/vip-floor/business-days",
+    "initialRole": "owner",
+    "requestFields": [
+      "businessDate",
+      "reason"
+    ],
+    "successFields": [
+      "ok",
+      "action",
+      "reused",
+      "entityVersion",
+      "boardRevision",
+      "auditLogId",
+      "eventDayId",
+      "businessDate",
+      "created",
+      "slotsCreated",
+      "operatingStatus"
+    ],
+    "errorCodes": [
+      "INVALID_COMMAND",
+      "UNAUTHENTICATED",
+      "FORBIDDEN",
+      "ADMIN_MUTATION_DISABLED",
+      "IDEMPOTENCY_MISMATCH",
+      "IDEMPOTENCY_IN_PROGRESS"
+    ]
+  }
 } as const;
 
 export const VIP_MANAGER_ERROR_CODES = VIP_MANAGER_RUNTIME_CONTRACT.errorCodes;
@@ -95,6 +126,64 @@ export function readVipManagerBusinessDates(value: unknown): string[] | null {
   if (payload.businessDates.length > VIP_MANAGER_MAX_BUSINESS_DAY_SUGGESTIONS) return null;
   if (!payload.businessDates.every((date) => typeof date === "string")) return null;
   return payload.businessDates as string[];
+}
+
+export type VipManagerBusinessDayEnsure = {
+  action: "business_day.ensured";
+  reused: boolean;
+  entityVersion: number;
+  boardRevision: number;
+  auditLogId: string;
+  eventDayId: string;
+  businessDate: string;
+  created: boolean;
+  slotsCreated: number;
+  operatingStatus: "open" | "closed";
+};
+
+export function readVipManagerBusinessDayEnsure(
+  value: unknown,
+): VipManagerBusinessDayEnsure | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const payload = value as Record<string, unknown>;
+  if (payload.ok !== true) return null;
+  if (payload.action !== "business_day.ensured") return null;
+  if (typeof payload.reused !== "boolean") return null;
+  if (
+    typeof payload.entityVersion !== "number"
+    || !Number.isSafeInteger(payload.entityVersion)
+    || payload.entityVersion < 1
+  ) return null;
+  if (
+    typeof payload.boardRevision !== "number"
+    || !Number.isSafeInteger(payload.boardRevision)
+    || payload.boardRevision < 0
+  ) return null;
+  if (
+    typeof payload.auditLogId !== "string"
+    || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u.test(payload.auditLogId)
+  ) return null;
+  if (typeof payload.eventDayId !== "string") return null;
+  if (typeof payload.businessDate !== "string") return null;
+  if (typeof payload.created !== "boolean") return null;
+  if (
+    typeof payload.slotsCreated !== "number"
+    || !Number.isSafeInteger(payload.slotsCreated)
+    || payload.slotsCreated < 0
+  ) return null;
+  if (payload.operatingStatus !== "open" && payload.operatingStatus !== "closed") return null;
+  return {
+    action: payload.action,
+    reused: payload.reused,
+    entityVersion: payload.entityVersion,
+    boardRevision: payload.boardRevision,
+    auditLogId: payload.auditLogId,
+    eventDayId: payload.eventDayId,
+    businessDate: payload.businessDate,
+    created: payload.created,
+    slotsCreated: payload.slotsCreated,
+    operatingStatus: payload.operatingStatus,
+  };
 }
 
 export function isVipManagerReservationProvenance(

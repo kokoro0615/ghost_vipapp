@@ -21,7 +21,7 @@ const ROUTE_INVENTORY = new Map([
   ["admin/demo/lease/route.ts", { GET: "read" }],
   ["admin/session/route.ts", { GET: "cookie-mutation", POST: "json-mutation", DELETE: "cookie-mutation" }],
   ["admin/vip-floor/route.ts", { GET: "cookie-mutation" }],
-  ["admin/vip-floor/business-days/route.ts", { GET: "read" }],
+  ["admin/vip-floor/business-days/route.ts", { GET: "read", POST: "json-mutation" }],
   ["admin/vip-floor/commands/route.ts", { POST: "json-mutation" }],
   ["admin/vip-floor/customers/[customerId]/route.ts", { GET: "read", PATCH: "json-mutation" }],
   ["admin/vip-floor/events/route.ts", { GET: "read" }],
