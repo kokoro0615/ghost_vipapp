@@ -19,17 +19,16 @@ test("standalone VIP Manager documents and tests its canonical source boundary",
   }
 });
 
-test("Walk-in cancellation exists only on the canonical standalone inspector", async () => {
+test("reservation cancellation exists on the canonical standalone inspector", async () => {
   const [inspector, commandCenter, commandRoute] = await Promise.all([
     read("src/components/admin/vip-floor-v2/inspector/Inspector.tsx"),
     read("src/components/admin/vip-floor-v2/commands/CommandCenter.tsx"),
     read("src/app/api/admin/vip-floor/commands/route.ts"),
   ]);
 
-  assert.match(inspector, /reservation\.sourceChannel === "walk_in"/u);
   assert.match(inspector, /onCommand\("walk_in_cancel"\)/u);
-  assert.match(inspector, /Walk-in取消/u);
-  assert.match(commandCenter, /Walk-inを取り消す/u);
+  assert.match(inspector, /予約取消/u);
+  assert.match(commandCenter, /予約を取り消す/u);
   assert.match(commandCenter, /data-least-destructive/u);
   assert.match(commandRoute, /walk_in_cancel[\s\S]*\/cancel/u);
 });

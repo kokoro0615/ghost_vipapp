@@ -19,17 +19,20 @@ export const COMMAND_KINDS = [
   "assignment",
   "seat_extension",
   "note",
+  // Cancels a reservation from any source channel. The historical kind name is
+  // part of the cross-repo contract (ghost.vip-manager.v2.1 routes.json).
   "walk_in_cancel",
 ] as const;
 export type CommandKind = (typeof COMMAND_KINDS)[number];
 
-export const WALK_IN_CANCELLATION_REASONS = [
+export const RESERVATION_CANCELLATION_REASONS = [
   "mistake",
   "duplicate",
   "guest_request",
+  "no_contact",
   "venue_decision",
 ] as const;
-export type WalkInCancellationReason = (typeof WALK_IN_CANCELLATION_REASONS)[number];
+export type ReservationCancellationReason = (typeof RESERVATION_CANCELLATION_REASONS)[number];
 
 export type LiveCommandDraft = {
   kind: CommandKind;
@@ -41,8 +44,7 @@ export type LiveCommandDraft = {
     tableIds?: string[];
     extendMinutes?: number;
     note?: string;
-    sourceChannel?: "walk_in";
-    cancelReason?: WalkInCancellationReason;
+    cancelReason?: ReservationCancellationReason;
     reasonNote?: string;
     confirmedCapacityOverride?: boolean;
     capacityOverrideReason?: string;

@@ -33,6 +33,8 @@ const COMMANDS = {
   service_status: (id: string) => `/api/admin/v2/reservations/${encodeURIComponent(id)}/service-status`,
   arrival_time: (id: string) => `/api/admin/v2/reservations/${encodeURIComponent(id)}/arrival-time`,
   note: (id: string) => `/api/admin/v2/reservations/${encodeURIComponent(id)}/notes`,
+  // Cancels a reservation from any source channel; the kind name is fixed by
+  // the cross-repo contract (ghost.vip-manager.v2.1 routes.json).
   walk_in_cancel: (id: string) => `/api/admin/v2/reservations/${encodeURIComponent(id)}/cancel`,
 } as const;
 
@@ -47,10 +49,11 @@ const ALLOWED_KINDS = new Set<CommandKind>([
   "walk_in_cancel",
 ]);
 const ALLOWED_SERVICE_STATUSES = new Set<string>(VIP_SERVICE_STATUSES);
-const WALK_IN_CANCELLATION_REASON_CODES = {
+const RESERVATION_CANCELLATION_REASON_CODES = {
   mistake: "other",
   duplicate: "duplicate",
   guest_request: "customer_request",
+  no_contact: "no_contact",
   venue_decision: "venue_decision",
 } as const;
 
@@ -64,7 +67,6 @@ type CommandBody = {
     tableIds?: unknown;
     extendMinutes?: unknown;
     note?: unknown;
-    sourceChannel?: unknown;
     cancelReason?: unknown;
     reasonNote?: unknown;
     capacityOverride?: unknown;
@@ -238,17 +240,18 @@ function toCommandPayload(kind: CommandKind, body: CommandBody, expectedVersion:
     }
 
     case "walk_in_cancel": {
-      if (body.payload?.sourceChannel !== "walk_in") {
-        return { ok: false, error: "walk_in_cancel_only" as const };
-      }
-      const cancelReason = boundedString(body.payload.cancelReason, 32);
+      /* Refunds, card charges and notifications stay out of this adapter:
+       * the browser cannot opt into them. Owner decision 2026-09-19: late
+       * cancellation fees for online bookings are charged in the Stripe
+       * Dashboard, not here. */
+      const cancelReason = boundedString(body.payload?.cancelReason, 32);
       if (
         !cancelReason
-        || !(cancelReason in WALK_IN_CANCELLATION_REASON_CODES)
+        || !Object.hasOwn(RESERVATION_CANCELLATION_REASON_CODES, cancelReason)
       ) {
         return { ok: false, error: "invalid_cancellation_reason" as const };
       }
-      const reasonNote = boundedString(body.payload.reasonNote, 500);
+      const reasonNote = boundedString(body.payload?.reasonNote, 500);
       if (!reasonNote) {
         return { ok: false, error: "invalid_cancellation_reason_note" as const };
       }
@@ -257,8 +260,8 @@ function toCommandPayload(kind: CommandKind, body: CommandBody, expectedVersion:
         payload: {
           expectedVersion,
           reasonCode:
-            WALK_IN_CANCELLATION_REASON_CODES[
-              cancelReason as keyof typeof WALK_IN_CANCELLATION_REASON_CODES
+            RESERVATION_CANCELLATION_REASON_CODES[
+              cancelReason as keyof typeof RESERVATION_CANCELLATION_REASON_CODES
             ],
           reasonNote,
           refundDecision: "none",

@@ -9,8 +9,8 @@ import type { VipFloorBoardV2, VipServiceStatus } from "@/lib/vipFloorV2Contract
 import type {
   CommandKind,
   LiveCommandDraft,
+  ReservationCancellationReason,
   UiReservation,
-  WalkInCancellationReason,
 } from "../contract/uiTypes";
 import { DemoCue, useDemoMode } from "../demo/DemoMode";
 import { isStandardServiceTransition } from "../contract/statusModel";
@@ -24,7 +24,7 @@ const commandLabels: Record<CommandKind, string> = {
   assignment: "卓を決める",
   seat_extension: "利用時間を延長",
   note: "スタッフメモ",
-  walk_in_cancel: "Walk-inを取り消す",
+  walk_in_cancel: "予約を取り消す",
 };
 
 type Props = {
@@ -102,10 +102,12 @@ export function CommandCenter({
     if (kind === "seat_extension") return "現在の利用期限を15分単位、最大120分まで延長します。";
     if (kind === "note") return "500文字以内の現場共有メモを監査付きで保存します。";
     if (kind === "walk_in_cancel") return demoMode.enabled
-      ? "合成Walk-inを取消済みにし、使用中の卓をbrowser-local台帳で解放します。元記録と監査履歴は残ります。"
-      : "Walk-inを取消済みにし、使用中の卓を解放します。元記録と監査履歴は残り、返金・顧客通知は実行しません。";
+      ? "合成予約を取消済みにし、割り当てた卓をbrowser-local台帳で解放します。元記録と監査履歴は残ります。"
+      : reservation?.sourceChannel === "online"
+        ? "予約を取消済みにし、割り当てた卓を解放します。元記録と監査履歴は残り、カードへの請求・返金と通知は実行しません。キャンセル料はStripeダッシュボードで請求してください。"
+        : "予約を取消済みにし、割り当てた卓を解放します。元記録と監査履歴は残り、請求・返金と通知は実行しません。";
     return "接客状態を更新し、Floor・Chart・Listへ反映します。";
-  }, [demoMode.enabled, kind]);
+  }, [demoMode.enabled, kind, reservation?.sourceChannel]);
 
   useEffect(() => {
     if (!open) return;
@@ -232,10 +234,9 @@ export function CommandCenter({
           ...base,
           kind,
           payload: {
-            sourceChannel: "walk_in",
             cancelReason: String(
               formData.get("cancelReason"),
-            ) as WalkInCancellationReason,
+            ) as ReservationCancellationReason,
             reasonNote: String(formData.get("reasonNote") ?? "").trim(),
           },
         };
@@ -293,7 +294,10 @@ export function CommandCenter({
         <form className={styles.commandForm} onSubmit={submit}>
           <div className={styles.commandContext}>
             <strong>{reservation.publicCode}</strong>
-            <span>{reservation.guestLabel} / {reservation.startLabel} / 更新版 {reservation.version}</span>
+            <span>
+              {reservation.guestLabel} / {reservation.startLabel}
+              {kind === "walk_in_cancel" ? ` / ${reservation.sourceLabel}` : ""} / 更新版 {reservation.version}
+            </span>
           </div>
           <fieldset disabled={pending}>
             {/* The dialog is already titled with this text. The legend stays for
@@ -455,10 +459,12 @@ export function CommandCenter({
               <>
                 <label>
                   取消区分
-                  <select name="cancelReason" defaultValue="mistake" required>
+                  <select name="cancelReason" defaultValue="" required>
+                    <option value="" disabled>選択してください</option>
+                    <option value="guest_request">お客様都合</option>
+                    <option value="no_contact">連絡なし</option>
                     <option value="mistake">誤登録</option>
                     <option value="duplicate">重複登録</option>
-                    <option value="guest_request">来店取り消し</option>
                     <option value="venue_decision">店舗判断</option>
                   </select>
                 </label>
@@ -466,17 +472,17 @@ export function CommandCenter({
                   取消理由メモ
                   <textarea
                     name="reasonNote"
-                    defaultValue={
-                      demoMode.enabled
-                        ? "デモ：Walk-in誤登録"
-                        : "Walk-in誤登録"
-                    }
                     maxLength={500}
+                    placeholder={
+                      demoMode.enabled
+                        ? "例: デモ：お客様から取消の連絡"
+                        : "例: お客様から電話で取消の連絡"
+                    }
                     required
-                    aria-describedby="walk-in-cancel-note-hint"
+                    aria-describedby="reservation-cancel-note-hint"
                   />
                 </label>
-                <p id="walk-in-cancel-note-hint" className={styles.helperText}>
+                <p id="reservation-cancel-note-hint" className={styles.helperText}>
                   個人情報は入力しないでください。取消後は席が解放され、元記録は監査履歴に残ります。
                 </p>
               </>
@@ -531,7 +537,7 @@ export function CommandCenter({
               {pending ? "反映中" : step === 1
                 ? <>確認へ<ArrowRight size={16} /></>
                 : kind === "walk_in_cancel"
-                  ? <><Check size={16} />Walk-inを取り消す</>
+                  ? <><Check size={16} />予約を取り消す</>
                   : <><Check size={16} />{demoMode.enabled ? "合成台帳へ反映" : "GHOSTへ反映"}</>}
             </button>
           </footer>

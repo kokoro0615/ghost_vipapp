@@ -9,6 +9,7 @@ import type {
   StaffWorkspaceData,
   WaitlistAction,
 } from "@/components/admin/vip-floor-v2/contract/uiTypes";
+import { RESERVATION_CANCELLATION_REASONS } from "@/components/admin/vip-floor-v2/contract/uiTypes";
 import {
   DEMO_FIRST_BUSINESS_DATE,
   DEMO_LAST_BUSINESS_DATE,
@@ -49,12 +50,6 @@ import { isGhostOperatingInterval } from "@/lib/ghostOperatingHours";
 
 const REVISION_CHANNEL = "ghost-vip-demo-revision";
 const BLOCK_REPEAT_DAYS = new Set([1, 7, 14]);
-const WALK_IN_CANCELLATION_REASONS = new Set([
-  "mistake",
-  "duplicate",
-  "guest_request",
-  "venue_decision",
-]);
 
 type RepositoryConfig = {
   workspaceId: string;
@@ -812,13 +807,12 @@ export class BrowserDemoRepository {
         this.bumpTables(envelope, reservation.tableIds);
       } else if (draft.kind === "walk_in_cancel") {
         if (
-          reservation.sourceChannel !== "walk_in"
-          || reservation.lifecycleStatus === "cancelled"
+          reservation.lifecycleStatus === "cancelled"
           || ["completed", "no_show"].includes(reservation.serviceStatus ?? "")
         ) {
           throw new DemoRepositoryError(
             "INVALID_STATE_TRANSITION",
-            "この予約はWalk-in取消の対象ではありません。",
+            "この予約は取消の対象ではありません。",
             409,
           );
         }
@@ -828,9 +822,8 @@ export class BrowserDemoRepository {
         );
         if (
           !reasonNote
-          || draft.payload.sourceChannel !== "walk_in"
           || !draft.payload.cancelReason
-          || !WALK_IN_CANCELLATION_REASONS.has(draft.payload.cancelReason)
+          || !RESERVATION_CANCELLATION_REASONS.includes(draft.payload.cancelReason)
         ) {
           throw new DemoRepositoryError(
             "INVALID_SYNTHETIC_INPUT",
@@ -886,7 +879,7 @@ export class BrowserDemoRepository {
         entityId: reservation.id,
         entityVersion: reservation.version,
         summary: draft.kind === "walk_in_cancel"
-          ? `デモ：Walk-inを取消（${draft.payload.cancelReason ?? "mistake"}）`
+          ? `デモ：予約を取消（${draft.payload.cancelReason ?? "mistake"}）`
           : `デモ：予約操作 ${draft.kind}`,
       };
     });

@@ -2206,6 +2206,12 @@
 }
 .commandGrid button[data-danger] { color: var(--alert); }
 .commandGrid button[data-danger] svg { color: var(--alert); }
+/* 予約編集 owns a full row, so every later child sits in the left column when
+   its index is even. 予約取消 is last: at an even index it starts a row of its
+   own and the empty right cell shows through as a bare rule-coloured block, so
+   it takes the whole row instead. At an odd index it pairs with the command
+   before it and needs nothing. */
+.commandGrid button[data-danger]:nth-child(even) { grid-column: 1 / -1; }
 
 .inspectorTabs {
   display: flex;

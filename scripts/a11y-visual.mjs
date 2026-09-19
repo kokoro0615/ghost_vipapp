@@ -554,12 +554,12 @@ async function auditViewport(context, viewport) {
 	    : demoWalkInPage.locator('[data-instance="desktop"]');
 	  await createdWalkInInspector.waitFor();
 	  await createdWalkInInspector.getByText("デモスタッフA", { exact: true }).waitFor();
-  await demoWalkInPage.getByRole("button", { name: "Walk-in取消", exact: true }).click();
-  const cancelDialog = demoWalkInPage.getByRole("dialog", { name: "Walk-inを取り消す" });
+  await demoWalkInPage.getByRole("button", { name: "予約取消", exact: true }).click();
+  const cancelDialog = demoWalkInPage.getByRole("dialog", { name: "予約を取り消す" });
   await cancelDialog.getByLabel("取消区分").selectOption("mistake");
   await cancelDialog.getByLabel("取消理由メモ").fill("デモ：Walk-in誤登録");
   await cancelDialog.getByRole("button", { name: /確認へ/u }).click();
-  await cancelDialog.getByRole("button", { name: "Walk-inを取り消す", exact: true }).waitFor();
+  await cancelDialog.getByRole("button", { name: "予約を取り消す", exact: true }).waitFor();
   assert.equal(
     await cancelDialog.locator("[data-least-destructive]").evaluate(
       (element) => element === document.activeElement,
@@ -568,11 +568,34 @@ async function auditViewport(context, viewport) {
     "destructive confirmation must initially focus the least destructive action",
   );
   await capture(demoWalkInPage, "command-walk-in-cancel");
-  await cancelDialog.getByRole("button", { name: "Walk-inを取り消す", exact: true }).click();
+  await cancelDialog.getByRole("button", { name: "予約を取り消す", exact: true }).click();
   await cancelDialog.waitFor({ state: "hidden" });
   await createdWalkInRow.waitFor({ state: "hidden" });
   await goToDemoWorkspace(demoWalkInPage, "floor", "2026-07-31");
   await demoWalkInPage.getByRole("button", { name: /VIP-8.*空席/u }).waitFor();
+
+  /* Owner report 2026-09-19: the control used to exist only for 店頭 bookings,
+   * so a 電話 / 管理者 / オンライン reservation could not be cancelled at all.
+   * Cancel the seeded 管理者 booking to witness the generalised path. */
+  await goToDemoWorkspace(demoWalkInPage, "list", "2026-07-31");
+  const seededRow = demoWalkInPage.locator("tr", { hasText: "デモゲスト051" });
+  await seededRow.getByRole("button", { name: /の詳細を開く/u }).click();
+  const seededInspector = viewport.width < 1024
+    ? demoWalkInPage.getByRole("dialog", { name: "予約詳細" })
+    : demoWalkInPage.locator('[data-instance="desktop"]');
+  await seededInspector.waitFor();
+  await seededInspector.getByText("管理者", { exact: true }).waitFor();
+  await demoWalkInPage.getByRole("button", { name: "予約取消", exact: true }).click();
+  const seededCancelDialog = demoWalkInPage.getByRole("dialog", { name: "予約を取り消す" });
+  await seededCancelDialog.getByText("管理者", { exact: false }).waitFor();
+  await seededCancelDialog.getByLabel("取消区分").selectOption("no_contact");
+  await seededCancelDialog.getByLabel("取消理由メモ").fill("デモ：連絡が取れないため取消");
+  await seededCancelDialog.getByRole("button", { name: /確認へ/u }).click();
+  await seededCancelDialog.getByRole("button", { name: "予約を取り消す", exact: true }).waitFor();
+  await capture(demoWalkInPage, "command-reservation-cancel");
+  await seededCancelDialog.getByRole("button", { name: "予約を取り消す", exact: true }).click();
+  await seededCancelDialog.waitFor({ state: "hidden" });
+  await seededRow.waitFor({ state: "hidden" });
   assert.deepEqual(demoWalkInPage.qaServerErrors, [], "demo Walk-in produced a server 5xx");
   await closeQaPage(demoWalkInPage);
 

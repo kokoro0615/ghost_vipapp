@@ -34,7 +34,7 @@ Productionのcommitとこのcheckoutを照合します。
 - healthy / loading / stale / reconnecting / error / read-only / empty / dense の運用状態
 - GHOST本体管理APIを中継し、実予約データを表示
 - 検索、check-in、到着時間更新、卓割当、延長、memo、service_status更新、
-  Walk-in取消の7 command入口
+  予約取消（全経路）の7 command入口
 - 顧客情報は表示上の必要最小限（マスク）を維持し、個人情報の新規エクスポートは対象外
 - 外部連携はBasic認証付きの本番API連携で、TableCheck/API連携はこのサンドボックス外
 

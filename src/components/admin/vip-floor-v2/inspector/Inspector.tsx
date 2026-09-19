@@ -169,22 +169,20 @@ export function Inspector({
                 {command.label}
               </button>;
             })}
-            {reservation.sourceChannel === "walk_in" ? (
-              <button
-                type="button"
-                data-danger
-                onClick={() => onCommand("walk_in_cancel")}
-                disabled={
-                  readOnly
-                  || reservation.lifecycleStatus === "cancelled"
-                  || reservation.serviceStatus === "completed"
-                  || reservation.serviceStatus === "no_show"
-                  || !canCommand("walk_in_cancel")
-                }
-              >
-                Walk-in取消
-              </button>
-            ) : null}
+            <button
+              type="button"
+              data-danger
+              onClick={() => onCommand("walk_in_cancel")}
+              disabled={
+                readOnly
+                || reservation.lifecycleStatus === "cancelled"
+                || reservation.serviceStatus === "completed"
+                || reservation.serviceStatus === "no_show"
+                || !canCommand("walk_in_cancel")
+              }
+            >
+              予約取消
+            </button>
           </div>
 
           <div className={styles.inspectorTabs} role="tablist" aria-label="予約詳細" onKeyDown={moveTabFocus}>

@@ -98,7 +98,7 @@ test("command payload translation preserves the v2 concurrency and domain fields
   assert.match(source, /auditLogId: rawPayload\.auditLogId/u);
   assert.match(source, /walk_in_cancel[\s\S]*refundDecision: "none"/u);
   assert.match(source, /walk_in_cancel[\s\S]*notifyCustomer: false/u);
-  assert.match(source, /body\.payload\?\.sourceChannel !== "walk_in"/u);
+  assert.doesNotMatch(source, /sourceChannel !== "walk_in"/u);
 });
 
 test("seating cannot bypass check-in's two-hour release-time update", () => {

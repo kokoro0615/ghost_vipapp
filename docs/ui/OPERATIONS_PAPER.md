@@ -415,10 +415,10 @@ The four elements the Owner requires are all present without stacking:
 The queue is never a second copy of the ledger. That duplication was the
 original collapse.
 
-Walk-in取消はInspectorの店頭予約だけに現れる危険操作とし、理由入力と影響確認を
+予約取消はInspectorの危険操作とし、経路を問わず有効な予約に現れる。理由入力と影響確認を
 分離する。確認画面では「戻る」を初期focusにし、取消実行はgraphiteの通常action
 ではなく`--alert`で区別する。取消は割当席を解放するが物理削除ではなく、元記録・
-version・監査履歴を残す。返金ケースと顧客通知はこの導線から作らない。
+version・監査履歴を残す。返金ケース、カード請求、顧客通知はこの導線から作らない。
 
 卓回転はfocus identity直下の単一graphite actionで扱う。会計済みかつ配席中だけ
 `退店・席を開放`を表示し、完了後は同卓の次予約へ選択を移して同じ位置を
