@@ -60,6 +60,48 @@ type AuthState =
 
 const STREAM_RECONNECT_GRACE_MS = 6_000;
 
+/* ── Every request carries a deadline ──────────────────────────────────────
+ *
+ * The venue tablet runs the whole night on one tab. iPadOS suspends that tab
+ * whenever the device sleeps or the operator switches away, and the house
+ * Wi-Fi re-associates it between access points without ever closing the
+ * socket. A request issued across either moment is not rejected — it simply
+ * never settles, and a bare `fetch` waits for it until the tab is reloaded.
+ *
+ * When that happens to an `initial` board load the workspace latches at
+ * `loading`, and `loading` is the state that takes the floor away from the
+ * operator: `operationEntryBlocked` disables 新規受付, and every view renders
+ * the skeleton instead of the board, so the view switcher changes the route
+ * and nothing on screen moves. No error is thrown and no banner appears, which
+ * is why the tablet reads as "the buttons stopped working".
+ *
+ * A deadline converts that silence into a state the operator can act on. A
+ * read lands in `stale`/`error`, both of which offer 再読込; a write lands in
+ * the existing "保存結果を確認できませんでした" outcome, which already tells
+ * the operator to re-read the board rather than re-send. Writes get the longer
+ * budget because their idempotency key is minted per attempt: aborting one is
+ * only ever a report that the result is unknown, never a retry.
+ */
+const READ_DEADLINE_MS = 15_000;
+const WRITE_DEADLINE_MS = 45_000;
+/* Resuming re-resolves these; `healthy`, `empty` and `read_only` are settled. */
+const RESUMABLE_STATES = new Set(["loading", "stale", "reconnecting", "error"]);
+const RESUME_COALESCE_MS = 2_000;
+
+async function fetchWithDeadline(
+  input: string,
+  init: RequestInit & { deadlineMs: number },
+): Promise<Response> {
+  const { deadlineMs, ...request } = init;
+  const controller = new AbortController();
+  const deadline = setTimeout(() => controller.abort(), deadlineMs);
+  try {
+    return await fetch(input, { ...request, signal: controller.signal });
+  } finally {
+    clearTimeout(deadline);
+  }
+}
+
 function currentBusinessDate() {
   const businessClock = new Date(Date.now() - 5 * 60 * 60 * 1000);
   return new Intl.DateTimeFormat("sv-SE", {
@@ -106,6 +148,7 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
     "inactive" | "checking" | "active" | "read_only" | "expired"
   >("inactive");
   const demoTransportRef = useRef<DemoTransport | null>(null);
+  const loadSequenceRef = useRef(0);
   const authMode = auth.status === "authenticated" ? auth.session.mode ?? "owner" : null;
   const isDemo = auth.status === "authenticated" && auth.session.mode === "demo";
   const operatorAuthorized = auth.status === "authenticated"
@@ -117,8 +160,16 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
     || ["loading", "error"].includes(state.globalState);
   const mutationBlocked = workspaceMutationBlocked
     || (isDemo && demoLeaseState !== "active");
+  const globalStateRef = useRef(state.globalState);
 
   const loadBoard = useCallback(async (date: string, mode: "initial" | "refresh" = "refresh") => {
+    /* A woken tablet starts a fresh load while the abandoned one is still
+     * running out its deadline. Only the newest load may write state, so the
+     * loser cannot overwrite a recovered board with its own failure. */
+    const sequence = loadSequenceRef.current + 1;
+    loadSequenceRef.current = sequence;
+    const superseded = () => loadSequenceRef.current !== sequence;
+
     const demoTransport = demoTransportRef.current;
     if (demoTransport) {
       if (mode === "initial") {
@@ -130,6 +181,7 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
         });
       }
       const result = await demoTransport.loadBoard(date);
+      if (superseded()) return false;
       if (!result.ok) {
         const payload = result.payload as unknown as Record<string, unknown>;
         dispatch({
@@ -173,10 +225,12 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
     }
 
     try {
-      const response = await fetch(`/api/admin/vip-floor?date=${encodeURIComponent(date)}`, {
+      const response = await fetchWithDeadline(`/api/admin/vip-floor?date=${encodeURIComponent(date)}`, {
         cache: "no-store",
+        deadlineMs: READ_DEADLINE_MS,
       });
       const payload = await response.json().catch(() => ({})) as Record<string, unknown>;
+      if (superseded()) return false;
       if (response.status === 401) {
         purgeSafeBoardCache();
         setAuth({ status: "unauthenticated", session: null });
@@ -223,6 +277,7 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
       setOffline(false);
       return true;
     } catch {
+      if (superseded()) return false;
       const cachedBoard = readSafeBoardCache(date);
       if (cachedBoard) dispatch({ type: "hydrate", board: cachedBoard, message: "安全な最終台帳を表示中" });
       dispatch({
@@ -243,7 +298,10 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
     let cancelled = false;
     void (async () => {
       try {
-        const response = await fetch("/api/admin/session", { cache: "no-store" });
+        const response = await fetchWithDeadline("/api/admin/session", {
+          cache: "no-store",
+          deadlineMs: READ_DEADLINE_MS,
+        });
         const payload = await response.json().catch(() => ({})) as Session;
         if (cancelled) return;
         const publicDemoConfig = readDemoConfig(payload);
@@ -374,6 +432,49 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
       window.removeEventListener("online", markOnline);
     };
   }, [auth, businessDate, loadBoard]);
+
+  /* The resume handler runs long after the render that settled this state, so
+   * it reads the latest value instead of re-registering on every transition. */
+  useEffect(() => {
+    globalStateRef.current = state.globalState;
+  }, [state.globalState]);
+
+  useEffect(() => {
+    if (auth.status !== "authenticated") return;
+    /* `online` is not a reliable partner to `offline` on iPadOS: waking the
+     * tablet or roaming between the venue's access points can deliver the
+     * disconnect without ever delivering the reconnect, which leaves `offline`
+     * latched and 新規受付 disabled on a device whose network is fine.
+     *
+     * The page becoming visible again is the event that is always delivered,
+     * and it is the same moment the operator reaches for the screen — so that
+     * is what clears the flag and re-resolves a board left unsettled. Focus
+     * and a back-forward-cache restore are the same moment arriving by another
+     * name, so they are coalesced rather than acted on three times.
+     */
+    let lastResumeAt = 0;
+    const resume = () => {
+      if (document.visibilityState !== "visible") return;
+      if (typeof navigator !== "undefined" && !navigator.onLine) return;
+      setOffline(false);
+      if (!RESUMABLE_STATES.has(globalStateRef.current)) return;
+      const now = Date.now();
+      if (now - lastResumeAt < RESUME_COALESCE_MS) return;
+      lastResumeAt = now;
+      void loadBoard(businessDate);
+    };
+    const resumeFromCache = (event: PageTransitionEvent) => {
+      if (event.persisted) resume();
+    };
+    document.addEventListener("visibilitychange", resume);
+    window.addEventListener("pageshow", resumeFromCache);
+    window.addEventListener("focus", resume);
+    return () => {
+      document.removeEventListener("visibilitychange", resume);
+      window.removeEventListener("pageshow", resumeFromCache);
+      window.removeEventListener("focus", resume);
+    };
+  }, [auth.status, businessDate, loadBoard]);
 
   useEffect(() => {
     if (
@@ -558,8 +659,9 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
   const reconnect = useCallback(async () => {
     dispatch({ type: "pending", pending: true });
     try {
-      const response = await fetch("/api/admin/session", {
+      const response = await fetchWithDeadline("/api/admin/session", {
         cache: "no-store",
+        deadlineMs: READ_DEADLINE_MS,
       });
       const payload = await response.json().catch(() => ({})) as Session & Record<string, unknown>;
       if (!response.ok || !payload.ok) {
@@ -614,11 +716,12 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
   const unlock = useCallback(async (credentials: { username: string; password: string }) => {
     dispatch({ type: "pending", pending: true });
     try {
-      const response = await fetch("/api/admin/session", {
+      const response = await fetchWithDeadline("/api/admin/session", {
         method: "POST",
         cache: "no-store",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(credentials),
+        deadlineMs: WRITE_DEADLINE_MS,
       });
       const payload = await response.json().catch(() => ({})) as Record<string, unknown>;
       if (!response.ok || payload.ok !== true) {
@@ -655,7 +758,10 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
 
   const logout = useCallback(async () => {
     try {
-      await fetch("/api/admin/session", { method: "DELETE" });
+      await fetchWithDeadline("/api/admin/session", {
+        method: "DELETE",
+        deadlineMs: WRITE_DEADLINE_MS,
+      });
     } finally {
       purgeSafeBoardCache();
       demoTransportRef.current = null;
@@ -759,13 +865,14 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
         return true;
       }
 
-      const response = await fetch("/api/admin/vip-floor/commands", {
+      const response = await fetchWithDeadline("/api/admin/vip-floor/commands", {
         method: "POST",
         headers: {
           "content-type": "application/json",
           "idempotency-key": crypto.randomUUID(),
         },
         body: JSON.stringify(draft),
+        deadlineMs: WRITE_DEADLINE_MS,
       });
       const payload = await response.json().catch(() => ({})) as Record<string, unknown>;
       if (!response.ok) {
@@ -892,9 +999,9 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
         }
         return result.payload;
       }
-      const response = await fetch(
+      const response = await fetchWithDeadline(
         `/api/admin/vip-floor/options?date=${encodeURIComponent(targetBusinessDate)}`,
-        { cache: "no-store" },
+        { cache: "no-store", deadlineMs: READ_DEADLINE_MS },
       );
       const payload = await response.json().catch(() => ({})) as Record<string, unknown>;
 
@@ -950,9 +1057,9 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
     }
 
     try {
-      const response = await fetch(
+      const response = await fetchWithDeadline(
         `/api/admin/vip-floor/business-days?after=${encodeURIComponent(afterBusinessDate)}&limit=3`,
-        { cache: "no-store" },
+        { cache: "no-store", deadlineMs: READ_DEADLINE_MS },
       );
       const payload = await response.json().catch(() => ({})) as Record<string, unknown>;
       if (!response.ok || payload.ok !== true || !Array.isArray(payload.businessDates)) {
@@ -1037,13 +1144,14 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
         await loadBoard(businessDate);
         return true;
       }
-      const response = await fetch("/api/admin/vip-floor/operations", {
+      const response = await fetchWithDeadline("/api/admin/vip-floor/operations", {
         method: "POST",
         headers: {
           "content-type": "application/json",
           "idempotency-key": crypto.randomUUID(),
         },
         body: JSON.stringify(draft),
+        deadlineMs: WRITE_DEADLINE_MS,
       });
       const payload = await response.json().catch(() => ({})) as Record<string, unknown>;
 
@@ -1105,9 +1213,9 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
         const result = await demoTransport.loadWaitlist(businessDate);
         return result.ok ? result.payload.entries : null;
       }
-      const response = await fetch(
+      const response = await fetchWithDeadline(
         `/api/admin/vip-floor/waitlist?date=${encodeURIComponent(businessDate)}`,
-        { cache: "no-store" },
+        { cache: "no-store", deadlineMs: READ_DEADLINE_MS },
       );
       const payload = await response.json().catch(() => ({})) as Record<string, unknown>;
       if (!response.ok || payload.ok !== true || !Array.isArray(payload.entries)) {
@@ -1180,13 +1288,14 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
         await loadBoard(businessDate);
         return true;
       }
-      const response = await fetch("/api/admin/vip-floor/waitlist", {
+      const response = await fetchWithDeadline("/api/admin/vip-floor/waitlist", {
         method: "POST",
         headers: {
           "content-type": "application/json",
           "idempotency-key": crypto.randomUUID(),
         },
         body: JSON.stringify(draft),
+        deadlineMs: WRITE_DEADLINE_MS,
       });
       const payload = await response.json().catch(() => ({})) as Record<string, unknown>;
       if (!response.ok) {
@@ -1238,9 +1347,9 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
         const result = await demoTransport.loadStaff(businessDate);
         return result.ok ? result.payload : null;
       }
-      const response = await fetch(
+      const response = await fetchWithDeadline(
         `/api/admin/vip-floor/staff?date=${encodeURIComponent(businessDate)}`,
-        { cache: "no-store" },
+        { cache: "no-store", deadlineMs: READ_DEADLINE_MS },
       );
       const payload = await response.json().catch(() => ({})) as Record<string, unknown>;
       if (
@@ -1279,13 +1388,14 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
         await loadBoard(businessDate);
         return true;
       }
-      const response = await fetch("/api/admin/vip-floor/staff", {
+      const response = await fetchWithDeadline("/api/admin/vip-floor/staff", {
         method: "POST",
         headers: {
           "content-type": "application/json",
           "idempotency-key": crypto.randomUUID(),
         },
         body: JSON.stringify(draft),
+        deadlineMs: WRITE_DEADLINE_MS,
       });
       const payload = await response.json().catch(() => ({})) as Record<string, unknown>;
       if (!response.ok) {
@@ -1331,9 +1441,9 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
       return result.ok ? result.payload.customer : null;
     }
     try {
-      const response = await fetch(
+      const response = await fetchWithDeadline(
         `/api/admin/vip-floor/customers/${encodeURIComponent(customerId)}`,
-        { cache: "no-store" },
+        { cache: "no-store", deadlineMs: READ_DEADLINE_MS },
       );
       const payload = await response.json().catch(() => ({})) as Record<string, unknown>;
       return response.ok && payload.ok === true && payload.customer
@@ -1368,9 +1478,10 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
       return result.ok;
     }
     try {
-      const response = await fetch(
+      const response = await fetchWithDeadline(
         `/api/admin/vip-floor/customers/${encodeURIComponent(customerId)}`,
         {
+          deadlineMs: WRITE_DEADLINE_MS,
           method: "PATCH",
           headers: {
             "content-type": "application/json",
@@ -1398,9 +1509,10 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
       return result.ok;
     }
     try {
-      const response = await fetch(
+      const response = await fetchWithDeadline(
         `/api/admin/vip-floor/reservations/${encodeURIComponent(draft.reservationId)}/customer-link`,
         {
+          deadlineMs: WRITE_DEADLINE_MS,
           method: "PATCH",
           headers: {
             "content-type": "application/json",
@@ -1441,8 +1553,9 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
       };
     }
     try {
-      const response = await fetch("/api/admin/vip-floor/observability?windowMinutes=60", {
+      const response = await fetchWithDeadline("/api/admin/vip-floor/observability?windowMinutes=60", {
         cache: "no-store",
+        deadlineMs: READ_DEADLINE_MS,
       });
       const payload = await response.json().catch(() => ({})) as Record<string, unknown>;
       return response.ok && payload.ok === true && payload.metrics && payload.alerts
