@@ -62,8 +62,16 @@ export default function ReservationListView({
               return (
                 <tr
                   key={reservation.id}
+                  className={styles.reservationRow}
                   data-selected={reservation.id === selectedReservationId || undefined}
                   data-attention={reservation.exceptionLabel ? "" : undefined}
+                  onClick={(event) => {
+                    // The native button remains the keyboard/AT entry point.
+                    // Other cells select the row without a stretched overlay:
+                    // Safari 18 does not contain absolute children within tr.
+                    if (event.target instanceof Element && event.target.closest("button, a, input, select, textarea")) return;
+                    onSelect(reservation.id);
+                  }}
                 >
                   <td className={styles.timeCell}>
                     <button

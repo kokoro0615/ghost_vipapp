@@ -1005,12 +1005,8 @@
   white-space: nowrap;
 }
 .reservationTable th svg { display: inline; vertical-align: -2px; }
-/* `--h-row` is the declared ledger row (52px, chosen for the touch floor). The
-   row has to actually be that: `.rowOpen` used to re-declare the 44px floor as
-   its own min-height, and with 6px of cell padding on top of it every row came
-   out 57px — the token quietly overridden by a control that is not the target.
-   The row itself is the target (`.rowOpen::after` covers it), so the floor
-   belongs to the row and the cell keeps its padding tight. */
+/* The ledger row is 52px and its native time button keeps the 44px touch
+   floor. Other cells select via the row's click handler, not an overlay. */
 .reservationTable td {
   height: var(--h-row);
   padding: var(--s-2) var(--s-5);
@@ -1019,7 +1015,8 @@
   white-space: nowrap;
 }
 .listView[data-density="comfortable"] .reservationTable td { height: 64px; padding: var(--s-3) var(--s-5); }
-.reservationTable tbody tr { position: relative; transition: background var(--dur-fast) var(--ease-ui); }
+.reservationTable tbody tr { transition: background var(--dur-fast) var(--ease-ui); }
+.reservationRow { cursor: pointer; }
 .reservationTable tbody tr:nth-child(even) { background: var(--surface-quiet); }
 .reservationTable tr[data-attention] { background: var(--alert-wash); }
 /* Selection is the accent spine every ledger entry on this surface takes,
@@ -1033,12 +1030,9 @@
 
 /* Time is the hero of every row, and it is the row's single control. */
 .timeCell { padding-left: var(--s-6) !important; }
-/* The row's control keeps the 44px floor in its own box — the audit measures
-   the control, not the overlay that stretches its hit area — and the cell keeps
-   its padding tight, so the row lands on the declared `--h-row` instead of the
-   57px the old 6px padding pushed it to. */
+/* Safari 18 skips positioned table rows as containing blocks. Do not stretch
+   an absolute pseudo-element from this button: it would cover the workspace. */
 .rowOpen { display: grid; min-height: var(--h-control); align-content: center; gap: 1px; padding: 0; border: 0; background: none; text-align: left; }
-.rowOpen::after { position: absolute; inset: 0; content: ""; }
 .rowOpen strong {
   color: var(--ink);
   font-family: var(--font-figure);
@@ -3696,17 +3690,6 @@
 .turnoverAction button:active:not(:disabled) { border-color: var(--action-press); background: var(--action-press); transition-duration: 0s; }
 .viewSwitcher button:active, .inspectorTabs button:active { color: var(--ink); }
 .reservationTable tbody tr:has(.rowOpen:active) { background: var(--surface-active); transition-duration: 0s; }
-
-@media (hover: none) {
-  /* The ledger row reads as one object and, under a cursor, highlighted as one.
-     Only the time cell was ever pressable, so on touch the operator aims at the
-     middle of a 52px row and nothing happens. The accessible control stays one
-     button with one name; its hit area is stretched to the row it already
-     stands for. The row carries no other interactive element, so the overlay
-     covers nothing. */
-  .reservationTable tbody tr { position: relative; }
-  .rowOpen::after { content: ""; position: absolute; inset: 0; }
-}
 
 /* ── 13. disabled overrides that must outrank later component rules ─────── */
 

@@ -31,6 +31,7 @@ export const QA_VIEWPORTS = Object.freeze([
   { browser: "chromium", width: 375, height: 812 },
   { browser: "chromium", width: 320, height: 800 },
   { browser: "webkit", width: 1080, height: 810, touch: true, scale: 2 },
+  { browser: "webkit", width: 810, height: 1080, touch: true, scale: 2 },
   { browser: "webkit", width: 1194, height: 834 },
 ]);
 

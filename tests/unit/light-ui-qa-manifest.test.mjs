@@ -30,13 +30,14 @@ test("light UI QA freezes the exact Chromium and WebKit release matrix", () => {
        * is pinned for WebKit too and reported as not-run where the host cannot
        * launch it. */
       "webkit-1080x810",
+      "webkit-810x1080",
       "webkit-1194x834",
     ],
   );
   /* Touch emulation is part of the contract, not a detail of the run: without
    * it the harness drives a mouse browser at a tablet size and cannot observe
    * hover that latches on tap. */
-  for (const key of ["chromium-1080x810", "chromium-810x1080", "webkit-1080x810"]) {
+  for (const key of ["chromium-1080x810", "chromium-810x1080", "webkit-1080x810", "webkit-810x1080"]) {
     const entry = QA_VIEWPORTS.find(
       ({ browser, width, height }) => `${browser}-${width}x${height}` === key,
     );

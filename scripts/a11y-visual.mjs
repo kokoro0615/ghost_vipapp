@@ -5,6 +5,7 @@ import path from "node:path";
 import process from "node:process";
 
 import { chromium, webkit } from "playwright-core";
+import { assertLedgerInteraction } from "./lib/ledger-hit-area-qa.mjs";
 import {
   buildQaSummary,
   QA_ALLOWED_MEDIA_SELECTORS,
@@ -196,7 +197,13 @@ async function auditViewport(context, viewport) {
   };
 
   if (targetedState) {
-    if (targetedState === "chart-phases") {
+    if (targetedState === "list") {
+      const listPage = await newQaPage(context, { boardPayload: turnoverBoard });
+      await goToWorkspace(listPage, "list");
+      await assertLedgerInteraction(listPage, viewport);
+      await capture(listPage, "list");
+      await closeQaPage(listPage);
+    } else if (targetedState === "chart-phases") {
       const phasePage = await newQaPage(context, {
         boardPayload: timelinePhaseBoard,
         fixedNow: timelinePhaseNow,
@@ -234,6 +241,7 @@ async function auditViewport(context, viewport) {
   const page = await newQaPage(context);
   for (const view of ["list", "floor", "chart"]) {
     await goToWorkspace(page, view);
+    if (view === "list") await assertLedgerInteraction(page, viewport);
     await capture(page, view);
   }
 

@@ -93,6 +93,17 @@ that the two defects that actually reach the operator were unobservable:
 Treat "the gate is green" as necessary and not sufficient whenever a change is
 about the device rather than about the markup.
 
+**Safari 18 compatibility (2026-09-21):** an iPad viewport and user agent on a
+new WebKit do not emulate the venue's older engine. Safari 18 ignores positioned
+table rows as containing blocks ([WebKit 240961](https://bugs.webkit.org/show_bug.cgi?id=240961)).
+Never stretch an absolutely positioned button/pseudo-element against a `tr`:
+it can cover the workspace and intercept every control below the calendar.
+Keep native row buttons for keyboard/AT access and delegate other cell taps
+without an overlay. The browser gate forces static table-row positioning and
+checks actual hit targets, menu/intake, view changes, row selection and reload.
+Device-specific incidents also require a Safari 18 engine check in both target
+orientations; label Linux WebKit evidence separately from a physical iPad test.
+
 ---
 
 ## 2. Tech stack
