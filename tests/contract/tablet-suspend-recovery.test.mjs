@@ -12,15 +12,14 @@ async function readHook() {
 
 test("every workspace request carries a deadline", async () => {
   const source = await readHook();
-  // `fetchWithDeadline` owns the only bare call, and realtime metrics are
-  // fire-and-forget: nothing the operator is waiting on may run without a
-  // deadline, because an iPadOS-suspended request never rejects on its own.
+  // All awaited JSON reads and writes must use the body-aware helper. The
+  // telemetry POST is fire-and-forget and never gates operator interaction.
   const bare = [...source.matchAll(/(?<![\w.])fetch\(/gu)].length;
-  const inHelper = [...source.matchAll(/return await fetch\(input,/gu)].length;
   const metrics = [...source.matchAll(/await fetch\("\/api\/admin\/vip-floor\/observability", \{/gu)].length;
-  assert.equal(inHelper, 1, "fetchWithDeadline must wrap exactly one bare fetch");
-  assert.equal(metrics, 1, "the realtime metric POST stays fire-and-forget");
-  assert.equal(bare, inHelper + metrics, "a workspace request is missing its deadline");
+  assert.equal(metrics, 1);
+  assert.equal(bare, metrics, "an awaited request bypasses the JSON deadline");
+  assert.match(source, /import \{ fetchJsonWithDeadline \} from/u);
+  assert.doesNotMatch(source, /response\.json\(/u);
   assert.match(source, /const READ_DEADLINE_MS = \d[\d_]*;/u);
   assert.match(source, /const WRITE_DEADLINE_MS = \d[\d_]*;/u);
 });

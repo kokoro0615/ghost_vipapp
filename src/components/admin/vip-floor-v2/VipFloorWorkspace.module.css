@@ -810,6 +810,35 @@
 .stateBanner span { min-width: 0; overflow: hidden; color: var(--ink-2); text-overflow: ellipsis; white-space: nowrap; }
 .stateBanner[data-tone="danger"] { border-bottom-color: var(--alert-line); background: var(--alert-wash); color: var(--alert); }
 
+.recoveryBar {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  padding: var(--s-2) var(--s-5);
+  border-bottom: 1px solid var(--rule);
+  background: var(--surface);
+  color: var(--ink-2);
+  font-size: var(--t-mini);
+}
+.recoveryBar span { min-width: 0; }
+.recoveryBar button {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-2);
+  min-height: 44px;
+  min-width: 88px;
+  border: 1px solid var(--rule-control);
+  border-radius: var(--r-control);
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+}
+.recoveryBar button:disabled { cursor: wait; }
+
 /* Idle costs no pixels: the live region is only painted when it has news. */
 .liveMessage {
   position: absolute;

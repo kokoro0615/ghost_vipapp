@@ -978,6 +978,15 @@ export default function VipFloorWorkspace({
           <strong className="tabular-nums">REV {state.board.boardRevision}</strong>
         </div>
 
+        {["loading", "stale", "reconnecting", "error"].includes(state.globalState) ? (
+          <div className={styles.recoveryBar}>
+            <span>{state.globalState === "loading" ? "台帳を読み込んでいます。" : "接続を確認して再読込してください。"}</span>
+            <button type="button" onClick={() => void loadBoard()} disabled={state.pending}>
+              <RefreshCw size={16} aria-hidden />再読込
+            </button>
+          </div>
+        ) : null}
+
         <div className={styles.viewFrame}>
           {state.globalState === "loading" ? <WorkspaceSkeleton label="VIP Floorを読み込んでいます" /> : null}
           {state.globalState === "error" ? <ErrorState description={state.stateDescription} onRetry={() => void loadBoard()} /> : null}

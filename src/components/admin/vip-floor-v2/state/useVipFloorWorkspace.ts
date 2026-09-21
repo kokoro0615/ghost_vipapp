@@ -27,6 +27,7 @@ import {
   readSafeBoardCache,
   writeSafeBoardCache,
 } from "@/lib/vipFloorRealtime";
+import { fetchJsonWithDeadline } from "@/lib/fetchJsonWithDeadline";
 import { readVipOperationFailure } from "@/lib/vipFloorClientErrors";
 import { readVipFloorDayStateEvent } from "@/lib/vipFloorDayState";
 
@@ -88,19 +89,6 @@ const WRITE_DEADLINE_MS = 45_000;
 const RESUMABLE_STATES = new Set(["loading", "stale", "reconnecting", "error"]);
 const RESUME_COALESCE_MS = 2_000;
 
-async function fetchWithDeadline(
-  input: string,
-  init: RequestInit & { deadlineMs: number },
-): Promise<Response> {
-  const { deadlineMs, ...request } = init;
-  const controller = new AbortController();
-  const deadline = setTimeout(() => controller.abort(), deadlineMs);
-  try {
-    return await fetch(input, { ...request, signal: controller.signal });
-  } finally {
-    clearTimeout(deadline);
-  }
-}
 
 function currentBusinessDate() {
   const businessClock = new Date(Date.now() - 5 * 60 * 60 * 1000);
@@ -225,11 +213,11 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
     }
 
     try {
-      const response = await fetchWithDeadline(`/api/admin/vip-floor?date=${encodeURIComponent(date)}`, {
+      const { response, payload: jsonPayload } = await fetchJsonWithDeadline(`/api/admin/vip-floor?date=${encodeURIComponent(date)}`, {
         cache: "no-store",
         deadlineMs: READ_DEADLINE_MS,
       });
-      const payload = await response.json().catch(() => ({})) as Record<string, unknown>;
+      const payload = jsonPayload as Record<string, unknown>;
       if (superseded()) return false;
       if (response.status === 401) {
         purgeSafeBoardCache();
@@ -298,11 +286,11 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
     let cancelled = false;
     void (async () => {
       try {
-        const response = await fetchWithDeadline("/api/admin/session", {
+        const { response, payload: jsonPayload } = await fetchJsonWithDeadline("/api/admin/session", {
           cache: "no-store",
           deadlineMs: READ_DEADLINE_MS,
         });
-        const payload = await response.json().catch(() => ({})) as Session;
+        const payload = jsonPayload as Session;
         if (cancelled) return;
         const publicDemoConfig = readDemoConfig(payload);
         if (publicDemoConfig) setDemoConfig(publicDemoConfig);
@@ -659,11 +647,11 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
   const reconnect = useCallback(async () => {
     dispatch({ type: "pending", pending: true });
     try {
-      const response = await fetchWithDeadline("/api/admin/session", {
+      const { response, payload: jsonPayload } = await fetchJsonWithDeadline("/api/admin/session", {
         cache: "no-store",
         deadlineMs: READ_DEADLINE_MS,
       });
-      const payload = await response.json().catch(() => ({})) as Session & Record<string, unknown>;
+      const payload = jsonPayload as Session & Record<string, unknown>;
       if (!response.ok || !payload.ok) {
         const publicDemoConfig = readDemoConfig(payload);
         if (publicDemoConfig) setDemoConfig(publicDemoConfig);
@@ -716,14 +704,14 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
   const unlock = useCallback(async (credentials: { username: string; password: string }) => {
     dispatch({ type: "pending", pending: true });
     try {
-      const response = await fetchWithDeadline("/api/admin/session", {
+      const { response, payload: jsonPayload } = await fetchJsonWithDeadline("/api/admin/session", {
         method: "POST",
         cache: "no-store",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(credentials),
         deadlineMs: WRITE_DEADLINE_MS,
       });
-      const payload = await response.json().catch(() => ({})) as Record<string, unknown>;
+      const payload = jsonPayload as Record<string, unknown>;
       if (!response.ok || payload.ok !== true) {
         setAuth({ status: "locked", session: null });
         dispatch({
@@ -758,7 +746,7 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
 
   const logout = useCallback(async () => {
     try {
-      await fetchWithDeadline("/api/admin/session", {
+      await fetchJsonWithDeadline("/api/admin/session", {
         method: "DELETE",
         deadlineMs: WRITE_DEADLINE_MS,
       });
@@ -865,7 +853,7 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
         return true;
       }
 
-      const response = await fetchWithDeadline("/api/admin/vip-floor/commands", {
+      const { response, payload: jsonPayload } = await fetchJsonWithDeadline("/api/admin/vip-floor/commands", {
         method: "POST",
         headers: {
           "content-type": "application/json",
@@ -874,7 +862,7 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
         body: JSON.stringify(draft),
         deadlineMs: WRITE_DEADLINE_MS,
       });
-      const payload = await response.json().catch(() => ({})) as Record<string, unknown>;
+      const payload = jsonPayload as Record<string, unknown>;
       if (!response.ok) {
         if (response.status === 401 || response.status === 410) {
           purgeSafeBoardCache();
@@ -999,11 +987,11 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
         }
         return result.payload;
       }
-      const response = await fetchWithDeadline(
+      const { response, payload: jsonPayload } = await fetchJsonWithDeadline(
         `/api/admin/vip-floor/options?date=${encodeURIComponent(targetBusinessDate)}`,
         { cache: "no-store", deadlineMs: READ_DEADLINE_MS },
       );
-      const payload = await response.json().catch(() => ({})) as Record<string, unknown>;
+      const payload = jsonPayload as Record<string, unknown>;
 
       if (!response.ok || payload.ok !== true) {
         const eventDayMissing = payload.error === "event_day_not_found";
@@ -1057,11 +1045,11 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
     }
 
     try {
-      const response = await fetchWithDeadline(
+      const { response, payload: jsonPayload } = await fetchJsonWithDeadline(
         `/api/admin/vip-floor/business-days?after=${encodeURIComponent(afterBusinessDate)}&limit=3`,
         { cache: "no-store", deadlineMs: READ_DEADLINE_MS },
       );
-      const payload = await response.json().catch(() => ({})) as Record<string, unknown>;
+      const payload = jsonPayload as Record<string, unknown>;
       if (!response.ok || payload.ok !== true || !Array.isArray(payload.businessDates)) {
         return [];
       }
@@ -1144,7 +1132,7 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
         await loadBoard(businessDate);
         return true;
       }
-      const response = await fetchWithDeadline("/api/admin/vip-floor/operations", {
+      const { response, payload: jsonPayload } = await fetchJsonWithDeadline("/api/admin/vip-floor/operations", {
         method: "POST",
         headers: {
           "content-type": "application/json",
@@ -1153,7 +1141,7 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
         body: JSON.stringify(draft),
         deadlineMs: WRITE_DEADLINE_MS,
       });
-      const payload = await response.json().catch(() => ({})) as Record<string, unknown>;
+      const payload = jsonPayload as Record<string, unknown>;
 
       if (!response.ok) {
         const failure = readVipOperationFailure(response.status, payload);
@@ -1213,11 +1201,11 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
         const result = await demoTransport.loadWaitlist(businessDate);
         return result.ok ? result.payload.entries : null;
       }
-      const response = await fetchWithDeadline(
+      const { response, payload: jsonPayload } = await fetchJsonWithDeadline(
         `/api/admin/vip-floor/waitlist?date=${encodeURIComponent(businessDate)}`,
         { cache: "no-store", deadlineMs: READ_DEADLINE_MS },
       );
-      const payload = await response.json().catch(() => ({})) as Record<string, unknown>;
+      const payload = jsonPayload as Record<string, unknown>;
       if (!response.ok || payload.ok !== true || !Array.isArray(payload.entries)) {
         dispatch({
           type: "commandOutcome",
@@ -1288,7 +1276,7 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
         await loadBoard(businessDate);
         return true;
       }
-      const response = await fetchWithDeadline("/api/admin/vip-floor/waitlist", {
+      const { response, payload: jsonPayload } = await fetchJsonWithDeadline("/api/admin/vip-floor/waitlist", {
         method: "POST",
         headers: {
           "content-type": "application/json",
@@ -1297,7 +1285,7 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
         body: JSON.stringify(draft),
         deadlineMs: WRITE_DEADLINE_MS,
       });
-      const payload = await response.json().catch(() => ({})) as Record<string, unknown>;
+      const payload = jsonPayload as Record<string, unknown>;
       if (!response.ok) {
         dispatch({
           type: "commandOutcome",
@@ -1347,11 +1335,11 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
         const result = await demoTransport.loadStaff(businessDate);
         return result.ok ? result.payload : null;
       }
-      const response = await fetchWithDeadline(
+      const { response, payload: jsonPayload } = await fetchJsonWithDeadline(
         `/api/admin/vip-floor/staff?date=${encodeURIComponent(businessDate)}`,
         { cache: "no-store", deadlineMs: READ_DEADLINE_MS },
       );
-      const payload = await response.json().catch(() => ({})) as Record<string, unknown>;
+      const payload = jsonPayload as Record<string, unknown>;
       if (
         !response.ok
         || payload.ok !== true
@@ -1388,7 +1376,7 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
         await loadBoard(businessDate);
         return true;
       }
-      const response = await fetchWithDeadline("/api/admin/vip-floor/staff", {
+      const { response, payload: jsonPayload } = await fetchJsonWithDeadline("/api/admin/vip-floor/staff", {
         method: "POST",
         headers: {
           "content-type": "application/json",
@@ -1397,7 +1385,7 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
         body: JSON.stringify(draft),
         deadlineMs: WRITE_DEADLINE_MS,
       });
-      const payload = await response.json().catch(() => ({})) as Record<string, unknown>;
+      const payload = jsonPayload as Record<string, unknown>;
       if (!response.ok) {
         dispatch({
           type: "commandOutcome",
@@ -1441,11 +1429,11 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
       return result.ok ? result.payload.customer : null;
     }
     try {
-      const response = await fetchWithDeadline(
+      const { response, payload: jsonPayload } = await fetchJsonWithDeadline(
         `/api/admin/vip-floor/customers/${encodeURIComponent(customerId)}`,
         { cache: "no-store", deadlineMs: READ_DEADLINE_MS },
       );
-      const payload = await response.json().catch(() => ({})) as Record<string, unknown>;
+      const payload = jsonPayload as Record<string, unknown>;
       return response.ok && payload.ok === true && payload.customer
         ? payload.customer as CustomerDetail
         : null;
@@ -1478,7 +1466,7 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
       return result.ok;
     }
     try {
-      const response = await fetchWithDeadline(
+      const { response } = await fetchJsonWithDeadline(
         `/api/admin/vip-floor/customers/${encodeURIComponent(customerId)}`,
         {
           deadlineMs: WRITE_DEADLINE_MS,
@@ -1509,7 +1497,7 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
       return result.ok;
     }
     try {
-      const response = await fetchWithDeadline(
+      const { response } = await fetchJsonWithDeadline(
         `/api/admin/vip-floor/reservations/${encodeURIComponent(draft.reservationId)}/customer-link`,
         {
           deadlineMs: WRITE_DEADLINE_MS,
@@ -1553,11 +1541,11 @@ export function useVipFloorWorkspace(initialBusinessDate?: string) {
       };
     }
     try {
-      const response = await fetchWithDeadline("/api/admin/vip-floor/observability?windowMinutes=60", {
+      const { response, payload: jsonPayload } = await fetchJsonWithDeadline("/api/admin/vip-floor/observability?windowMinutes=60", {
         cache: "no-store",
         deadlineMs: READ_DEADLINE_MS,
       });
-      const payload = await response.json().catch(() => ({})) as Record<string, unknown>;
+      const payload = jsonPayload as Record<string, unknown>;
       return response.ok && payload.ok === true && payload.metrics && payload.alerts
         ? payload as unknown as SloPayload
         : null;
