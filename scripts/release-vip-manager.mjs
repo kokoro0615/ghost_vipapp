@@ -577,8 +577,9 @@ function assertStagedCandidate(candidate, errorSuffix = "") {
   ));
   if (
     !automaticAliasesAreSafe
-    || aliases.length !== automaticAliases.length
-    || aliases.some((hostname, index) => hostname !== automaticAliases[index])
+    // With --skip-domain, Vercel can advertise automaticAliases before any
+    // are attached. Every attached alias must still be provider-declared.
+    || aliases.some((hostname) => !automaticAliases.includes(hostname))
   ) {
     throw new Error(`candidate_is_not_aliasless${errorSuffix}`);
   }

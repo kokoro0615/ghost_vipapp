@@ -931,6 +931,7 @@ test("candidate accepts only provider-declared automatic aliases on a staged Pro
     "ghost-vipapp-kokoro0634-projects-b6224582.vercel.app",
   ];
   let fixedReads = 0;
+  let attachedAliases = automaticAliases;
   const base = baseReleaseRuntime();
   const runtime = baseReleaseRuntime({
     async resolveProductionDeploymentId(hostname) {
@@ -940,7 +941,7 @@ test("candidate accepts only provider-declared automatic aliases on a staged Pro
     async getVercelDeployment(value) {
       if (value === "ghost-vipapp-candidate.vercel.app" || value === "dpl_VipCandidate") {
         return releaseDeployment("dpl_VipCandidate", {
-          alias: automaticAliases,
+          alias: attachedAliases,
           automaticAliases,
           readySubstate: "STAGED",
         });
@@ -949,9 +950,13 @@ test("candidate accepts only provider-declared automatic aliases on a staged Pro
     },
   });
 
-  const result = await createCandidate({ repoRoot: "/fixture/repo" }, runtime);
-  assert.equal(result.deploymentId, "dpl_VipCandidate");
-  assert.equal(fixedReads, 2, "the fixed customer hostname must be unchanged after staging");
+  for (const aliases of [automaticAliases, [], automaticAliases.slice(0, 1)]) {
+    attachedAliases = aliases;
+    fixedReads = 0;
+    const result = await createCandidate({ repoRoot: "/fixture/repo" }, runtime);
+    assert.equal(result.deploymentId, "dpl_VipCandidate");
+    assert.equal(fixedReads, 2, "the fixed customer hostname must be unchanged after staging");
+  }
 
   for (const candidate of [
     releaseDeployment("dpl_VipCandidate", {
@@ -961,6 +966,16 @@ test("candidate accepts only provider-declared automatic aliases on a staged Pro
     }),
     releaseDeployment("dpl_VipCandidate", {
       alias: [...automaticAliases, "unexpected.example"],
+      automaticAliases,
+      readySubstate: "STAGED",
+    }),
+    releaseDeployment("dpl_VipCandidate", {
+      alias: [],
+      automaticAliases: [RELEASE_CONFIG.productionHostname],
+      readySubstate: "STAGED",
+    }),
+    releaseDeployment("dpl_VipCandidate", {
+      alias: [RELEASE_CONFIG.productionHostname],
       automaticAliases,
       readySubstate: "STAGED",
     }),
