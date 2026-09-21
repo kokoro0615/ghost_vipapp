@@ -104,6 +104,11 @@ checks actual hit targets, menu/intake, view changes, row selection and reload.
 Device-specific incidents also require a Safari 18 engine check in both target
 orientations; label Linux WebKit evidence separately from a physical iPad test.
 
+**QA scope (Owner, 2026-09-21):** the app is not used on smartphones, so phone
+widths are excluded from release verification. The iPad orientations lead;
+desktop and other tablet widths remain regression cover. Existing phone UI is
+preserved, but phone-width testing is not a release prerequisite.
+
 ---
 
 ## 2. Tech stack
@@ -719,8 +724,8 @@ portrait (810pt) took both. They are now separate.
   timeline. The queue occupies the right column only while nothing is selected,
   and is never a second copy of the ledger.
 - Audited viewports, device first: **`1080×810` and `810×1080` (Chromium, touch,
-  2x)**, then `1440×900 · 1366×768 · 1194×834 · 1024×768 · 768×1024 · 390×844 ·
-  375×812 · 320×800` (Chromium, pointer), and `1080×810` + `1194×834` (WebKit).
+  2x)**, then `1920×1080 · 1440×900 · 1366×768 · 1194×834 · 1024×768 · 768×1024`
+  (Chromium, pointer), and `1080×810` + `810×1080` + `1194×834` (WebKit).
 - **`1080×810` is the standalone height.** In Safari the tab and address bars
   take roughly 84pt off it, so the browser case is nearer `1080×726`. That case
   is not audited directly; the audited `1024×768` sits below it in height and
@@ -1080,7 +1085,7 @@ npm run ci   # lint · typecheck · unit+contract+PII · build · maintenance ·
 | Gate | Pins |
 |---|---|
 | `tests/contract/operator-light-ui.test.mjs` | The design itself: OKLCH light tokens on a white ground, no revived dark aliases, no hex, the Instrument Sans + Noto Sans JP pairing with variable weight roles, the optical tracking curve, tabular figures, six-step scale, the accent as a mark and never a fill, the contact shadow only on sticky content, the authored business-date control, two-zone wizard with all eight steps, Basic-only access with no secondary credential field, two-column shell, hidden idle live region, full-colour floor plan with ≥52×44 nodes, chart rows filling height, no coloured side tabs, no `backdrop-filter`, no radius ≥12px |
-| `npm run test:a11y` | Required-state and viewport counts come from `scripts/light-ui-qa-manifest.mjs`; the harness currently captures 52 required states plus one date-unavailable fixture state per viewport, across 13 configured viewports. Gate: axe 0 · horizontal overflow 0 · controls <44px 0 · **text controls <16px 0** · legacy purple 0 · console errors 0 · 5xx 0. Viewports carrying `touch: true` are driven with `hasTouch`/`isMobile` at `deviceScaleFactor: 2`, so `hover`/`pointer` media resolve the way they do on the device. WebKit that cannot launch is recorded as `notRun` and is never counted as passed. Read counts from artifacts, never this prose. |
+| `npm run test:a11y` | Required-state and viewport counts come from `scripts/light-ui-qa-manifest.mjs`; phone widths are excluded per §1.1. Gate: axe 0 · horizontal overflow 0 · controls <44px 0 · **text controls <16px 0** · legacy purple 0 · console errors 0 · 5xx 0. Viewports carrying `touch: true` are driven with `hasTouch`/`isMobile` at `deviceScaleFactor: 2`, so `hover`/`pointer` media resolve the way they do on the device. WebKit that cannot launch is recorded as `notRun` and is never counted as passed. Read counts from artifacts, never this prose. |
 | `tests/contract/source-of-truth-guard.test.mjs` | The legacy website admin surface is never treated as this app's UI |
 | `tests/unit/inspector-accessibility.test.mjs`, `timeline-state`, `ghost-operating-hours`, `workspace-route-sync` | Focus order, timeline state model, the 22:00–翌05:00 window, URL/state sync |
 | `npm run test:maintenance` | The maintenance anchor still renders |
@@ -1253,7 +1258,7 @@ only where it currently happens to be painted.
       equivalent; every new control has an `:active` state (§6.1).
 - [ ] Focus visible, never covered by sticky chrome; dialog focus enters, `Escape`
       closes, focus returns; destructive confirmations focus the safe control.
-- [ ] No horizontal overflow at 320px; no page-level scroll.
+- [ ] No horizontal overflow at the audited tablet/desktop widths; no page-level scroll.
 - [ ] `prefers-reduced-motion` has an authored static state wherever motion
       carried meaning.
 - [ ] Chrome above the work area still ≤108px desktop / ≤156px phone; still two

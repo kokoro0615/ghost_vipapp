@@ -23,9 +23,6 @@ test("light UI QA freezes the exact Chromium and WebKit release matrix", () => {
       "chromium-1194x834",
       "chromium-1024x768",
       "chromium-768x1024",
-      "chromium-390x844",
-      "chromium-375x812",
-      "chromium-320x800",
       /* Safari is the browser the venue actually uses, so the device viewport
        * is pinned for WebKit too and reported as not-run where the host cannot
        * launch it. */
@@ -109,10 +106,10 @@ test("light UI QA summary fails closed when a state or viewport is absent", () =
 
   const incomplete = buildQaSummary(
     results.filter((result) =>
-      result.state !== "conflict" && result.viewport !== "chromium-375x812"),
+      result.state !== "conflict" && result.viewport !== "webkit-810x1080"),
     "/tmp/evidence",
   );
   assert.equal(incomplete.ok, false);
   assert.deepEqual(incomplete.missingStates, ["conflict"]);
-  assert.deepEqual(incomplete.missingViewports, ["chromium-375x812"]);
+  assert.deepEqual(incomplete.missingViewports, ["webkit-810x1080"]);
 });

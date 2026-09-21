@@ -2,7 +2,8 @@
  * The venue device is an iPad (8th generation, 2020): a 10.2" panel of
  * 2160×1620 physical pixels at 2x, i.e. 1080×810 CSS points, running Safari on
  * iPadOS 18.3.1. Those two orientations are the primary contract; every other
- * entry is regression cover for the shells that still exist.
+ * entry is desktop/tablet regression cover. The Owner excluded smartphone
+ * widths from release QA on 2026-09-21 because the app is used only on iPads.
  *
  * `touch: true` matters as much as the size. Without it the harness drives a
  * mouse browser at a tablet size and can never observe the two defects that
@@ -27,9 +28,6 @@ export const QA_VIEWPORTS = Object.freeze([
   { browser: "chromium", width: 1194, height: 834 },
   { browser: "chromium", width: 1024, height: 768 },
   { browser: "chromium", width: 768, height: 1024 },
-  { browser: "chromium", width: 390, height: 844 },
-  { browser: "chromium", width: 375, height: 812 },
-  { browser: "chromium", width: 320, height: 800 },
   { browser: "webkit", width: 1080, height: 810, touch: true, scale: 2 },
   { browser: "webkit", width: 810, height: 1080, touch: true, scale: 2 },
   { browser: "webkit", width: 1194, height: 834 },
