@@ -62,7 +62,6 @@ type Draft = {
   phone: string;
   email: string;
   languageCode: string;
-  guestLabel: string;
   operatorNote: string;
   sourceChannel: "online" | "phone" | "admin";
   serviceStatus: VipServiceStatus;
@@ -82,6 +81,12 @@ type Props = {
    * line sits behind this dialog, so a rejected save used to look like a dead
    * button. */
   failure?: CommandOutcome | null;
+  /** The reservation name (saved as `guestLabel`, printed in the ledger's
+   * ゲスト column). OperationCenter owns it because this wizard remounts on
+   * every event-day change, and the name is typed on the same step as the
+   * date. */
+  guestLabel: string;
+  onGuestLabelChange: (guestLabel: string) => void;
   onRun: (draft: OperationDraft) => Promise<boolean>;
   onDone: () => void;
   onBusinessDateChange: (businessDate: string) => Promise<boolean>;
@@ -96,6 +101,8 @@ export function ReservationWizard({
   pending,
   datePending,
   failure = null,
+  guestLabel,
+  onGuestLabelChange,
   onRun,
   onDone,
   onBusinessDateChange,
@@ -143,11 +150,10 @@ export function ReservationWizard({
     offeringId: initialOfferingId,
     guestCount: reservation?.guestCount ?? 2,
     tableIds: initialTableIds,
-    displayName: reservation?.guestLabel ?? "",
+    displayName: "",
     phone: "",
     email: "",
     languageCode: "ja",
-    guestLabel: reservation?.guestLabel ?? "",
     operatorNote: reservation?.operatorNote ?? "",
     sourceChannel: reservation?.sourceChannel === "online"
       || reservation?.sourceChannel === "phone"
@@ -189,7 +195,14 @@ export function ReservationWizard({
   const staffName = (staffData?.staffMembers ?? [])
     .find((member) => member.id === draft.bookingStaffMemberId)?.displayName ?? null;
   const emailMissing = draft.notificationPreference === "email" && !reservation && !draft.email;
-  const guestName = (reservation?.guestLabel ?? draft.displayName) || "匿名";
+  // What gets saved: `nullable()` trims, so the receipt shows the trimmed name.
+  const savedGuestLabel = guestLabel.trim();
+  /* The customer profile is a separate encrypted record and never feeds the
+   * ledger, so its row states the profile — the name typed on step 5, or the
+   * link an edit keeps — and never repeats the reservation name. */
+  const customerSummary = reservation
+    ? reservation.customerId ? "紐付け済み" : "未紐付け"
+    : draft.displayName.trim() || null;
 
   function goToStep(next: number) {
     setAcknowledgedFailure(failure);
@@ -222,7 +235,7 @@ export function ReservationWizard({
         phone: nullable(draft.phone),
         email: nullable(draft.email),
         languageCode: nullable(draft.languageCode),
-        guestLabel: nullable(draft.guestLabel),
+        guestLabel: nullable(guestLabel),
         operatorNote: nullable(draft.operatorNote),
         sourceChannel: draft.sourceChannel,
         serviceStatus: draft.serviceStatus,
@@ -369,7 +382,27 @@ export function ReservationWizard({
         <div className={styles.wizardActive}>
         {step === 0 ? (
           <fieldset>
-            <legend>予約日を選ぶ</legend>
+            <legend>予約名と予約日</legend>
+            {/* The name the ledger prints leads the first step: the step-4
+              * shortcut skips every later optional step, so this is the only
+              * place every intake passes. */}
+            <div className={styles.wizardField}>
+              <label>
+                予約名（任意）
+                <input
+                  value={guestLabel}
+                  maxLength={80}
+                  autoComplete="off"
+                  placeholder={demoMode.enabled ? "例: デモ予約001" : trialMode ? "例: TRIAL-予約01" : "例: 山田様"}
+                  aria-describedby="reservation-guest-label-hint"
+                  onChange={(event) => onGuestLabelChange(event.target.value)}
+                />
+              </label>
+              <p id="reservation-guest-label-hint" className={styles.wizardHint}>
+                予約一覧の「ゲスト」に表示されます。
+                {demoMode.enabled ? "DEMOでは「デモ」または「DEMO」を含む架空名だけを入力してください。" : null}
+              </p>
+            </div>
             {reservation ? (
               <p className={styles.wizardLockedValue}>
                 <span className="tabular-nums">
@@ -573,7 +606,7 @@ export function ReservationWizard({
             <legend>{demoMode.enabled ? "顧客（合成データ専用）" : "顧客（暗号化・Owner限定）"}</legend>
             {reservation ? (
               <>
-                <p className={styles.wizardLockedValue}>{reservation.guestLabel}</p>
+                <p className={styles.wizardLockedValue}>{customerSummary}</p>
                 <p className={styles.wizardHint}>{demoMode.enabled
                   ? reservation.customerId
                     ? "現在の合成顧客リンクをbrowser-localで保持します。"
@@ -584,7 +617,7 @@ export function ReservationWizard({
               </>
             ) : (
               <>
-                <label>氏名<input value={draft.displayName} maxLength={120} autoComplete="off" placeholder={demoMode.enabled ? "例: デモゲスト001" : trialMode ? "例: TRIAL-ゲスト01" : undefined} onChange={(event) => patch({ displayName: event.target.value })} /></label>
+                <label>顧客氏名<input value={draft.displayName} maxLength={120} autoComplete="off" placeholder={demoMode.enabled ? "例: デモゲスト001" : trialMode ? "例: TRIAL-ゲスト01" : undefined} onChange={(event) => patch({ displayName: event.target.value })} /></label>
                 <div className={styles.formColumns}>
                   <label>電話<input type="tel" value={draft.phone} maxLength={40} autoComplete="off" disabled={syntheticMode} aria-describedby={syntheticMode ? "synthetic-phone-rule" : undefined} onChange={(event) => patch({ phone: event.target.value })} /></label>
                   <label>Eメール<input type="email" value={draft.email} maxLength={254} autoComplete="off" placeholder={demoMode.enabled ? "demo-001@example.invalid" : trialMode ? "trial-01@example.com" : undefined} pattern={demoMode.enabled ? "^[^@\\s]+@example\\.invalid$" : trialMode ? "^[^@\\s]+@example\\.com$" : undefined} onChange={(event) => patch({ email: event.target.value })} /></label>
@@ -592,7 +625,7 @@ export function ReservationWizard({
                 {syntheticMode ? (
                   <p id="synthetic-phone-rule" className={styles.trialInputHint}>
                     {demoMode.enabled
-                      ? "DEMOでは電話番号を保存できません。氏名はデモ cue必須、Eメールは@example.invalidだけ使用できます。"
+                      ? "DEMOでは電話番号を保存できません。顧客氏名はデモ cue必須、Eメールは@example.invalidだけ使用できます。"
                       : "TRIALでは電話番号は入力できません。Eメールは@example.comのみ使用できます。"}
                   </p>
                 ) : null}
@@ -609,7 +642,6 @@ export function ReservationWizard({
               <label>経路<select value={draft.sourceChannel} onChange={(event) => patch({ sourceChannel: event.target.value as Draft["sourceChannel"] })}><option value="phone">電話受付</option><option value="admin">管理者作成</option><option value="online">GHOST Web</option></select></label>
               <label>状態<select value={draft.serviceStatus} onChange={(event) => patch({ serviceStatus: event.target.value as VipServiceStatus })}><option value="expected">来店予定</option><option value="late">遅刻</option><option value="arrived">到着</option><option value="seated">着席</option></select></label>
             </div>
-            <label>入口表示名<input value={draft.guestLabel} maxLength={80} onChange={(event) => patch({ guestLabel: event.target.value })} /></label>
             <label>現場共有メモ<textarea value={draft.operatorNote} maxLength={500} onChange={(event) => patch({ operatorNote: event.target.value })} /></label>
           </fieldset>
         ) : null}
@@ -632,6 +664,7 @@ export function ReservationWizard({
           <div className={styles.wizardConfirm}>
             <h3>この内容で{reservation ? "更新" : "作成"}します</h3>
             <dl>
+              <div><dt>予約名</dt><dd data-empty={savedGuestLabel ? undefined : true}>{savedGuestLabel || "未設定"}</dd></div>
               <div><dt>営業日</dt><dd className="tabular-nums">{formatBusinessDateWithWeekday(board.businessDay.businessDate)}</dd></div>
               <div>
                 <dt>時刻</dt>
@@ -647,8 +680,7 @@ export function ReservationWizard({
                   {selectedTables.length > 0 ? <span className="tabular-nums"> / 定員{capacity}名</span> : null}
                 </dd>
               </div>
-              <div><dt>顧客</dt><dd>{guestName}</dd></div>
-              <div><dt>入口表示名</dt><dd data-empty={draft.guestLabel ? undefined : true}>{draft.guestLabel || "未設定"}</dd></div>
+              <div><dt>顧客</dt><dd data-empty={customerSummary ? undefined : true}>{customerSummary ?? "未入力"}</dd></div>
               <div><dt>経路 / 状態</dt><dd>{SOURCE_LABELS[draft.sourceChannel]} / {SERVICE_STATUS_LABELS[draft.serviceStatus] ?? draft.serviceStatus}</dd></div>
               <div><dt>担当</dt><dd data-empty={staffName ? undefined : true}>{staffName ?? "未指定"}</dd></div>
               <div><dt>通知</dt><dd>{draft.notificationPreference === "email" ? "Eメール送信" : "送信しない"}</dd></div>
@@ -681,8 +713,8 @@ export function ReservationWizard({
         {step === 7 ? null : (
           <aside className={styles.wizardAside} aria-label="この予約の控え">
             <dl>
-              <div><dt>顧客</dt><dd>{guestName}</dd></div>
-              <div><dt>入口表示名</dt><dd data-empty={draft.guestLabel ? undefined : true}>{draft.guestLabel || "未設定"}</dd></div>
+              <div><dt>予約名</dt><dd data-empty={savedGuestLabel ? undefined : true}>{savedGuestLabel || "未設定"}</dd></div>
+              <div><dt>顧客</dt><dd data-empty={customerSummary ? undefined : true}>{customerSummary ?? "未入力"}</dd></div>
               <div><dt>担当</dt><dd data-empty={staffName ? undefined : true}>{staffName ?? "未指定"}</dd></div>
               <div><dt>通知</dt><dd>{draft.notificationPreference === "email" ? "Eメール送信" : "送信しない"}</dd></div>
               <div><dt>版</dt><dd>{reservation ? `v${reservation.version}` : "新規"}</dd></div>

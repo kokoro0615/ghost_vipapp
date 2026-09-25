@@ -1188,6 +1188,7 @@ async function runUiReservationCreateAndEdit(page, plan, businessDate) {
   await dialog.getByRole("tab", { name: "事前予約" }).click();
   let wizard = dialog.locator('section[aria-label^="予約作成"]');
 
+  await wizard.getByLabel("予約名（任意）", { exact: true }).fill("RC UI Guest");
   await wizard.getByRole("button", { name: "次へ" }).click();
   await wizard.getByLabel("開始", { exact: true }).fill(tokyoLocalInput(plan.startAt));
   await wizard.getByLabel("終了", { exact: true }).fill(tokyoLocalInput(plan.endAt));
@@ -1197,11 +1198,10 @@ async function runUiReservationCreateAndEdit(page, plan, businessDate) {
   await wizard.getByRole("group", { name: "予約卓" })
     .getByText(plan.tableDisplayCode, { exact: true })
     .click();
-  await wizard.getByRole("button", { name: "次へ" }).click();
-  await wizard.getByLabel("氏名", { exact: true }).fill("Release Candidate UI Guest");
+  await wizard.getByRole("button", { name: "任意項目を入力" }).click();
+  await wizard.getByLabel("顧客氏名", { exact: true }).fill("Release Candidate UI Guest");
   await wizard.getByLabel("Eメール", { exact: true }).fill("release-candidate-ui@example.com");
   await wizard.getByRole("button", { name: "次へ" }).click();
-  await wizard.getByLabel("入口表示名", { exact: true }).fill("RC UI Guest");
   await wizard.getByLabel("現場共有メモ", { exact: true }).fill("UI wizard release checkpoint");
   await wizard.getByRole("button", { name: "次へ" }).click();
   await wizard.getByRole("button", { name: "次へ" }).click();
@@ -1256,13 +1256,13 @@ async function runUiReservationCreateAndEdit(page, plan, businessDate) {
 
   const editDialog = page.getByRole("dialog", { name: "予約編集" });
   wizard = editDialog.locator('section[aria-label^="予約編集"]');
+  await wizard.getByLabel("予約名（任意）", { exact: true }).fill("RC UI Guest Edited");
   await wizard.getByRole("button", { name: "次へ" }).click();
   await wizard.getByRole("button", { name: "次へ" }).click();
   await wizard.getByLabel("人数", { exact: true }).fill("3");
   await wizard.getByRole("button", { name: "次へ" }).click();
   await wizard.getByRole("button", { name: "次へ" }).click();
   await wizard.getByRole("button", { name: "次へ" }).click();
-  await wizard.getByLabel("入口表示名", { exact: true }).fill("RC UI Guest Edited");
   await wizard.getByRole("button", { name: "次へ" }).click();
   await wizard.getByRole("button", { name: "次へ" }).click();
   const editResponsePromise = waitForUiOperationResponse(page);

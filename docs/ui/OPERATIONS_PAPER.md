@@ -497,8 +497,12 @@ authored here.
   overlay of codes double-labelled all eight tables. The old wizard map was
   `invert(1) grayscale(1)`, i.e. the colour venue drawing reduced to an
   illegible grey line at ~293px, and it never marked the selection.
+- **予約名 is visible before the date on step 1.** This optional, 80-character
+  reservation label feeds the ledger's ゲスト column and stays separate from the
+  encrypted 顧客氏名 on step 5. Date changes keep the typed name; closing the intake
+  clears it. It must remain available when optional detail is skipped.
 - **確認 reviews everything that gets saved**: 営業日, 時刻, 人数, 卓 (+定員), 顧客,
-  入口表示名, 経路 / 状態, 担当, 通知, 現場メモ, 版. It previously showed four of them.
+  予約名, 経路 / 状態, 担当, 通知, 現場メモ, 版. It previously showed four of them.
 - **Optional detail does not become a toll gate.** After 卓, a new reservation
   can move directly to 確認 with 顧客 / 追加 / 担当 explicitly marked as 既定値.
   All three steps remain in the ruler and are reachable in one tap from the

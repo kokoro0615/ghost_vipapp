@@ -331,7 +331,7 @@ test("the reservation wizard keeps one dominant column and a persistent record",
   assert.match(reservationWizard, /table\.geometry\.xPercent/u);
   assert.match(reservationWizard, /unoptimized/u);
   // Confirmation shows everything that gets saved, not four of the fields.
-  for (const field of ["担当", "通知", "現場メモ", "入口表示名"]) {
+  for (const field of ["担当", "通知", "現場メモ", "予約名"]) {
     assert.match(reservationWizard, new RegExp(`<dt>${field}</dt>`, "u"));
   }
 });

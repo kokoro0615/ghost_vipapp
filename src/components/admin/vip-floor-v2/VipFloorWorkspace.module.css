@@ -2806,6 +2806,9 @@
 
 .wizardLockedValue { margin: 0; color: var(--ink); font-size: var(--t-figure); font-weight: var(--weight-ui); letter-spacing: var(--track-figure); }
 .wizardDateControl { width: min(100%, 260px); }
+/* A field and the hint that explains it, held closer than the step's own gap so
+ * the hint reads as this field's and not as the next control's. */
+.wizardField { display: grid; min-width: 0; gap: var(--s-3); }
 .wizardHint { margin: 0; color: var(--ink-2); font-size: var(--t-micro); line-height: var(--lh-ui); letter-spacing: var(--track-micro); }
 .wizardWarning { margin: 0; color: var(--alert); font-size: var(--t-mini); font-weight: var(--weight-strong); line-height: var(--lh-ui); letter-spacing: var(--track-micro); }
 /* Validation sits with the field it concerns, never in a standing side panel. */

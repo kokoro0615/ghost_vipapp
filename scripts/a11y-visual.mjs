@@ -6,6 +6,7 @@ import process from "node:process";
 
 import { chromium, webkit } from "playwright-core";
 import { assertLedgerInteraction } from "./lib/ledger-hit-area-qa.mjs";
+import { assertReservationNameFlow } from "./lib/reservation-name-qa.mjs";
 import {
   buildQaSummary,
   QA_ALLOWED_MEDIA_SELECTORS,
@@ -203,6 +204,8 @@ async function auditViewport(context, viewport) {
       await assertLedgerInteraction(listPage, viewport);
       await capture(listPage, "list");
       await closeQaPage(listPage);
+    } else if (targetedState === "reservation-name-saved") {
+      await auditReservationName(context, capture);
     } else if (targetedState === "chart-phases") {
       const phasePage = await newQaPage(context, {
         boardPayload: timelinePhaseBoard,
@@ -226,6 +229,7 @@ async function auditViewport(context, viewport) {
     return results;
   }
 
+  await auditReservationName(context, capture);
   const bootPage = await newQaPage(context, { sessionDelayMs: 8_000 });
   await bootPage.goto(origin, { waitUntil: "domcontentloaded" });
   await bootPage.locator('main[aria-busy="true"]').waitFor();
@@ -307,6 +311,7 @@ async function auditViewport(context, viewport) {
   for (let step = 1; step <= 8; step += 1) {
     await page.getByLabel(new RegExp(`予約作成 ${step}/8`, "u")).waitFor();
     if (step === 1) {
+      await page.getByLabel("予約名（任意）", { exact: true }).fill("デモ予約名・日付変更");
       await pickBusinessDate(page, "予約日", unavailableBusinessDate);
       await page.getByRole("alert").filter({ hasText: "この日は予約受付対象外です。" }).waitFor();
       assert.equal(
@@ -328,6 +333,7 @@ async function auditViewport(context, viewport) {
           && shown("営業日") === expectedDate
           && new URL(window.location.href).searchParams.get("date") === expectedDate;
       }, alternateBusinessDate);
+      assert.equal(await page.getByLabel("予約名（任意）", { exact: true }).inputValue(), "デモ予約名・日付変更");
     }
     if (step === 4) {
       const tableGroup = page.getByRole("group", { name: "予約卓" });
@@ -1062,6 +1068,15 @@ async function pickBusinessDate(scope, label, value, options = {}) {
     .getByRole("gridcell", { name: new RegExp(`^${month}月${day}日 ${weekday}曜日`, "u") })
     .click({ timeout });
   await popover.waitFor({ state: "detached", timeout });
+}
+
+async function auditReservationName(context, capture) {
+  const page = await newQaPage(context, { boardPayload: emptyBoard });
+  try {
+    await assertReservationNameFlow({ page, board: emptyBoard, reservationTemplate: board.reservations[0], origin, capture });
+  } finally {
+    await closeQaPage(page);
+  }
 }
 
 async function newQaPage(context, scenario = {}) {
