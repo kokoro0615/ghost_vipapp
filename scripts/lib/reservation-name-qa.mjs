@@ -45,21 +45,28 @@ export async function assertReservationNameFlow({
   await page.getByRole("button", { name: /新規オペレーション/u }).click();
   let dialog = page.getByRole("dialog", { name: "新規予約", exact: true });
   await dialog.getByRole("tab", { name: "事前予約", exact: true }).click();
-  const input = dialog.getByLabel("予約名（任意）", { exact: true });
+  const input = dialog.getByLabel("予約名（必須）", { exact: true });
   await input.waitFor({ timeout: 10000 });
   assert.equal(await input.getAttribute("maxlength"), "80");
-  assert.equal(await input.getAttribute("required"), null);
+  assert.notEqual(await input.getAttribute("required"), null);
+  assert.equal(await dialog.getByLabel("開始", { exact: true }).inputValue(), "");
+  assert.equal(await dialog.getByLabel("人数（必須）", { exact: true }).inputValue(), "");
+  await dialog.getByRole("button", { name: "内容を確認", exact: true }).click();
+  assert.equal(commands.length, 0);
+  await dialog.getByText("予約名を入力してください（80文字以内）。", { exact: true }).waitFor();
+  await capture(page, "reservation-create-errors");
   const box = await input.boundingBox();
   assert.ok(box && box.y >= 0 && box.y + box.height <= page.viewportSize().height,
     "reservation name must be in the first viewport without scrolling");
   await input.fill(`  ${name}  `);
   await input.focus();
   assert.ok(await input.evaluate((element) => element === document.activeElement));
-  for (let step = 1; step < 4; step++) await dialog.getByRole("button", { name: "次へ", exact: true }).click();
+  await dialog.getByLabel("開始", { exact: true }).selectOption(`${board.businessDay.businessDate}T22:00`);
+  await dialog.getByLabel("人数（必須）", { exact: true }).fill("2");
   await dialog.getByRole("group", { name: "予約卓", exact: true })
     .locator('input[type="checkbox"]:not([disabled])').first().check();
-  await dialog.getByRole("button", { name: "確認へ進む", exact: true }).click();
-  await dialog.getByLabel("予約作成 8/8 確認", { exact: true }).waitFor();
+  await dialog.getByRole("button", { name: "内容を確認", exact: true }).click();
+  await dialog.getByLabel("予約作成 確認", { exact: true }).waitFor();
   assert.ok((await dialog.locator("dl div").filter({ has: page.locator("dt", { hasText: /^予約名$/u }) }).textContent()).includes(name));
   await dialog.getByRole("button", { name: "競合確認して作成", exact: true }).click();
   await dialog.waitFor({ state: "detached" });
@@ -73,11 +80,11 @@ export async function assertReservationNameFlow({
   await page.getByRole("button", { name: "QA-NAME-01の詳細を開く", exact: true }).click();
   await page.getByRole("button", { name: "予約編集", exact: true }).click();
   dialog = page.getByRole("dialog", { name: "予約編集", exact: true });
-  assert.equal(await dialog.getByLabel("予約名（任意）", { exact: true }).inputValue(), name);
+  assert.equal(await dialog.getByLabel("予約名（必須）", { exact: true }).inputValue(), name);
   const longName = "デモ予約名" + "あ".repeat(75);
   assert.equal(longName.length, 80);
-  await dialog.getByLabel("予約名（任意）", { exact: true }).fill(longName);
-  for (let step = 1; step < 8; step++) await dialog.getByRole("button", { name: "次へ", exact: true }).click();
+  await dialog.getByLabel("予約名（必須）", { exact: true }).fill(longName);
+  await dialog.getByRole("button", { name: "内容を確認", exact: true }).click();
   await capture(page, "reservation-name-long");
   await dialog.getByRole("button", { name: "競合確認して更新", exact: true }).click();
   await dialog.waitFor({ state: "detached" });
@@ -92,26 +99,31 @@ export async function assertReservationNameFlow({
   await page.getByRole("button", { name: /新規オペレーション/u }).click();
   dialog = page.getByRole("dialog", { name: "新規予約", exact: true });
   await dialog.getByRole("tab", { name: "事前予約", exact: true }).click();
-  assert.equal(await dialog.getByLabel("予約名（任意）", { exact: true }).inputValue(), "");
-  await dialog.getByLabel("予約名（任意）", { exact: true }).fill("デモ破棄する予約名");
+  assert.equal(await dialog.getByLabel("予約名（必須）", { exact: true }).inputValue(), "");
+  await dialog.getByLabel("予約名（必須）", { exact: true }).fill("デモ破棄する予約名");
   await dialog.getByRole("tab", { name: "Walk-in", exact: true }).click();
   await dialog.getByRole("tab", { name: "事前予約", exact: true }).click();
-  assert.equal(await dialog.getByLabel("予約名（任意）", { exact: true }).inputValue(), "");
-  await dialog.getByLabel("予約名（任意）", { exact: true }).fill("デモ閉じる予約名");
+  assert.equal(await dialog.getByLabel("予約名（必須）", { exact: true }).inputValue(), "");
+  await dialog.getByLabel("予約名（必須）", { exact: true }).fill("デモ閉じる予約名");
   await dialog.getByRole("button", { name: "新規作成を閉じる", exact: true }).click();
   await dialog.waitFor({ state: "detached" });
   await page.getByRole("button", { name: /新規オペレーション/u }).click();
   dialog = page.getByRole("dialog", { name: "新規予約", exact: true });
   await dialog.getByRole("tab", { name: "事前予約", exact: true }).click();
-  assert.equal(await dialog.getByLabel("予約名（任意）", { exact: true }).inputValue(), "");
-  await dialog.getByLabel("予約名（任意）", { exact: true }).fill("   ");
-  for (let step = 1; step < 4; step++) await dialog.getByRole("button", { name: "次へ", exact: true }).click();
+  assert.equal(await dialog.getByLabel("予約名（必須）", { exact: true }).inputValue(), "");
+  await dialog.getByLabel("予約名（必須）", { exact: true }).fill("   ");
+  await dialog.getByLabel("開始", { exact: true }).selectOption(`${board.businessDay.businessDate}T22:00`);
+  await dialog.getByLabel("人数（必須）", { exact: true }).fill("2");
   await dialog.getByRole("group", { name: "予約卓", exact: true })
     .locator('input[type="checkbox"]:not([disabled])').last().check();
-  await dialog.getByRole("button", { name: "確認へ進む", exact: true }).click();
-  await dialog.getByRole("button", { name: "競合確認して作成", exact: true }).click();
-  await dialog.waitFor({ state: "detached" });
-  assert.equal(commands.length, 3);
-  assert.equal(commands[2].payload.guestLabel, null, "blank reservation names remain optional");
-  assert.equal(commands[2].payload.displayName, null);
+  await dialog.getByRole("button", { name: "内容を確認", exact: true }).click();
+  await dialog.getByText("予約名を入力してください（80文字以内）。", { exact: true }).waitFor();
+  assert.equal(commands.length, 2, "blank/whitespace names must never reach the API");
+  await input.fill("デモ人数の検証");
+  for (const value of ["", "0", "1.5", "100"]) {
+    await dialog.getByLabel("人数（必須）", { exact: true }).fill(value);
+    await dialog.getByRole("button", { name: "内容を確認", exact: true }).click();
+    assert.equal(await dialog.getByLabel("人数（必須）", { exact: true }).getAttribute("aria-invalid"), "true");
+    assert.equal(commands.length, 2);
+  }
 }

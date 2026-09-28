@@ -1186,25 +1186,19 @@ async function runUiReservationCreateAndEdit(page, plan, businessDate) {
   await page.getByRole("button", { name: /^新規オペレーション/u }).click();
   const dialog = page.getByRole("dialog", { name: "新規予約" });
   await dialog.getByRole("tab", { name: "事前予約" }).click();
-  let wizard = dialog.locator('section[aria-label^="予約作成"]');
+  let wizard = dialog.locator('form[aria-label^="予約作成"]');
 
-  await wizard.getByLabel("予約名（任意）", { exact: true }).fill("RC UI Guest");
-  await wizard.getByRole("button", { name: "次へ" }).click();
-  await wizard.getByLabel("開始", { exact: true }).fill(tokyoLocalInput(plan.startAt));
-  await wizard.getByLabel("終了", { exact: true }).fill(tokyoLocalInput(plan.endAt));
-  await wizard.getByRole("button", { name: "次へ" }).click();
-  await wizard.getByLabel("人数", { exact: true }).fill("2");
-  await wizard.getByRole("button", { name: "次へ" }).click();
+  await wizard.getByLabel("予約名（必須）", { exact: true }).fill("RC UI Guest");
+  await wizard.getByLabel("開始", { exact: true }).selectOption(tokyoLocalInput(plan.startAt));
+  await wizard.getByLabel("終了", { exact: true }).selectOption(tokyoLocalInput(plan.endAt));
+  await wizard.getByLabel("人数（必須）", { exact: true }).fill("2");
   await wizard.getByRole("group", { name: "予約卓" })
     .getByText(plan.tableDisplayCode, { exact: true })
     .click();
-  await wizard.getByRole("button", { name: "任意項目を入力" }).click();
   await wizard.getByLabel("顧客氏名", { exact: true }).fill("Release Candidate UI Guest");
   await wizard.getByLabel("Eメール", { exact: true }).fill("release-candidate-ui@example.com");
-  await wizard.getByRole("button", { name: "次へ" }).click();
   await wizard.getByLabel("現場共有メモ", { exact: true }).fill("UI wizard release checkpoint");
-  await wizard.getByRole("button", { name: "次へ" }).click();
-  await wizard.getByRole("button", { name: "次へ" }).click();
+  await wizard.getByRole("button", { name: "内容を確認" }).click();
   const createResponsePromise = waitForUiOperationResponse(page);
   await wizard.getByRole("button", { name: "競合確認して作成" }).click();
   const createPayload = await assertUiOperationSucceeded(
@@ -1255,16 +1249,10 @@ async function runUiReservationCreateAndEdit(page, plan, businessDate) {
   await inspector.getByRole("button", { name: "予約編集" }).click();
 
   const editDialog = page.getByRole("dialog", { name: "予約編集" });
-  wizard = editDialog.locator('section[aria-label^="予約編集"]');
-  await wizard.getByLabel("予約名（任意）", { exact: true }).fill("RC UI Guest Edited");
-  await wizard.getByRole("button", { name: "次へ" }).click();
-  await wizard.getByRole("button", { name: "次へ" }).click();
-  await wizard.getByLabel("人数", { exact: true }).fill("3");
-  await wizard.getByRole("button", { name: "次へ" }).click();
-  await wizard.getByRole("button", { name: "次へ" }).click();
-  await wizard.getByRole("button", { name: "次へ" }).click();
-  await wizard.getByRole("button", { name: "次へ" }).click();
-  await wizard.getByRole("button", { name: "次へ" }).click();
+  wizard = editDialog.locator('form[aria-label^="予約編集"]');
+  await wizard.getByLabel("予約名（必須）", { exact: true }).fill("RC UI Guest Edited");
+  await wizard.getByLabel("人数（必須）", { exact: true }).fill("3");
+  await wizard.getByRole("button", { name: "内容を確認" }).click();
   const editResponsePromise = waitForUiOperationResponse(page);
   await wizard.getByRole("button", { name: "競合確認して更新" }).click();
   await assertUiOperationSucceeded(editResponsePromise, "ui_reservation_edit");

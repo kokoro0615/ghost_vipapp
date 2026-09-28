@@ -6,6 +6,7 @@ import process from "node:process";
 
 import { chromium, webkit } from "playwright-core";
 import { assertLedgerInteraction } from "./lib/ledger-hit-area-qa.mjs";
+import { assertReservationAlerts } from "./lib/reservation-alerts-qa.mjs";
 import { assertReservationNameFlow } from "./lib/reservation-name-qa.mjs";
 import {
   buildQaSummary,
@@ -204,6 +205,8 @@ async function auditViewport(context, viewport) {
       await assertLedgerInteraction(listPage, viewport);
       await capture(listPage, "list");
       await closeQaPage(listPage);
+    } else if (targetedState === "reservation-alert-arrival") {
+      await auditReservationAlerts(context, capture);
     } else if (targetedState === "reservation-name-saved") {
       await auditReservationName(context, capture);
     } else if (targetedState === "chart-phases") {
@@ -230,6 +233,7 @@ async function auditViewport(context, viewport) {
   }
 
   await auditReservationName(context, capture);
+  await auditReservationAlerts(context, capture);
   const bootPage = await newQaPage(context, { sessionDelayMs: 8_000 });
   await bootPage.goto(origin, { waitUntil: "domcontentloaded" });
   await bootPage.locator('main[aria-busy="true"]').waitFor();
@@ -308,60 +312,49 @@ async function auditViewport(context, viewport) {
   await page.getByRole("tab", { name: /受付ブロック/u }).click();
   await capture(page, "block");
   await page.getByRole("tab", { name: /事前予約/u }).click();
-  for (let step = 1; step <= 8; step += 1) {
-    await page.getByLabel(new RegExp(`予約作成 ${step}/8`, "u")).waitFor();
-    if (step === 1) {
-      await page.getByLabel("予約名（任意）", { exact: true }).fill("デモ予約名・日付変更");
-      await pickBusinessDate(page, "予約日", unavailableBusinessDate);
-      await page.getByRole("alert").filter({ hasText: "この日は予約受付対象外です。" }).waitFor();
-      assert.equal(
-        await readBusinessDate(page, "営業日"),
-        board.businessDay.businessDate,
-        "an unavailable reservation date must not change the workspace business date",
-      );
-      await capture(page, "reservation-date-unavailable");
-      await pickBusinessDate(page, "予約日", alternateBusinessDate);
-      await page.waitForFunction((expectedDate) => {
-        const shown = (label) => {
-          const heading = [...document.querySelectorAll("span")]
-            .find((node) => node.textContent?.trim() === label);
-          const text = heading?.closest("div")?.textContent ?? "";
-          const match = /(\d{4})\/(\d{2})\/(\d{2})/u.exec(text);
-          return match ? `${match[1]}-${match[2]}-${match[3]}` : null;
-        };
-        return shown("予約日") === expectedDate
-          && shown("営業日") === expectedDate
-          && new URL(window.location.href).searchParams.get("date") === expectedDate;
-      }, alternateBusinessDate);
-      assert.equal(await page.getByLabel("予約名（任意）", { exact: true }).inputValue(), "デモ予約名・日付変更");
-    }
-    if (step === 4) {
-      const tableGroup = page.getByRole("group", { name: "予約卓" });
-      await tableGroup.locator('input[type="checkbox"]:not([disabled])').first().check();
-      assert.ok(
-        await tableGroup.locator("label[data-unavailable]").count() > 0,
-        "incompatible tables must remain visible with a disabled reason",
-      );
-      assert.ok(
-        await tableGroup.getByText(/プラン外/u).count() > 0,
-        "an incompatible table must name why it cannot be selected",
-      );
-    }
-    await capture(page, `reservation-create-${step}`);
-    if (step === 4) {
-      await page.getByRole("button", { name: "確認へ進む", exact: true }).click();
-      await page.getByLabel("予約作成 8/8 確認").waitFor();
-      assert.equal(
-        await page.locator('li[data-state="defaulted"]').count(),
-        3,
-        "the shortcut must mark all three optional steps as defaults",
-      );
-      await capture(page, "reservation-create-shortcut");
-      await page.getByRole("button", { name: "任意項目を入力", exact: true }).click();
-      continue;
-    }
-    if (step < 8) await page.getByRole("button", { name: /次へ/u }).click();
+  await page.getByLabel("予約作成 入力", { exact: true }).waitFor();
+  await page.getByLabel("人数（必須）", { exact: true }).fill("3");
+  await page.getByLabel("現場共有メモ", { exact: true }).fill("デモ日付変更で保持");
+  await page.getByLabel("予約名（必須）", { exact: true }).fill("デモ予約名・日付変更");
+  await pickBusinessDate(page, "予約日", unavailableBusinessDate);
+  await page.getByRole("alert").filter({ hasText: "この日は予約受付対象外です。" }).waitFor();
+  assert.equal(
+    await readBusinessDate(page, "営業日"),
+    board.businessDay.businessDate,
+    "an unavailable reservation date must not change the workspace business date",
+  );
+  await capture(page, "reservation-date-unavailable");
+  await pickBusinessDate(page, "予約日", alternateBusinessDate);
+  await page.waitForFunction((expectedDate) => {
+    const shown = (label) => {
+      const heading = [...document.querySelectorAll("span")]
+        .find((node) => node.textContent?.trim() === label);
+      const text = heading?.closest("div")?.textContent ?? "";
+      const match = /(\d{4})\/(\d{2})\/(\d{2})/u.exec(text);
+      return match ? `${match[1]}-${match[2]}-${match[3]}` : null;
+    };
+    return shown("予約日") === expectedDate
+      && shown("営業日") === expectedDate
+      && new URL(window.location.href).searchParams.get("date") === expectedDate;
+  }, alternateBusinessDate);
+  assert.equal(await page.getByLabel("予約名（必須）", { exact: true }).inputValue(), "デモ予約名・日付変更");
+  assert.equal(await page.getByLabel("人数（必須）", { exact: true }).inputValue(), "3");
+  assert.equal(await page.getByLabel("現場共有メモ", { exact: true }).inputValue(), "デモ日付変更で保持");
+  assert.equal(await page.getByLabel("開始", { exact: true }).inputValue(), "");
+  await page.getByLabel("開始", { exact: true }).selectOption(`${alternateBusinessDate}T22:00`);
+  await page.getByLabel("プラン", { exact: true }).selectOption({ index: 1 });
+  const tableGroup = page.getByRole("group", { name: "予約卓" });
+  await tableGroup.locator('input[type="checkbox"]:not([disabled])').first().check();
+  assert.ok(await tableGroup.getByText(/プラン外/u).count() > 0);
+  // All inputs are mounted on one screen; no step navigation is needed.
+  for (const label of ["予約名（必須）", "開始", "終了", "人数（必須）", "顧客氏名", "現場共有メモ", "担当スタッフ"]) {
+    assert.equal(await operationDialog.getByLabel(label, { exact: true }).count(), 1);
   }
+  await operationDialog.locator('[class*="reservationFields"]').evaluate(el => { el.scrollTop = 0; });
+  await capture(page, "reservation-create-input");
+  await operationDialog.getByRole("button", { name: "内容を確認", exact: true }).click();
+  await page.getByLabel("予約作成 確認", { exact: true }).waitFor();
+  await capture(page, "reservation-create-confirm");
   await page.keyboard.press("Escape");
 
   await goToWorkspace(page, "list");
@@ -711,7 +704,7 @@ async function auditOperationDateRecovery(context, capture) {
     "changing away from a rejected date must immediately remove its stale warning",
   );
   await dialog.getByRole("button", { name: "この日を開く" }).click({ timeout: QA_RECOVERY_TIMEOUT_MS });
-  await dialog.getByLabel("予約作成 1/8").waitFor({ timeout: QA_RECOVERY_TIMEOUT_MS });
+  await dialog.getByLabel("予約作成 入力").waitFor({ timeout: QA_RECOVERY_TIMEOUT_MS });
   assert.equal(
     await dialog.getByRole("tab", { name: "事前予約" }).getAttribute("aria-selected"),
     "true",
@@ -1070,10 +1063,26 @@ async function pickBusinessDate(scope, label, value, options = {}) {
   await popover.waitFor({ state: "detached", timeout });
 }
 
+async function auditReservationAlerts(context, capture) {
+  const page = await newQaPage(context);
+  try {
+    await assertReservationAlerts({ page, board, origin, capture });
+  } catch (error) {
+    await page.screenshot({ path: `${artifactDirectory}/alert-failure.png` });
+    throw error;
+  } finally {
+    await closeQaPage(page);
+  }
+}
+
 async function auditReservationName(context, capture) {
   const page = await newQaPage(context, { boardPayload: emptyBoard });
   try {
     await assertReservationNameFlow({ page, board: emptyBoard, reservationTemplate: board.reservations[0], origin, capture });
+  } catch (error) {
+    await page.screenshot({ path: `${artifactDirectory}/reservation-failure.png` });
+    console.error(await page.getByRole("dialog").ariaSnapshot());
+    throw error;
   } finally {
     await closeQaPage(page);
   }
@@ -1422,6 +1431,12 @@ async function installSyntheticRoutes(page, scenario = {}) {
   }));
   let boardRequests = 0;
   await page.route("**/api/admin/vip-floor?**", async (route) => {
+    if (new URL(route.request().url()).searchParams.get("purpose") === "alerts") {
+      const date = new URL(route.request().url()).searchParams.get("date");
+      return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({
+        ok: false, dayState: { state: "missing", businessDate: date },
+      }) });
+    }
     boardRequests += 1;
     const requestedDate = new URL(route.request().url()).searchParams.get("date");
     const delayMs = boardRequests > 1

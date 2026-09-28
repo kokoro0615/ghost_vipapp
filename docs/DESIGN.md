@@ -25,6 +25,30 @@ and is not repeated here.
 This document governs `src/app/**` and `src/components/admin/vip-floor-v2/**`
 in this repository only. It does not govern the public GHOST website.
 
+### 0.0 Reservation intake and reminders — Owner, 2026-09-28
+
+The Owner replaces the eight-step reservation intake with **one input screen**
+and a separate final review. Reservation name (`guestLabel`), arrival/end time,
+and party size are required in the UI and BFF. New arrival time and party size
+start unselected; do not silently save 22:00 / 2 guests. Names remain separate
+from encrypted customer profiles. A business-date change keeps personal fields,
+party size and notes, and resets the date-dependent time, plan and table choices.
+Existing capacity approval, conflicts, versions, idempotency and audit remain.
+This supersedes stepper-specific presentation rules and test descriptions below.
+
+Reminders are **silent visible popups while the app is open**, 15 minutes before
+arrival and 15 minutes before the effective end (`expectedReleaseAt`, including
+extensions). Independently watch the current Tokyo business night even while
+another date is selected. Ignore cancelled/terminal records, arrival after
+check-in and release checks after settlement begins. Acknowledgement is per
+reservation/type/target time in this tab; no guest data is persisted. Changing
+or extending a target time creates a fresh reminder. Popups preserve the current
+draft and return focus, have an explicit acknowledgement, and do not auto-hide.
+No push, audio, email or LINE is part of this feature. Suspended tabs refresh on
+return; failed reads visibly report unavailable monitoring and cannot create a
+new alert from stale data. This is device-local acknowledgement, not a shared
+floor status mutation.
+
 ### 0.1 Precedence over the workspace-wide UI rule
 
 `/home/kokoro/projects/.claude/rules/ui-ux-excellence.md` is an always-on rule

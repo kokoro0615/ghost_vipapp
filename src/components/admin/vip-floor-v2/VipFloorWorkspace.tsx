@@ -22,6 +22,7 @@ import {
   RotateCcw,
 } from "lucide-react";
 
+import { ReservationAlerts } from "./alerts/ReservationAlerts";
 import { CommandCenter } from "./commands/CommandCenter";
 import { CustomerPanel } from "./customers/CustomerPanel";
 import { buildQueueGroups, matchesReservation, toUiReservations } from "./contract/viewModel";
@@ -1222,6 +1223,7 @@ export default function VipFloorWorkspace({
         onRun={(draft) => void runCommand(draft)}
       />
 
+      <ReservationAlerts board={state.board} healthy={!offline && ["healthy", "empty", "read_only"].includes(state.globalState)} demo={isDemo} />
       <OperationCenter
         key={operationOpen ? "open" : "closed"}
         open={operationOpen}

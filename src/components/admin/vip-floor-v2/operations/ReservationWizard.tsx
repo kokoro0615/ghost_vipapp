@@ -1,12 +1,11 @@
 "use client";
 
 import Image from "next/image";
-import { useMemo, useState } from "react";
+import { useRef, useState } from "react";
 import { AlertTriangle, ArrowLeft, ArrowRight, Check, Mail } from "lucide-react";
 
 import {
   formatGhostTimeRange,
-  getGhostOperatingWindow,
   isGhostOperatingInterval,
 } from "@/lib/ghostOperatingHours";
 import type { VipFloorBoardV2, VipServiceStatus } from "@/lib/vipFloorV2Contract";
@@ -24,20 +23,6 @@ import { BusinessTimeFields } from "./BusinessTimeFields";
 import { occupancyLabel, tableOccupancy } from "./tableOccupancy";
 import styles from "../VipFloorWorkspace.module.css";
 import { useTrialMode } from "../TrialMode";
-
-const STEPS = ["日付", "時刻", "人数", "卓", "顧客", "追加", "担当", "確認"] as const;
-
-/*
- * Visual grouping only. All eight steps stay separate, keep their order, and
- * stay individually reachable and announced; this just tells the operator which
- * part of the job they are in so eight equal cells stop reading as eight equal
- * tasks.
- */
-const PHASES = [
-  { label: "日時・席", firstStep: 0, lastStep: 3 },
-  { label: "顧客・詳細", firstStep: 4, lastStep: 6 },
-  { label: "確認", firstStep: 7, lastStep: 7 },
-] as const;
 
 const SOURCE_LABELS: Record<Draft["sourceChannel"], string> = {
   phone: "電話受付",
@@ -81,10 +66,7 @@ type Props = {
    * line sits behind this dialog, so a rejected save used to look like a dead
    * button. */
   failure?: CommandOutcome | null;
-  /** The reservation name (saved as `guestLabel`, printed in the ledger's
-   * ゲスト column). OperationCenter owns it because this wizard remounts on
-   * every event-day change, and the name is typed on the same step as the
-   * date. */
+  /** Reservation label, independent from the encrypted customer profile. */
   guestLabel: string;
   onGuestLabelChange: (guestLabel: string) => void;
   onRun: (draft: OperationDraft) => Promise<boolean>;
@@ -110,16 +92,6 @@ export function ReservationWizard({
   const trialMode = useTrialMode();
   const demoMode = useDemoMode();
   const syntheticMode = trialMode || demoMode.enabled;
-  const businessDate = board.businessDay.businessDate;
-  const defaults = useMemo(
-    () => reservation
-      ? {
-          start: localInput(reservation.startAt),
-          end: localInput(reservation.endAt),
-        }
-      : scheduleDefaults(businessDate),
-    [businessDate, reservation],
-  );
   const initialOfferingId = reservation?.bookingOfferingId
     ?? options.offerings.find((offering) =>
       selectedTableId
@@ -136,19 +108,20 @@ export function ReservationWizard({
       initialOffering?.compatibleTableIds === null
       || initialOffering?.compatibleTableIds === undefined
       || initialOffering?.compatibleTableIds.includes(tableId));
-  const [step, setStep] = useState(0);
+  const [reviewing, setReviewing] = useState(false);
+  const [attempted, setAttempted] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
   // A failure stays on screen until the operator moves to fix it; a later
   // failure is a new object and shows again.
   const [acknowledgedFailure, setAcknowledgedFailure] = useState<CommandOutcome | null>(null);
-  const [skippedOptionalSteps, setSkippedOptionalSteps] = useState(false);
   const [dateError, setDateError] = useState<string | null>(null);
   const [capacityOverrideConfirmed, setCapacityOverrideConfirmed] = useState(false);
   const [capacityOverrideReason, setCapacityOverrideReason] = useState("");
   const [draft, setDraft] = useState<Draft>(() => ({
-    startAt: defaults.start,
-    endAt: defaults.end,
+    startAt: reservation ? localInput(reservation.startAt) : "",
+    endAt: reservation ? localInput(reservation.endAt) : "",
     offeringId: initialOfferingId,
-    guestCount: reservation?.guestCount ?? 2,
+    guestCount: reservation?.guestCount ?? 0,
     tableIds: initialTableIds,
     displayName: "",
     phone: "",
@@ -176,21 +149,18 @@ export function ReservationWizard({
   const capacityShort = selectedTables.length > 0 && capacity < draft.guestCount;
   const capacityOverrideReady = !capacityShort
     || (capacityOverrideConfirmed && capacityOverrideReason.trim().length > 0);
-  const occupancy = useMemo(
-    () => tableOccupancy(board, draft.startAt, draft.endAt, reservation?.id ?? null),
-    [board, draft.startAt, draft.endAt, reservation?.id],
-  );
+  const occupancy = tableOccupancy(board, draft.startAt, draft.endAt, reservation?.id ?? null);
   const occupiedSelection = selectedTables.filter((table) => occupancy.has(table.id));
-  const canContinue = !datePending
-    && !dateError
-    && (step < 3 || !hasTableMismatch)
-    && (step !== 3 && step !== 7 || capacityOverrideReady)
-    && (step !== 3 && step !== 7 || occupiedSelection.length === 0)
-    && stepValid(step, draft, Boolean(reservation), options.businessDay.businessDate);
+  const nameValid = guestLabel.trim().length > 0 && guestLabel.trim().length <= 80;
+  const countValid = Number.isInteger(draft.guestCount) && draft.guestCount >= 1 && draft.guestCount <= 99;
+  const timeValid = isGhostOperatingInterval(draft.startAt, draft.endAt, options.businessDay.businessDate);
+  const canContinue = !datePending && !dateError && nameValid && countValid && timeValid
+    && Boolean(draft.offeringId) && draft.tableIds.length > 0 && !hasTableMismatch
+    && capacityOverrideReady && occupiedSelection.length === 0
+    && (draft.notificationPreference !== "email" || Boolean(reservation) || /^[^@\s]+@[^@\s]+\.[^@\s]+$/u.test(draft.email));
   const visibleFailure = failure && !failure.ok && failure !== acknowledgedFailure ? failure : null;
   const failureNeedsTableOrTime = visibleFailure !== null && TABLE_OR_TIME_FAILURES.has(visibleFailure.code);
 
-  const phase = PHASES.find((entry) => step >= entry.firstStep && step <= entry.lastStep) ?? PHASES[0];
   const tableCodes = selectedTables.map((table) => table.displayCode).join("・");
   const staffName = (staffData?.staffMembers ?? [])
     .find((member) => member.id === draft.bookingStaffMemberId)?.displayName ?? null;
@@ -198,15 +168,26 @@ export function ReservationWizard({
   // What gets saved: `nullable()` trims, so the receipt shows the trimmed name.
   const savedGuestLabel = guestLabel.trim();
   /* The customer profile is a separate encrypted record and never feeds the
-   * ledger, so its row states the profile — the name typed on step 5, or the
+   * ledger, so its row states the profile — the optional profile name, or the
    * link an edit keeps — and never repeats the reservation name. */
   const customerSummary = reservation
     ? reservation.customerId ? "紐付け済み" : "未紐付け"
     : draft.displayName.trim() || null;
 
-  function goToStep(next: number) {
+  function editFields() {
     setAcknowledgedFailure(failure);
-    setStep(next);
+    setReviewing(false);
+  }
+
+  function review(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setAttempted(true);
+    if (canContinue) {
+      setReviewing(true);
+      window.requestAnimationFrame(() => formRef.current?.querySelector<HTMLElement>("h3")?.focus());
+    } else {
+      window.requestAnimationFrame(() => formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus());
+    }
   }
 
   function patch(next: Partial<Draft>) {
@@ -218,7 +199,7 @@ export function ReservationWizard({
   }
 
   async function save() {
-    if (!canContinue) return;
+    if (!canContinue || pending || !reviewing) return;
     const shared = {
         eventDayId: options.businessDay.id,
         offeringId: draft.offeringId,
@@ -289,69 +270,23 @@ export function ReservationWizard({
       setDateError("この日は予約受付対象外です。定休日または営業日未登録の可能性があるため、別の日を選んでください。");
       return;
     }
-    /* The event-day lookup replaces board/options without remounting this
-     * wizard. Keep the in-progress draft on the new day's operating window;
-     * otherwise an old 22:00 becomes "翌22:00" and step 2 is impossible. */
-    const nextSchedule = scheduleDefaults(nextBusinessDate);
-    setDraft((current) => ({
-      ...current,
-      startAt: nextSchedule.start,
-      endAt: nextSchedule.end,
-    }));
+    // Personal fields stay in this form. Date-specific choices must be made
+    // against the new day's offerings and occupancy, never an old table version.
+    setDraft((current) => ({ ...current, startAt: "", endAt: "", tableIds: [], offeringId: "" }));
+    setCapacityOverrideConfirmed(false);
+    setCapacityOverrideReason("");
+    setAttempted(false);
   }
 
   return (
-    <section
+    <form
+      ref={formRef}
       id="operation-panel"
       className={styles.reservationWizard}
-      aria-label={`予約${reservation ? "編集" : "作成"} ${step + 1}/8 ${STEPS[step]}`}
+      aria-label={`予約${reservation ? "編集" : "作成"} ${reviewing ? "確認" : "入力"}`}
+      noValidate
+      onSubmit={review}
     >
-      <div className={styles.wizardProgress}>
-        <p className={styles.wizardPhase}>
-          <strong>{phase.label}</strong>
-          <span className="tabular-nums">{step + 1}/8</span>
-          <em>{STEPS[step]}</em>
-        </p>
-        <ol className={styles.wizardRail} aria-label={`予約${reservation ? "編集" : "作成"}ステップ`}>
-          {STEPS.map((label, index) => {
-            const stepState = index < step
-              ? skippedOptionalSteps && index >= 4 && index <= 6
-                ? "defaulted"
-                : "done"
-              : index === step
-                ? "current"
-                : "todo";
-            return (
-              <li
-                key={label}
-                data-state={stepState}
-                data-phase-start={PHASES.some((entry) => entry.firstStep === index) || undefined}
-                aria-current={index === step ? "step" : undefined}
-              >
-                <span className={styles.wizardRailMark} aria-hidden>
-                  {stepState === "done" || stepState === "defaulted"
-                    ? <Check size={11} strokeWidth={3} />
-                    : index + 1}
-                </span>
-                <small>{label}</small>
-                {/* State is never colour-only: it is also spoken. */}
-                <span className="sr-only">
-                  {stepState === "done"
-                    ? "入力済み"
-                    : stepState === "defaulted"
-                      ? "既定値を使用"
-                      : stepState === "current"
-                        ? "現在の段階"
-                        : "未入力"}
-                </span>
-              </li>
-            );
-          })}
-        </ol>
-      </div>
-
-      {/* The running record stays on screen at every width, so no step ever
-        * hides what the operator already decided. */}
       <dl className={styles.wizardSummaryBar} aria-label="入力済みの予約内容">
         <div>
           <dt>日付</dt>
@@ -365,12 +300,12 @@ export function ReservationWizard({
         <div>
           <dt>時刻</dt>
           <dd className="tabular-nums">
-            {formatGhostTimeRange(draft.startAt, draft.endAt, options.businessDay.businessDate)}
+            {timeValid ? formatGhostTimeRange(draft.startAt, draft.endAt, options.businessDay.businessDate) : "未選択"}
           </dd>
         </div>
         <div>
           <dt>人数</dt>
-          <dd className="tabular-nums">{draft.guestCount}名</dd>
+          <dd className="tabular-nums">{draft.guestCount ? `${draft.guestCount}名` : "未入力"}</dd>
         </div>
         <div>
           <dt>卓</dt>
@@ -378,19 +313,18 @@ export function ReservationWizard({
         </div>
       </dl>
 
-      <div className={styles.wizardBody} data-single={step === 7 || undefined}>
-        <div className={styles.wizardActive}>
-        {step === 0 ? (
-          <fieldset>
+      <div className={`${styles.wizardBody} ${styles.reservationFormBody}`} data-single>
+        <div className={`${styles.wizardActive} ${styles.reservationFields}`} data-reviewing={reviewing || undefined}>
+        {!reviewing ? (
+          <fieldset disabled={pending || datePending}>
             <legend>予約名と予約日</legend>
-            {/* The name the ledger prints leads the first step: the step-4
-              * shortcut skips every later optional step, so this is the only
-              * place every intake passes. */}
             <div className={styles.wizardField}>
               <label>
-                予約名（任意）
+                予約名（必須）
                 <input
                   value={guestLabel}
+                  required
+                  aria-invalid={attempted && !nameValid}
                   maxLength={80}
                   autoComplete="off"
                   placeholder={demoMode.enabled ? "例: デモ予約001" : trialMode ? "例: TRIAL-予約01" : "例: 山田様"}
@@ -403,6 +337,7 @@ export function ReservationWizard({
                 {demoMode.enabled ? "DEMOでは「デモ」または「DEMO」を含む架空名だけを入力してください。" : null}
               </p>
             </div>
+            {attempted && !nameValid ? <p className={styles.wizardFieldError} role="alert">予約名を入力してください（80文字以内）。</p> : null}
             {reservation ? (
               <p className={styles.wizardLockedValue}>
                 <span className="tabular-nums">
@@ -432,44 +367,31 @@ export function ReservationWizard({
                 {dateError}
               </p>
             ) : null}
-            <dl className={styles.wizardFacts}>
-              <div>
-                <dt>営業枠</dt>
-                <dd className="tabular-nums">22:00–翌05:00</dd>
-              </div>
-              <div>
-                <dt>正式卓</dt>
-                <dd className="tabular-nums">VIP-1〜VIP-{board.tables.length}</dd>
-              </div>
-            </dl>
+
           </fieldset>
         ) : null}
-        {step === 1 ? (
-          <fieldset>
+        {!reviewing ? (
+          <fieldset disabled={pending || datePending}>
             <legend>予約時刻と滞在時間</legend>
             <BusinessTimeFields
               businessDate={options.businessDay.businessDate}
+              showErrors={attempted}
               value={{ startAt: draft.startAt, endAt: draft.endAt }}
               disabled={pending || datePending}
               onChange={(value) => patch(value)}
             />
-            <p className={styles.wizardReadout}>
-              <span>この予約の時間帯</span>
-              <strong className="tabular-nums">
-                {formatGhostTimeRange(draft.startAt, draft.endAt, options.businessDay.businessDate)}
-              </strong>
-              <em className="tabular-nums">{stayLabel(draft.startAt, draft.endAt)}</em>
-            </p>
-            <p className={styles.wizardHint}>保存時にも22:00〜翌05:00の営業範囲と卓の重複を再検証します。</p>
           </fieldset>
         ) : null}
-        {step === 2 ? (
-          <fieldset>
+        {!reviewing ? (
+          <fieldset disabled={pending || datePending}>
             <legend>プランと人数</legend>
             <div className={styles.formColumns}>
               <label>
                 プラン
                 <select
+                  required
+                  aria-invalid={attempted && !draft.offeringId}
+                  aria-label="プラン"
                   value={draft.offeringId}
                   onChange={(event) => {
                     const offeringId = event.target.value;
@@ -483,18 +405,21 @@ export function ReservationWizard({
                     });
                   }}
                 >
+                  <option value="" disabled>プランを選択</option>
                   {options.offerings.map((offering) => (
                     <option key={offering.id} value={offering.id}>{offering.name} / {offering.minGuests}–{offering.maxGuests}名</option>
                   ))}
                 </select>
               </label>
-              <label>人数<input type="number" min="1" max="99" value={draft.guestCount} onChange={(event) => patch({ guestCount: Number(event.target.value) })} /></label>
+              <label>人数（必須）<input type="number" inputMode="numeric" required min="1" max="99" step="1" aria-invalid={attempted && !countValid} value={draft.guestCount || ""} placeholder="人数を入力" onChange={(event) => patch({ guestCount: Number(event.target.value) })} /></label>
+              {attempted && !countValid ? <p className={styles.wizardFieldError} role="alert">人数を1〜99名の整数で入力してください。</p> : null}
             </div>
           </fieldset>
         ) : null}
-        {step === 3 ? (
-          <fieldset>
+        {!reviewing ? (
+          <fieldset disabled={pending || datePending}>
             <legend>卓を選ぶ</legend>
+            {attempted && draft.tableIds.length === 0 ? <p className={styles.wizardFieldError} role="alert">予約卓を選択してください。</p> : null}
             <div className={styles.checkGrid} role="group" aria-label="予約卓">
               {board.tables.map((table) => {
                 const compatible = compatibleTableIds === null || compatibleTableIds.has(table.id);
@@ -509,6 +434,7 @@ export function ReservationWizard({
                 >
                   <input
                     type="checkbox"
+                    aria-invalid={attempted && draft.tableIds.length === 0}
                     // A table that became busy after it was picked stays
                     // uncheckable, so the operator can clear it.
                     disabled={!compatible || (Boolean(occupied) && !selected)}
@@ -566,8 +492,10 @@ export function ReservationWizard({
                 </label>
               </section>
             ) : null}
-            {/* The plan is a working instrument on this step only: real venue
+            {/* The plan is a working instrument alongside the table selection: real venue
               * geometry, real colour, and the selection actually marked. */}
+            <details className={styles.reservationMapDetails}>
+              <summary>フロア図を確認</summary>
             <figure className={styles.wizardMap}>
               <Image
                 src="/media/images/vipmapv3.9239fd2174.webp"
@@ -599,10 +527,11 @@ export function ReservationWizard({
                   : "卓を選ぶと座席図の該当位置を強調します。"}
               </figcaption>
             </figure>
+            </details>
           </fieldset>
         ) : null}
-        {step === 4 ? (
-          <fieldset>
+        {!reviewing ? (
+          <fieldset disabled={pending || datePending}>
             <legend>{demoMode.enabled ? "顧客（合成データ専用）" : "顧客（暗号化・Owner限定）"}</legend>
             {reservation ? (
               <>
@@ -620,7 +549,7 @@ export function ReservationWizard({
                 <label>顧客氏名<input value={draft.displayName} maxLength={120} autoComplete="off" placeholder={demoMode.enabled ? "例: デモゲスト001" : trialMode ? "例: TRIAL-ゲスト01" : undefined} onChange={(event) => patch({ displayName: event.target.value })} /></label>
                 <div className={styles.formColumns}>
                   <label>電話<input type="tel" value={draft.phone} maxLength={40} autoComplete="off" disabled={syntheticMode} aria-describedby={syntheticMode ? "synthetic-phone-rule" : undefined} onChange={(event) => patch({ phone: event.target.value })} /></label>
-                  <label>Eメール<input type="email" value={draft.email} maxLength={254} autoComplete="off" placeholder={demoMode.enabled ? "demo-001@example.invalid" : trialMode ? "trial-01@example.com" : undefined} pattern={demoMode.enabled ? "^[^@\\s]+@example\\.invalid$" : trialMode ? "^[^@\\s]+@example\\.com$" : undefined} onChange={(event) => patch({ email: event.target.value })} /></label>
+                  <label>Eメール<input type="email" aria-invalid={attempted && draft.notificationPreference === "email" && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/u.test(draft.email)} value={draft.email} maxLength={254} autoComplete="off" placeholder={demoMode.enabled ? "demo-001@example.invalid" : trialMode ? "trial-01@example.com" : undefined} pattern={demoMode.enabled ? "^[^@\\s]+@example\\.invalid$" : trialMode ? "^[^@\\s]+@example\\.com$" : undefined} onChange={(event) => patch({ email: event.target.value })} /></label>
                 </div>
                 {syntheticMode ? (
                   <p id="synthetic-phone-rule" className={styles.trialInputHint}>
@@ -635,22 +564,22 @@ export function ReservationWizard({
             )}
           </fieldset>
         ) : null}
-        {step === 5 ? (
-          <fieldset>
+        {!reviewing ? (
+          <fieldset disabled={pending || datePending}>
             <legend>追加情報</legend>
             <div className={styles.formColumns}>
               <label>経路<select value={draft.sourceChannel} onChange={(event) => patch({ sourceChannel: event.target.value as Draft["sourceChannel"] })}><option value="phone">電話受付</option><option value="admin">管理者作成</option><option value="online">GHOST Web</option></select></label>
               <label>状態<select value={draft.serviceStatus} onChange={(event) => patch({ serviceStatus: event.target.value as VipServiceStatus })}><option value="expected">来店予定</option><option value="late">遅刻</option><option value="arrived">到着</option><option value="seated">着席</option></select></label>
             </div>
-            <label>現場共有メモ<textarea value={draft.operatorNote} maxLength={500} onChange={(event) => patch({ operatorNote: event.target.value })} /></label>
+            <label>現場共有メモ<textarea aria-label="現場共有メモ" value={draft.operatorNote} maxLength={500} onChange={(event) => patch({ operatorNote: event.target.value })} /></label>
           </fieldset>
         ) : null}
-        {step === 6 ? (
-          <fieldset>
+        {!reviewing ? (
+          <fieldset disabled={pending || datePending}>
             <legend>予約担当者</legend>
             <label>
               担当スタッフ
-              <select value={draft.bookingStaffMemberId} onChange={(event) => patch({ bookingStaffMemberId: event.target.value })}>
+              <select aria-label="担当スタッフ" value={draft.bookingStaffMemberId} onChange={(event) => patch({ bookingStaffMemberId: event.target.value })}>
                 <option value="">未指定</option>
                 {(staffData?.staffMembers ?? []).filter((member) => member.active).map((member) => (
                   <option key={member.id} value={member.id}>{member.displayName}</option>
@@ -660,19 +589,27 @@ export function ReservationWizard({
             <p className={styles.wizardHint}>予約担当者は営業日ごとの卓担当者とは別に保存します。</p>
           </fieldset>
         ) : null}
-        {step === 7 ? (
+        {!reviewing ? (
+            <fieldset disabled={pending || datePending}>
+              <legend>顧客通知</legend>
+              {attempted && emailMissing ? <p role="alert" className={styles.wizardFieldError}>Eメール送信には顧客Eメールが必要です。</p> : null}
+              <label className={styles.choiceRow}><input type="radio" name="notify" checked={draft.notificationPreference === "none"} onChange={() => patch({ notificationPreference: "none" })} />送信しない</label>
+              <label className={styles.choiceRow}><input type="radio" name="notify" checked={draft.notificationPreference === "email"} disabled={demoMode.enabled} onChange={() => patch({ notificationPreference: "email" })} /><Mail size={16} />{demoMode.enabled ? "DEMOでは外部送信なし" : "Eメール送信"}</label>
+            </fieldset>
+        ) : null}
+        {reviewing ? (
           <div className={styles.wizardConfirm}>
-            <h3>この内容で{reservation ? "更新" : "作成"}します</h3>
+            <h3 tabIndex={-1}>この内容で{reservation ? "更新" : "作成"}します</h3>
             <dl>
               <div><dt>予約名</dt><dd data-empty={savedGuestLabel ? undefined : true}>{savedGuestLabel || "未設定"}</dd></div>
               <div><dt>営業日</dt><dd className="tabular-nums">{formatBusinessDateWithWeekday(board.businessDay.businessDate)}</dd></div>
               <div>
                 <dt>時刻</dt>
                 <dd className="tabular-nums">
-                  {formatGhostTimeRange(draft.startAt, draft.endAt, options.businessDay.businessDate)}
+                  {timeValid ? formatGhostTimeRange(draft.startAt, draft.endAt, options.businessDay.businessDate) : "未選択"}
                 </dd>
               </div>
-              <div><dt>人数</dt><dd className="tabular-nums">{draft.guestCount}名</dd></div>
+              <div><dt>人数</dt><dd className="tabular-nums">{draft.guestCount ? `${draft.guestCount}名` : "未入力"}</dd></div>
               <div>
                 <dt>卓</dt>
                 <dd data-empty={selectedTables.length === 0 || undefined}>
@@ -690,41 +627,19 @@ export function ReservationWizard({
                     <div><dt>定員超過</dt><dd>{capacityOverrideConfirmed ? `Owner承認 / ${capacityOverrideReason}` : "未承認"}</dd></div>
                   ) : null}
             </dl>
-            <fieldset>
-              <legend>顧客通知</legend>
-              <label className={styles.choiceRow}><input type="radio" name="notify" checked={draft.notificationPreference === "none"} onChange={() => patch({ notificationPreference: "none" })} />送信しない</label>
-              <label className={styles.choiceRow}><input type="radio" name="notify" checked={draft.notificationPreference === "email"} disabled={demoMode.enabled} onChange={() => patch({ notificationPreference: "email" })} /><Mail size={16} />{demoMode.enabled ? "DEMOでは外部送信なし" : "Eメール送信"}</label>
-            </fieldset>
-            {emailMissing ? <p className={styles.wizardFieldError} role="alert">Eメール送信には顧客Eメールが必要です。手順5でEメールを入力してください。</p> : null}
+            {emailMissing ? <p className={styles.wizardFieldError} role="alert">Eメール送信には顧客Eメールが必要です。入力画面でEメールを入力してください。</p> : null}
             {occupiedSelection.length > 0 ? (
               <p className={styles.wizardFieldError} role="alert">
-                {occupiedSelection.map((table) => `${table.displayCode}は${occupancyLabel(occupancy.get(table.id)!)}`).join("、")}と重なっているため作成できません。手順4で卓を選び直してください。
+                {occupiedSelection.map((table) => `${table.displayCode}は${occupancyLabel(occupancy.get(table.id)!)}`).join("、")}と重なっているため作成できません。入力画面で卓を選び直してください。
               </p>
             ) : null}
             <p className={styles.wizardHint}>
               保存時に版と席競合を再検証し、{reservation ? "予約変更" : "新規予約作成"}を監査へ記録します。
             </p>
-            {skippedOptionalSteps ? (
-              <p className={styles.wizardHint}>顧客・追加情報・担当は既定値です。必要な場合は下の「任意項目を入力」から追記できます。</p>
-            ) : null}
+
           </div>
         ) : null}
         </div>
-        {step === 7 ? null : (
-          <aside className={styles.wizardAside} aria-label="この予約の控え">
-            <dl>
-              <div><dt>予約名</dt><dd data-empty={savedGuestLabel ? undefined : true}>{savedGuestLabel || "未設定"}</dd></div>
-              <div><dt>顧客</dt><dd data-empty={customerSummary ? undefined : true}>{customerSummary ?? "未入力"}</dd></div>
-              <div><dt>担当</dt><dd data-empty={staffName ? undefined : true}>{staffName ?? "未指定"}</dd></div>
-              <div><dt>通知</dt><dd>{draft.notificationPreference === "email" ? "Eメール送信" : "送信しない"}</dd></div>
-              <div><dt>版</dt><dd>{reservation ? `v${reservation.version}` : "新規"}</dd></div>
-              <div>
-                <dt>データ</dt>
-                <dd>{syntheticMode ? "合成のみ" : "Owner"}</dd>
-              </div>
-            </dl>
-          </aside>
-        )}
       </div>
       {visibleFailure ? (
         <div className={`${styles.conflictBox} ${styles.wizardFailure}`} role="alert">
@@ -735,10 +650,10 @@ export function ReservationWizard({
             <small>{visibleFailure.recovery}（{visibleFailure.code}）</small>
             {failureNeedsTableOrTime ? (
               <div className={styles.wizardFailureActions}>
-                <button type="button" className={styles.secondaryButton} disabled={pending} onClick={() => goToStep(3)}>
+                <button type="button" className={styles.secondaryButton} disabled={pending} onClick={() => editFields()}>
                   卓を選び直す
                 </button>
-                <button type="button" className={styles.secondaryButton} disabled={pending} onClick={() => goToStep(1)}>
+                <button type="button" className={styles.secondaryButton} disabled={pending} onClick={() => editFields()}>
                   時刻を変更
                 </button>
               </div>
@@ -747,52 +662,21 @@ export function ReservationWizard({
         </div>
       ) : null}
       <footer className={styles.wizardFooter}>
-        <button
-          type="button"
-          className={styles.secondaryButton}
-          disabled={step === 0 || pending}
-          onClick={() => goToStep(step === 7 && skippedOptionalSteps ? 3 : step - 1)}
-        >
-          <ArrowLeft size={16} />戻る
+        <button type="button" className={styles.secondaryButton} disabled={pending || datePending} onClick={reviewing ? editFields : onDone}>
+          <ArrowLeft size={16} aria-hidden />{reviewing ? "入力に戻る" : "キャンセル"}
         </button>
-        {!reservation && (step === 3 || (step === 7 && skippedOptionalSteps)) ? (
-          <button
-            type="button"
-            className={`${styles.secondaryButton} ${styles.wizardOptionalButton}`}
-            disabled={pending}
-            onClick={() => {
-              setSkippedOptionalSteps(false);
-              goToStep(4);
-            }}
-          >
-            任意項目を入力
-          </button>
-        ) : (
-          <span>{step < 7 ? `次は ${STEPS[step + 1]}` : "保存前の最終確認"}</span>
-        )}
-        {step < 7 ? (
-          <button
-            type="button"
-            className={styles.primaryButton}
-            disabled={!canContinue || pending}
-            onClick={() => {
-              if (!reservation && step === 3) {
-                setSkippedOptionalSteps(true);
-                goToStep(7);
-                return;
-              }
-              goToStep(step + 1);
-            }}
-          >
-            {!reservation && step === 3 ? "確認へ進む" : "次へ"}<ArrowRight size={16} />
-          </button>
-        ) : (
+        <span>{reviewing ? "保存前の最終確認" : "予約名・時刻・人数は必須"}</span>
+        {reviewing ? (
           <button type="button" className={styles.primaryButton} disabled={!canContinue || pending} onClick={() => void save()}>
-            <Check size={16} />{pending ? "保存中…" : `競合確認して${reservation ? "更新" : "作成"}`}
+            <Check size={16} aria-hidden />{pending ? "保存中…" : `競合確認して${reservation ? "更新" : "作成"}`}
+          </button>
+        ) : (
+          <button type="submit" className={styles.primaryButton} disabled={pending || datePending}>
+            内容を確認<ArrowRight size={16} aria-hidden />
           </button>
         )}
       </footer>
-    </section>
+    </form>
   );
 }
 
@@ -806,42 +690,6 @@ const TABLE_OR_TIME_FAILURES = new Set([
   "SLOT_COMPATIBILITY_MISSING",
   "outside_operating_hours",
 ]);
-
-function stepValid(step: number, draft: Draft, editing: boolean, businessDate: string) {
-  if (step === 1) return isGhostOperatingInterval(draft.startAt, draft.endAt, businessDate);
-  if (step === 2) return Boolean(draft.offeringId && draft.guestCount >= 1);
-  if (step === 3) return draft.tableIds.length > 0;
-  if (step === 7) {
-    return isGhostOperatingInterval(draft.startAt, draft.endAt, businessDate)
-      && Boolean(draft.offeringId && draft.guestCount >= 1)
-      && draft.tableIds.length > 0
-      && (draft.notificationPreference !== "email" || editing || Boolean(draft.email));
-  }
-  return true;
-}
-
-function scheduleDefaults(businessDate: string) {
-  const window = getGhostOperatingWindow(businessDate);
-  const startAt = Date.parse(window.startAt);
-  return {
-    start: localInput(new Date(startAt).toISOString()),
-    end: localInput(new Date(Math.min(
-      startAt + 120 * 60_000,
-      Date.parse(window.endAt),
-    )).toISOString()),
-  };
-}
-
-/* Presentational only: both inputs are naive local strings, so the difference is
- * timezone-independent. */
-function stayLabel(startAt: string, endAt: string) {
-  const minutes = Math.round((Date.parse(endAt) - Date.parse(startAt)) / 60_000);
-  if (!Number.isFinite(minutes) || minutes <= 0) return "—";
-  const hours = Math.floor(minutes / 60);
-  const rest = minutes % 60;
-  if (hours === 0) return `${rest}分`;
-  return rest === 0 ? `${hours}時間` : `${hours}時間${rest}分`;
-}
 
 function localInput(value: string) {
   return new Intl.DateTimeFormat("sv-SE", {

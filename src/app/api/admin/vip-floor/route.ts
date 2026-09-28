@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { normalizeGhostBusinessDay } from "@/lib/ghostOperatingHours";
+import { readVipFloorDayStateEvent } from "@/lib/vipFloorDayState";
 import { VIP_FLOOR_SCHEMA_VERSION } from "@/lib/vipFloorV2Contract";
 import { copyJson, ghostAdminFetch, readAdminToken } from "@/lib/server/ghostAdminProxy";
 import { assertOperatorMutation } from "@/lib/server/httpBoundary";
@@ -38,8 +39,14 @@ export async function GET(request: Request) {
     && versionedPayload !== null
     && "dayState" in versionedPayload
   ) {
+    const dayState = readVipFloorDayStateEvent(versionedPayload.dayState);
+    const idleMonitor = url.searchParams.get("purpose") === "alerts"
+      && versionedResponse.status === 404
+      && dayState?.businessDate === businessDate;
     return NextResponse.json(versionedPayload, {
-      status: versionedResponse.status,
+      // A monitored night without an event is a normal empty result. Preserve
+      // the existing workspace status and all authentication/error statuses.
+      status: idleMonitor ? 200 : versionedResponse.status,
       headers: { "Cache-Control": "no-store", "X-GHOST-Board-Contract": VIP_FLOOR_SCHEMA_VERSION },
     });
   }

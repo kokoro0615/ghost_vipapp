@@ -317,14 +317,12 @@ test("the reservation wizard keeps one dominant column and a persistent record",
   // The running record is never deleted on a small screen.
   assert.doesNotMatch(workspaceStyles, /\.wizard[A-Za-z]* \{ display: none/u);
   assert.match(workspaceStyles, /\.wizardSummaryBar \{/u);
-  // All eight steps stay present, in order, individually announced.
-  assert.match(reservationWizard, /STEPS = \["日付", "時刻", "人数", "卓", "顧客", "追加", "担当", "確認"\]/u);
-  assert.match(reservationWizard, /\$\{step \+ 1\}\/8/u);
-  assert.match(reservationWizard, /aria-current=\{index === step \? "step" : undefined\}/u);
-  // Step state is carried by more than colour.
-  for (const spokenState of ["入力済み", "既定値を使用", "現在の段階", "未入力"]) {
-    assert.ok(reservationWizard.includes(`"${spokenState}"`));
-  }
+  // All fields share one input screen; confirmation remains explicit.
+  assert.doesNotMatch(reservationWizard, /const STEPS|setStep|goToStep/u);
+  assert.match(reservationWizard, /onSubmit=\{review\}/u);
+  assert.match(reservationWizard, /予約名（必須）/u);
+  assert.match(reservationWizard, /人数（必須）/u);
+  assert.match(reservationWizard, /内容を確認/u);
   // The plan is a real instrument on the table step: true colour, real geometry.
   assert.match(workspaceStyles, /\.wizardMapImage \{[\s\S]*?filter: none;/u);
   assert.doesNotMatch(workspaceStyles, /invert\(1\)/u);

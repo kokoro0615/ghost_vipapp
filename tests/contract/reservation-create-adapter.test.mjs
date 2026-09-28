@@ -4,7 +4,7 @@ import test from "node:test";
 
 const read = (path) => readFile(new URL(`../../${path}`, import.meta.url), "utf8");
 
-test("eight-step reservation create is Owner-only, versioned, and notification-safe", async () => {
+test("single-screen reservation create is Owner-only, versioned, and notification-safe", async () => {
   const [proxy, wizard, operationCenter, hook] = await Promise.all([
     read("src/app/api/admin/vip-floor/operations/route.ts"),
     read("src/components/admin/vip-floor-v2/operations/ReservationWizard.tsx"),
@@ -18,7 +18,7 @@ test("eight-step reservation create is Owner-only, versioned, and notification-s
   assert.match(proxy, /notificationPreference/u);
   assert.match(proxy, /reservation_created/u);
   assert.match(proxy, /queued: notificationResponse\.ok/u);
-  assert.match(wizard, /const STEPS = \["日付", "時刻", "人数", "卓", "顧客", "追加", "担当", "確認"\]/u);
+  assert.match(wizard, /内容を確認/u);
   assert.match(wizard, /expectedVersion: table\.version/u);
   assert.match(wizard, /電話の完全一致を優先/u);
   assert.match(wizard, /送信しない/u);

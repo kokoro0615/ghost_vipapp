@@ -21,6 +21,7 @@ type BusinessTimeFieldsProps = {
   businessDate: string;
   value: TimeValue;
   disabled?: boolean;
+  showErrors?: boolean;
   startName?: string;
   endName?: string;
   onChange: (value: TimeValue) => void;
@@ -36,6 +37,7 @@ export function BusinessTimeFields({
   businessDate,
   value,
   disabled = false,
+  showErrors = true,
   startName,
   endName,
   onChange,
@@ -54,11 +56,12 @@ export function BusinessTimeFields({
         <label>
           開始
           <select
+            aria-label="開始"
             name={startName}
             value={value.startAt}
             disabled={disabled}
             required
-            aria-invalid={startInvalid || !intervalValid}
+            aria-invalid={showErrors && (startInvalid || !intervalValid)}
             aria-describedby="ghost-business-time-hint"
             onChange={(event) => {
               const startAt = event.target.value;
@@ -68,6 +71,7 @@ export function BusinessTimeFields({
               });
             }}
           >
+            <option value="" disabled>来店時刻を選択</option>
             {startInvalid ? (
               <option value={value.startAt} disabled>営業時間外（要修正）</option>
             ) : null}
@@ -79,15 +83,17 @@ export function BusinessTimeFields({
         <label>
           終了
           <select
+            aria-label="終了"
             name={endName}
             value={value.endAt}
             disabled={disabled}
             required
-            aria-invalid={endInvalid || !intervalValid}
+            aria-invalid={showErrors && (endInvalid || !intervalValid)}
             aria-describedby="ghost-business-time-hint"
             onChange={(event) => onChange({ ...value, endAt: event.target.value })}
           >
-            {endInvalid || value.endAt <= value.startAt ? (
+            <option value="" disabled>終了時刻を選択</option>
+            {value.endAt && (endInvalid || value.endAt <= value.startAt) ? (
               <option value={value.endAt} disabled>営業時間外（要修正）</option>
             ) : null}
             {endOptions.map((option) => (
@@ -100,13 +106,13 @@ export function BusinessTimeFields({
         営業日 <span className="tabular-nums">{formatBusinessDateWithWeekday(businessDate)}</span> の
         <strong className="tabular-nums"> 22:00〜翌05:00</strong>だけを15分単位で表示
       </p>
-      {intervalValid ? null : (
+      {intervalValid || !showErrors ? null : (
         <p className={styles.wizardFieldError} role="alert">
           営業時間内で、終了が開始より後になるよう選び直してください。
         </p>
       )}
       <p className={styles.businessTimeReadout}>
-        選択中 <strong className="tabular-nums">{formatGhostTimeRange(value.startAt, value.endAt, businessDate)}</strong>
+        選択中 <strong className="tabular-nums">{intervalValid ? formatGhostTimeRange(value.startAt, value.endAt, businessDate) : "未選択"}</strong>
       </p>
     </>
   );

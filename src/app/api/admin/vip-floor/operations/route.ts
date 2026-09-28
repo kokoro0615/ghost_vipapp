@@ -387,7 +387,7 @@ function parseReservationCreate(payload: Record<string, unknown>) {
     || Date.parse(scheduledStartAt) >= Date.parse(scheduledEndAt)
     || guestCount === null || !tableIds || !versions
     || displayName === undefined || phone === undefined || email === undefined
-    || languageCode === undefined || guestLabel === undefined || operatorNote === undefined
+    || languageCode === undefined || !guestLabel || operatorNote === undefined
     || !sourceChannel || !serviceStatus || !notificationPreference
     || (payload.bookingStaffMemberId !== null && !bookingStaffMemberId)
     || (email !== null && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/u.test(email))
@@ -462,7 +462,7 @@ function parseReservationUpdate(payload: Record<string, unknown>) {
     || !scheduledStartAt || !scheduledEndAt
     || Date.parse(scheduledStartAt) >= Date.parse(scheduledEndAt)
     || guestCount === null || !tableIds || !versions
-    || guestLabel === undefined || operatorNote === undefined
+    || !guestLabel || operatorNote === undefined
     || !sourceChannel || !serviceStatus || !notificationPreference
     || (payload.bookingStaffMemberId !== null && !bookingStaffMemberId)
   ) {

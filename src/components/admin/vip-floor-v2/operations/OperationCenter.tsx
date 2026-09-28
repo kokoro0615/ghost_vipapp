@@ -89,11 +89,7 @@ export function OperationCenter({
   const [walkInCapacityConfirmed, setWalkInCapacityConfirmed] = useState(false);
   const [walkInCapacityReason, setWalkInCapacityReason] = useState("");
   const [walkInErrors, setWalkInErrors] = useState<WalkInErrors>({});
-  /* The reservation name is the one part of the 事前予約 draft held here: the
-   * wizard is keyed by event day, so a date change remounts it and resets every
-   * date-dependent field, but the name is typed on that same step and must
-   * survive. It is tagged with the reservation it was typed for, so an edit can
-   * never prefill another reservation or a new intake. */
+  /* Keep reservation labels scoped to one create/edit intake. */
   const [reservationGuestLabel, setReservationGuestLabel] = useState<{
     owner: string;
     value: string;
@@ -466,7 +462,7 @@ export function OperationCenter({
 
         {(activeKind === "reservation_create" || editReservation) && options ? (
           <ReservationWizard
-            key={`${editReservation ? "edit" : "create"}:${options.businessDay.id}`}
+            key={editReservation ? `edit:${editReservation.id}` : "create"}
             board={board}
             options={options}
             staffData={staffData}

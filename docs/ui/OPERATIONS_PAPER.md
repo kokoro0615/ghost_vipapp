@@ -449,7 +449,11 @@ harness — change both together. In the workspace it means only *"the inspector
 not persistent"*, which is true for iPad portrait as well; the phone shell is a
 separate, lower tier.
 
-### 新規予約 dialog — two zones, never three
+### 新規予約 dialog — historical eight-step layout (superseded 2026-09-28)
+
+Current input/notification contract: `docs/DESIGN.md` §0.0. The record below
+is retained as the previous layout; its step order/optional-name rules no longer
+apply. The footer, venue artwork and conflict/confirmation safety still apply.
 
 The 事前予約 wizard keeps all eight steps (日付 / 時刻 / 人数 / 卓 / 顧客 / 追加 /
 担当 / 確認), their order, and their save behaviour. Only the presentation is

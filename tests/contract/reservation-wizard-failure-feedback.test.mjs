@@ -17,7 +17,7 @@ test("the reservation wizard shows a rejected save inside the dialog", async () 
   assert.match(wizard, /visibleFailure \? \([\s\S]*?role="alert"[\s\S]*?visibleFailure\.message[\s\S]*?visibleFailure\.recovery/u);
   // The panel sits outside the scrolling steps, directly above the footer.
   assert.match(wizard, /<\/div>\s*\{visibleFailure \? \([\s\S]*?\) : null\}\s*<footer className=\{styles\.wizardFooter\}>/u);
-  assert.match(wizard, /卓を選び直す[\s\S]*?goToStep\(3\)|goToStep\(3\)[\s\S]*?卓を選び直す/u);
+  assert.match(wizard, /卓を選び直す[\s\S]*?editFields\(\)|editFields\(\)[\s\S]*?卓を選び直す/u);
   assert.match(wizard, /pending \? "保存中…"/u);
 });
 
@@ -25,6 +25,6 @@ test("busy tables are marked before the save instead of failing after it", async
   const wizard = await read("src/components/admin/vip-floor-v2/operations/ReservationWizard.tsx");
 
   assert.match(wizard, /tableOccupancy\(board, draft\.startAt, draft\.endAt, reservation\?\.id \?\? null\)/u);
-  assert.match(wizard, /\(step !== 3 && step !== 7 \|\| occupiedSelection\.length === 0\)/u);
+  assert.match(wizard, /occupiedSelection\.length === 0/u);
   assert.match(wizard, /data-occupied=\{compatible && occupied \? true : undefined\}/u);
 });
