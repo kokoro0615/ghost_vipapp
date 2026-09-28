@@ -80,6 +80,7 @@ export async function assertReservationAlerts({ page, board, origin, capture }) 
   // A busy night must keep acknowledgement reachable while the list scrolls.
   alertBoard={...alertBoard,reservations:Array.from({length:12},(_,index)=>({...alertBoard.reservations[index%2],id:`ab000000-0000-4000-8000-${String(index+1).padStart(12,'0')}`}))};
   await refreshMonitor();
+  await popup().getByRole('listitem').nth(11).waitFor();
   assert.equal(await popup().getByRole('listitem').count(),12);
   const list=popup().getByRole('list',{name:'時刻確認が必要な予約',exact:true});
   await list.focus();
