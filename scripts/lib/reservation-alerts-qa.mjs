@@ -77,6 +77,16 @@ export async function assertReservationAlerts({ page, board, origin, capture }) 
   await refreshMonitor();
   await popup().waitFor();
   assert.equal(await popup().getByRole('listitem').count(),2);
+  // A busy night must keep acknowledgement reachable while the list scrolls.
+  alertBoard={...alertBoard,reservations:Array.from({length:12},(_,index)=>({...alertBoard.reservations[index%2],id:`ab000000-0000-4000-8000-${String(index+1).padStart(12,'0')}`}))};
+  await refreshMonitor();
+  assert.equal(await popup().getByRole('listitem').count(),12);
+  const list=popup().getByRole('list',{name:'時刻確認が必要な予約',exact:true});
+  await list.focus();
+  await page.keyboard.press('End');
+  await page.waitForFunction(()=>Array.from(document.querySelectorAll('dialog[open] ul')).some(el=>el.scrollTop>0));
+  assert.ok(await list.evaluate(el=>el.scrollTop>0),'keyboard must reach the end of a long alert list');
+  await popup().getByRole('button',{name:'確認しました（12件）',exact:true}).scrollIntoViewIfNeeded();
   await capture(page,'reservation-alert-multiple');
   // A cancellation/service outcome disappears on the next successful read.
   alertBoard={...alertBoard,boardRevision:1005,reservations:alertBoard.reservations.map(r=>({...r,lifecycleStatus:'cancelled'}))};

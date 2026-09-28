@@ -16,6 +16,7 @@
 .popup h2 { margin: 0; font-size: var(--t-figure); font-weight: var(--weight-strong); }
 .popup p { margin: var(--s-3) 0 0; font-size: var(--t-data); }
 .popup ul { min-height: 0; overflow-y: auto; margin: 0; padding: 0 var(--s-6); list-style: none; }
+.popup ul:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
 .popup li { padding: var(--s-6) 0; }
 .popup li + li { border-top: 1px solid var(--rule); }
 .popup h3 { margin: var(--s-3) 0 0; font-size: var(--t-lead); overflow-wrap: anywhere; }

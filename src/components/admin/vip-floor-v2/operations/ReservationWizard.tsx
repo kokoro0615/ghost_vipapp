@@ -314,7 +314,8 @@ export function ReservationWizard({
       </dl>
 
       <div className={`${styles.wizardBody} ${styles.reservationFormBody}`} data-single>
-        <div className={`${styles.wizardActive} ${styles.reservationFields}`} data-reviewing={reviewing || undefined}>
+        <div className={`${styles.wizardActive} ${styles.reservationFields}`} data-reviewing={reviewing || undefined}
+          tabIndex={reviewing ? 0 : undefined} role={reviewing ? "region" : undefined} aria-label={reviewing ? "予約内容の確認" : undefined}>
         {!reviewing ? (
           <fieldset disabled={pending || datePending}>
             <legend>予約名と予約日</legend>

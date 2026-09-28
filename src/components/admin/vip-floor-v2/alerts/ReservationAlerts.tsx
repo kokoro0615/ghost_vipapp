@@ -129,7 +129,7 @@ export function ReservationAlerts({ board, healthy, demo }: Props) {
           <h2 id="reservation-alert-title">予約時刻のお知らせ</h2>
           <p id="reservation-alert-description">来店・延長の確認をお願いします。</p>
         </header>
-        <ul>
+        <ul tabIndex={0} aria-label="時刻確認が必要な予約">
           {alerts.map((alert) => {
             const reservation = reservations.find((item) => item.id === alert.reservationId);
             const time = new Intl.DateTimeFormat("ja-JP", { timeZone: "Asia/Tokyo", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(alert.targetAt));
