@@ -149,7 +149,7 @@ preserved, but phone-width testing is not a release prerequisite.
 
 | Concern | Choice | Notes |
 |---|---|---|
-| Framework | **Next.js 16.2.11**, App Router | `src/app/**` |
+| Framework | **Next.js 16.3.8**, App Router | `src/app/**` |
 | Runtime | **React 19.2.4** / react-dom 19.2.4 | Server Components by default |
 | Node | **>= 24** | `engines.node` |
 | Language | **TypeScript ^5**, `strict`; alias `@/*` → `./src/*` | |
