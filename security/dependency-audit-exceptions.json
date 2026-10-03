@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "description": "Approved exceptions for the dependency security release gate (scripts/dependency-audit-gate.mjs). Each entry suppresses exactly one advisory id for one package (or '*') and one scope (production|development|all). Every entry MUST document reachability, compensating controls, an approver, and an expiry date (YYYY-MM-DD). Expired or malformed entries fail the gate instead of silently passing.",
+  "exceptions": [
+    {
+      "id": "GHSA-VFJ7-8CJW-P6XM",
+      "package": "braces",
+      "scope": "development",
+      "reachability": "ESLint build tooling only; braces accepts repository-owned static patterns. Absent from production dependency graph. No published patched braces version as of 2026-10-03.",
+      "compensatingControls": "Only trusted repository-owned lint configuration and paths; reject externally supplied glob patterns. Next.js production dependency upgraded to 16.3.8 and production audit remains mandatory. Re-evaluate by 2026-10-10.",
+      "approvedBy": "Owner explicit approval in 2026-10-03 conversation (development scope only, expires 2026-10-10)",
+      "expires": "2026-10-10"
+    },
+    {
+      "id": "micromatch",
+      "package": "micromatch",
+      "scope": "development",
+      "reachability": "ESLint build tooling only; braces accepts repository-owned static patterns. Absent from production dependency graph. No published patched braces version as of 2026-10-03.",
+      "compensatingControls": "Only trusted repository-owned lint configuration and paths; reject externally supplied glob patterns. Next.js production dependency upgraded to 16.3.8 and production audit remains mandatory. Re-evaluate by 2026-10-10.",
+      "approvedBy": "Owner explicit approval in 2026-10-03 conversation (development scope only, expires 2026-10-10)",
+      "expires": "2026-10-10"
+    },
+    {
+      "id": "fast-glob",
+      "package": "fast-glob",
+      "scope": "development",
+      "reachability": "ESLint build tooling only; braces accepts repository-owned static patterns. Absent from production dependency graph. No published patched braces version as of 2026-10-03.",
+      "compensatingControls": "Only trusted repository-owned lint configuration and paths; reject externally supplied glob patterns. Next.js production dependency upgraded to 16.3.8 and production audit remains mandatory. Re-evaluate by 2026-10-10.",
+      "approvedBy": "Owner explicit approval in 2026-10-03 conversation (development scope only, expires 2026-10-10)",
+      "expires": "2026-10-10"
+    },
+    {
+      "id": "@next/eslint-plugin-next",
+      "package": "@next/eslint-plugin-next",
+      "scope": "development",
+      "reachability": "ESLint build tooling only; braces accepts repository-owned static patterns. Absent from production dependency graph. No published patched braces version as of 2026-10-03.",
+      "compensatingControls": "Only trusted repository-owned lint configuration and paths; reject externally supplied glob patterns. Next.js production dependency upgraded to 16.3.8 and production audit remains mandatory. Re-evaluate by 2026-10-10.",
+      "approvedBy": "Owner explicit approval in 2026-10-03 conversation (development scope only, expires 2026-10-10)",
+      "expires": "2026-10-10"
+    },
+    {
+      "id": "eslint-config-next",
+      "package": "eslint-config-next",
+      "scope": "development",
+      "reachability": "ESLint build tooling only; braces accepts repository-owned static patterns. Absent from production dependency graph. No published patched braces version as of 2026-10-03.",
+      "compensatingControls": "Only trusted repository-owned lint configuration and paths; reject externally supplied glob patterns. Next.js production dependency upgraded to 16.3.8 and production audit remains mandatory. Re-evaluate by 2026-10-10.",
+      "approvedBy": "Owner explicit approval in 2026-10-03 conversation (development scope only, expires 2026-10-10)",
+      "expires": "2026-10-10"
+    }
+  ]
+}

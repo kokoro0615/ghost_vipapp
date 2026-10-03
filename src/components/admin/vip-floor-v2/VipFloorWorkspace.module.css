@@ -3755,3 +3755,8 @@
     opacity: 0.68;
   }
 }
+
+.actualTimeLabel {
+  display: block;
+  overflow-wrap: anywhere;
+}

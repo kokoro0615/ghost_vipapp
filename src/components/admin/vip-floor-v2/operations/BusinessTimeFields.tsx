@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 
 import {
   formatGhostTimeRange,
+  ghostActualTimeLabel,
   getGhostTimeOptions,
   isGhostOperatingInterval,
   resolveGhostEndTime,
@@ -104,7 +105,7 @@ export function BusinessTimeFields({
       </div>
       <p id="ghost-business-time-hint" className={styles.businessTimeHint}>
         営業日 <span className="tabular-nums">{formatBusinessDateWithWeekday(businessDate)}</span> の
-        <strong className="tabular-nums"> 22:00〜翌05:00</strong>だけを15分単位で表示
+        <strong className="tabular-nums"> 22:00〜29:00</strong>だけを15分単位で表示
       </p>
       {intervalValid || !showErrors ? null : (
         <p className={styles.wizardFieldError} role="alert">
@@ -113,6 +114,7 @@ export function BusinessTimeFields({
       )}
       <p className={styles.businessTimeReadout}>
         選択中 <strong className="tabular-nums">{intervalValid ? formatGhostTimeRange(value.startAt, value.endAt, businessDate) : "未選択"}</strong>
+        {intervalValid && ghostActualTimeLabel(value.startAt, value.endAt, businessDate) ? <span className={styles.actualTimeLabel}>{ghostActualTimeLabel(value.startAt, value.endAt, businessDate)}</span> : null}
       </p>
     </>
   );

@@ -1,3 +1,4 @@
+import { vipBusinessTimeLabel } from "@/lib/vipBusinessTime";
 import type { VipFloorBoardV2 } from "@/lib/vipFloorV2Contract";
 
 export type TableOccupancy = {
@@ -6,13 +7,6 @@ export type TableOccupancy = {
   endAt: string;
   publicCode: string | null;
 };
-
-const TOKYO_CLOCK = new Intl.DateTimeFormat("ja-JP", {
-  hour: "2-digit",
-  minute: "2-digit",
-  hour12: false,
-  timeZone: "Asia/Tokyo",
-});
 
 /*
  * Mirrors the server's save-time check so a busy table is visible before the
@@ -67,8 +61,8 @@ export function tableOccupancy(
   return occupied;
 }
 
-export function occupancyLabel(occupancy: TableOccupancy) {
-  const window = `${TOKYO_CLOCK.format(Date.parse(occupancy.startAt))}–${TOKYO_CLOCK.format(Date.parse(occupancy.endAt))}`;
+export function occupancyLabel(occupancy: TableOccupancy, businessDate: string | null = null) {
+  const window = `${vipBusinessTimeLabel(occupancy.startAt, businessDate)}–${vipBusinessTimeLabel(occupancy.endAt, businessDate)}`;
   if (occupancy.kind === "block") return `受付ブロック ${window}`;
   return occupancy.publicCode ? `予約 ${occupancy.publicCode} ${window}` : `予約あり ${window}`;
 }

@@ -212,7 +212,7 @@ export function TicketOperationsInspector({
         </div>
       ) : null}
 
-      <div className={styles.inspectorScroll}>
+      <div className={styles.inspectorScroll} role="region" aria-label="チケット注文の詳細内容" tabIndex={0}>
         <section className={styles.identityRail} aria-label="注文とイベント">
           <div>
             <span>イベント</span>

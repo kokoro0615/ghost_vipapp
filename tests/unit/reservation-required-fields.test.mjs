@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import vm from 'node:vm';
 import ts from 'typescript';
+import * as businessTime from '../../src/lib/vipBusinessTime.ts';
 const read = file => fs.readFile(new URL('../../'+file,import.meta.url),'utf8');
 function compile(source, deps={}) {
   const exports={};const context={URL,exports,module:{exports},require:name=>{if(!(name in deps))throw Error(name);return deps[name];}};
@@ -10,7 +11,7 @@ function compile(source, deps={}) {
   return exports;
 }
 const deps={
-  '@/lib/ghostOperatingHours':compile(await read('src/lib/ghostOperatingHours.ts')),
+  '@/lib/ghostOperatingHours':compile(await read('src/lib/ghostOperatingHours.ts'), {'./vipBusinessTime.ts':businessTime}),
   '@/lib/server/ownerCapacityOverride':compile(await read('src/lib/server/ownerCapacityOverride.ts')),
   '@/generated/vipManagerRuntimeContract':compile(await read('src/generated/vipManagerRuntimeContract.ts')),
   'next/server':{}, '@/lib/server/ghostAdminProxy':{}, '@/lib/server/httpBoundary':{},

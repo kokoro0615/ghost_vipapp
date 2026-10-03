@@ -4,6 +4,7 @@ import { createRequire } from "node:module";
 import test from "node:test";
 import vm from "node:vm";
 import ts from "typescript";
+import * as businessTime from "../../src/lib/vipBusinessTime.ts";
 
 async function loadProjection() {
   const root = new URL("../../src/components/admin/vip-floor-v2/contract/", import.meta.url);
@@ -20,12 +21,14 @@ async function loadProjection() {
     return createRequire(import.meta.url)(name);
   });
   return compile(await readFile(new URL("viewModel.ts", root), "utf8"), (name) => {
+    if (name === "@/lib/vipBusinessTime") return businessTime;
     assert.equal(name, "./statusModel");
     return status;
   });
 }
 
 const board = (customer) => ({
+  businessDay: { businessDate: "2026-09-26" },
   tables: [{ id: "table-1", displayCode: "VIP-1" }],
   reservations: [{
     id: "reservation-1", publicCode: "QA-NAME-01", serviceStatus: "expected",

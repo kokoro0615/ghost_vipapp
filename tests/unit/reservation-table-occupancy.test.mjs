@@ -4,6 +4,7 @@ import test from "node:test";
 import vm from "node:vm";
 
 import ts from "typescript";
+import * as businessTime from "../../src/lib/vipBusinessTime.ts";
 
 async function loadOccupancyModule() {
   const source = await readFile(
@@ -13,7 +14,7 @@ async function loadOccupancyModule() {
   const compiled = ts.transpileModule(source, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
   }).outputText;
-  const context = { exports: {}, module: { exports: {} } };
+  const context = { exports: {}, module: { exports: {} }, require: (name) => { assert.equal(name, "@/lib/vipBusinessTime"); return businessTime; } };
   context.module.exports = context.exports;
   vm.runInNewContext(compiled, context);
   return context.module.exports;
@@ -59,7 +60,7 @@ test("tables busy in the draft window are reported with the booking that holds t
   const busy = tableOccupancy(board, "2026-09-20T01:00", "2026-09-20T03:00", null);
 
   assert.deepEqual([...busy.keys()].sort(), ["t1", "t2", "t3"]);
-  assert.equal(occupancyLabel(busy.get("t2")), "予約 G324B6AD953 01:00–03:00");
+  assert.equal(occupancyLabel(busy.get("t2"), "2026-09-19"), "予約 G324B6AD953 25:00–27:00");
   assert.equal(busy.has("t5"), false, "the floor block ended at 00:00");
   assert.equal(busy.has("t7"), false, "online-only blocks do not stop manager bookings");
 });
@@ -76,7 +77,7 @@ test("all-operations blocks cover their section", async () => {
   const { tableOccupancy, occupancyLabel } = await loadOccupancyModule();
   const busy = tableOccupancy(board, "2026-09-19T23:00", "2026-09-20T00:30", null);
 
-  assert.equal(occupancyLabel(busy.get("t5")), "受付ブロック 23:00–00:00");
+  assert.equal(occupancyLabel(busy.get("t5"), "2026-09-19"), "受付ブロック 23:00–24:00");
   assert.equal(busy.has("t7"), false);
 });
 

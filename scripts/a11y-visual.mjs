@@ -375,6 +375,14 @@ async function auditViewport(context, viewport) {
     await openReservationDetail(page, viewport);
     await page.getByRole("button", { name: buttonLabel, exact: true }).click();
     await page.getByRole("dialog", { name: dialogLabel, exact: true }).waitFor();
+    if (state === "command-arrival-time") {
+      const dialog = page.getByRole("dialog", { name: dialogLabel, exact: true });
+      await dialog.getByRole("combobox").selectOption("2026-07-27T00:00");
+      await dialog.getByText("実際：2026/07/27(月) 00:00（日本時間）", { exact: true }).waitFor();
+      await dialog.getByRole("button", { name: "確認へ", exact: true }).click();
+      assert.equal(await dialog.getByRole("combobox").inputValue(), "2026-07-27T00:00");
+      await dialog.locator('section[class*="confirmation"]').getByText(/24:00[\s\S]*実際：2026\/07\/27/u).waitFor();
+    }
     await capture(page, state);
     await page.keyboard.press("Escape");
   }
@@ -695,7 +703,7 @@ async function auditOperationDateRecovery(context, capture) {
   await businessDateTrigger(dialog, "予約・受付日").waitFor({ timeout: QA_RECOVERY_TIMEOUT_MS });
   await capture(page, "operation-date-recovery");
   await pickBusinessDate(dialog, "予約・受付日", alternateBusinessDate, { timeout: QA_RECOVERY_TIMEOUT_MS });
-  await dialog.getByText(`${formatJpBusinessDate(alternateBusinessDate)} / 22:00–翌05:00`).waitFor({
+  await dialog.getByText(`${formatJpBusinessDate(alternateBusinessDate)} / 22:00–29:00`).waitFor({
     timeout: QA_RECOVERY_TIMEOUT_MS,
   });
   assert.equal(

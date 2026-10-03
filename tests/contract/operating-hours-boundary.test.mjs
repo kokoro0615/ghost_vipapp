@@ -33,7 +33,7 @@ test("timeline, options, board and mutations share the 22:00-next-day-05:00 cont
   assert.match(wizard, /startAt: "", endAt: "", tableIds: \[\]/u);
   assert.doesNotMatch(operationCenter, /type="datetime-local"/u);
   assert.match(timeFields, /getGhostTimeOptions\(businessDate\)/u);
-  assert.match(timeFields, /22:00〜翌05:00/u);
+  assert.match(timeFields, /22:00〜29:00/u);
   assert.match(timeFields, /15分単位/u);
   assert.match(boardRoute, /normalizeGhostBusinessDay\(businessDay\)/u);
   assert.match(optionsRoute, /normalizeGhostBusinessDay\(businessDay\)/u);

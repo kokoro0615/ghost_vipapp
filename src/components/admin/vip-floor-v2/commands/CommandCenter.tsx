@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, ArrowLeft, ArrowRight, Check, LockKeyhole, X } from "lucide-react";
 
 import { getGhostTimeOptions } from "@/lib/ghostOperatingHours";
+import { vipScheduleLabels } from "@/lib/vipBusinessTime";
 import type { VipFloorBoardV2, VipServiceStatus } from "@/lib/vipFloorV2Contract";
 
 import type {
@@ -67,6 +68,7 @@ export function CommandCenter({
   const [serviceTargetStatus, setServiceTargetStatus] = useState<VipServiceStatus>("expected");
   const [serviceOverrideConfirmed, setServiceOverrideConfirmed] = useState(false);
   const [serviceOverrideReason, setServiceOverrideReason] = useState("");
+  const [arrivalValue, setArrivalValue] = useState("");
   const panelRef = useRef<HTMLDivElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
   const source = reservation
@@ -82,6 +84,9 @@ export function CommandCenter({
       .filter((option) => Date.parse(`${option.value}:00+09:00`) <= renderedAt);
   }, [board.businessDay.businessDate, kind, open, renderedAt]);
   const arrivalDefault = arrivalOptions.at(-1)?.value ?? "";
+  const selectedArrival = arrivalOptions.some((option) => option.value === arrivalValue)
+    ? arrivalValue : arrivalDefault;
+  const arrivalSchedule = vipScheduleLabels(board.businessDay.businessDate, selectedArrival, null);
   const assignmentCapacity = board.tables
     .filter((table) => assignmentTableIds.includes(table.id))
     .reduce((sum, table) => sum + table.capacityMax, 0);
@@ -98,7 +103,7 @@ export function CommandCenter({
     if (kind === "check_in") return demoMode.enabled
       ? "合成来店を確定し、着席開始と利用期限をbrowser-local台帳へ記録します。"
       : "来店を確定し、着席開始と利用期限をGHOST予約台帳へ記録します。";
-    if (kind === "arrival_time") return "22:00〜翌05:00の候補から選んだ到着時刻を予約へ記録します。未来時刻は保存できません。";
+    if (kind === "arrival_time") return "22:00〜29:00の候補から選んだ到着時刻を予約へ記録します。未来時刻は保存できません。";
     if (kind === "seat_extension") return "現在の利用期限を15分単位、最大120分まで延長します。";
     if (kind === "note") return "500文字以内の現場共有メモを監査付きで保存します。";
     if (kind === "walk_in_cancel") return demoMode.enabled
@@ -108,6 +113,12 @@ export function CommandCenter({
         : "予約を取消済みにし、割り当てた卓を解放します。元記録と監査履歴は残り、請求・返金と通知は実行しません。";
     return "接客状態を更新し、Floor・Chart・Listへ反映します。";
   }, [demoMode.enabled, kind, reservation?.sourceChannel]);
+
+  useEffect(() => {
+    if (!open || kind !== "arrival_time") return;
+    const frame = window.requestAnimationFrame(() => setArrivalValue(""));
+    return () => window.cancelAnimationFrame(frame);
+  }, [open, kind, reservation?.id, board.businessDay.businessDate]);
 
   useEffect(() => {
     if (!open) return;
@@ -364,7 +375,8 @@ export function CommandCenter({
                 到着時刻
                 <select
                   name="occurredAt"
-                  defaultValue={arrivalDefault}
+                  value={selectedArrival}
+                  onChange={(event) => setArrivalValue(event.target.value)}
                   disabled={arrivalOptions.length === 0}
                   required
                 >
@@ -377,6 +389,7 @@ export function CommandCenter({
                 <small className={styles.syntheticInputHint}>
                   営業日 {formatBusinessDateWithWeekday(board.businessDay.businessDate)} / 15分単位 / 未来時刻は除外
                 </small>
+                {arrivalSchedule.actualLabel ? <small className={styles.actualTimeLabel}>{arrivalSchedule.actualLabel}</small> : null}
               </label>
             ) : null}
 
@@ -499,6 +512,7 @@ export function CommandCenter({
               <div>
                 <strong>{demoMode.enabled ? "browser-local合成台帳への反映を確認" : "本番台帳への反映を確認"}</strong>
                 <p>{impact}</p>
+                {kind === "arrival_time" ? <p>{arrivalSchedule.text}</p> : null}
                 <small>保存前に更新版を照合し、競合時は反映せず最新状態を再読込します。</small>
               </div>
             </section>

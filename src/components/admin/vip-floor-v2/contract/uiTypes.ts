@@ -290,6 +290,7 @@ export type UiReservation = {
   endAt: string;
   startLabel: string;
   endLabel: string;
+  actualTimeLabel?: string | null;
   guestCount: number;
   tableIds: string[];
   tableCodes: string[];

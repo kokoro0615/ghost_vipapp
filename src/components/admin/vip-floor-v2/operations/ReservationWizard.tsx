@@ -6,6 +6,7 @@ import { AlertTriangle, ArrowLeft, ArrowRight, Check, Mail } from "lucide-react"
 
 import {
   formatGhostTimeRange,
+  ghostActualTimeLabel,
   isGhostOperatingInterval,
 } from "@/lib/ghostOperatingHours";
 import type { VipFloorBoardV2, VipServiceStatus } from "@/lib/vipFloorV2Contract";
@@ -301,6 +302,7 @@ export function ReservationWizard({
           <dt>時刻</dt>
           <dd className="tabular-nums">
             {timeValid ? formatGhostTimeRange(draft.startAt, draft.endAt, options.businessDay.businessDate) : "未選択"}
+                  {timeValid && ghostActualTimeLabel(draft.startAt, draft.endAt, options.businessDay.businessDate) ? <small className={styles.actualTimeLabel}>{ghostActualTimeLabel(draft.startAt, draft.endAt, options.businessDay.businessDate)}</small> : null}
           </dd>
         </div>
         <div>
@@ -448,7 +450,7 @@ export function ReservationWizard({
                   />
                   <span>{table.displayCode}</span>
                   <small className="tabular-nums">
-                    {table.capacityMax}名{!compatible ? " / プラン外" : occupied ? ` / ${occupancyLabel(occupied)}` : ""}
+                    {table.capacityMax}名{!compatible ? " / プラン外" : occupied ? ` / ${occupancyLabel(occupied, board.businessDay.businessDate)}` : ""}
                   </small>
                 </label>
                 );
@@ -459,7 +461,7 @@ export function ReservationWizard({
             </p>
             {occupiedSelection.length > 0 ? (
               <p className={styles.wizardWarning} role="alert">
-                {occupiedSelection.map((table) => `${table.displayCode}は${occupancyLabel(occupancy.get(table.id)!)}`).join("、")}と重なっています。別の卓を選ぶか、時刻を変更してください。
+                {occupiedSelection.map((table) => `${table.displayCode}は${occupancyLabel(occupancy.get(table.id)!, board.businessDay.businessDate)}`).join("、")}と重なっています。別の卓を選ぶか、時刻を変更してください。
               </p>
             ) : null}
             <p className={capacityShort ? styles.wizardWarning : styles.wizardHint}>
@@ -608,6 +610,7 @@ export function ReservationWizard({
                 <dt>時刻</dt>
                 <dd className="tabular-nums">
                   {timeValid ? formatGhostTimeRange(draft.startAt, draft.endAt, options.businessDay.businessDate) : "未選択"}
+                  {timeValid && ghostActualTimeLabel(draft.startAt, draft.endAt, options.businessDay.businessDate) ? <small className={styles.actualTimeLabel}>{ghostActualTimeLabel(draft.startAt, draft.endAt, options.businessDay.businessDate)}</small> : null}
                 </dd>
               </div>
               <div><dt>人数</dt><dd className="tabular-nums">{draft.guestCount ? `${draft.guestCount}名` : "未入力"}</dd></div>
@@ -631,7 +634,7 @@ export function ReservationWizard({
             {emailMissing ? <p className={styles.wizardFieldError} role="alert">Eメール送信には顧客Eメールが必要です。入力画面でEメールを入力してください。</p> : null}
             {occupiedSelection.length > 0 ? (
               <p className={styles.wizardFieldError} role="alert">
-                {occupiedSelection.map((table) => `${table.displayCode}は${occupancyLabel(occupancy.get(table.id)!)}`).join("、")}と重なっているため作成できません。入力画面で卓を選び直してください。
+                {occupiedSelection.map((table) => `${table.displayCode}は${occupancyLabel(occupancy.get(table.id)!, board.businessDay.businessDate)}`).join("、")}と重なっているため作成できません。入力画面で卓を選び直してください。
               </p>
             ) : null}
             <p className={styles.wizardHint}>

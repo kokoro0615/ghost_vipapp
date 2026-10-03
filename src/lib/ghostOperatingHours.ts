@@ -1,9 +1,11 @@
+import { vipBusinessTimeLabel, vipScheduleLabels } from "./vipBusinessTime.ts";
+
 const BUSINESS_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/u;
 const LOCAL_DATE_TIME_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/u;
 const TOKYO_OFFSET = "+09:00";
 const FIFTEEN_MINUTES_MS = 15 * 60_000;
 
-export const GHOST_OPERATING_HOURS_LABEL = "22:00–翌05:00";
+export const GHOST_OPERATING_HOURS_LABEL = "22:00–29:00";
 export const GHOST_OPERATING_STEP_MINUTES = 15;
 
 export type GhostTimeOption = {
@@ -74,10 +76,9 @@ export function getGhostTimeOptions(businessDate: string): GhostTimeOption[] {
 
   for (let value = startMs; value <= endMs; value += FIFTEEN_MINUTES_MS) {
     const localValue = localInputValue(value);
-    const nextDay = localValue.slice(0, 10) !== businessDate;
     options.push({
       value: localValue,
-      label: `${nextDay ? "翌 " : ""}${localValue.slice(11)}`,
+      label: vipBusinessTimeLabel(localValue, businessDate),
     });
   }
 
@@ -86,11 +87,15 @@ export function getGhostTimeOptions(businessDate: string): GhostTimeOption[] {
 
 export function formatGhostTimeValue(value: string, businessDate: string) {
   if (!LOCAL_DATE_TIME_PATTERN.test(value)) return "未選択";
-  return `${value.slice(0, 10) === businessDate ? "" : "翌 "}${value.slice(11)}`;
+  return vipBusinessTimeLabel(value, businessDate);
 }
 
 export function formatGhostTimeRange(startAt: string, endAt: string, businessDate: string) {
   return `${formatGhostTimeValue(startAt, businessDate)}–${formatGhostTimeValue(endAt, businessDate)}`;
+}
+
+export function ghostActualTimeLabel(startAt: string, endAt: string | null, businessDate: string) {
+  return vipScheduleLabels(businessDate, startAt, endAt).actualLabel;
 }
 
 export function isGhostOperatingTimestamp(value: string, includeClose = false) {

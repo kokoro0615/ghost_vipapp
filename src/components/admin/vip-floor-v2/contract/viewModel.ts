@@ -1,3 +1,4 @@
+import { vipBusinessTimeLabel, vipScheduleLabels } from "@/lib/vipBusinessTime";
 import type { VipFloorBoardV2, VipFloorReservationV2 } from "@/lib/vipFloorV2Contract";
 
 import { getStatusMeta } from "./statusModel";
@@ -13,15 +14,6 @@ function readGuestLabel(reservation: VipFloorReservationV2) {
   const missing = typeof value !== "string" || !value.trim()
     || value === `Guest ${reservation.publicCode.slice(-4)}`;
   return { label: missing ? "名前未登録" : value, missing };
-}
-
-function formatTime(value: string) {
-  return new Intl.DateTimeFormat("ja-JP", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-    timeZone: "Asia/Tokyo",
-  }).format(new Date(value));
 }
 
 export function toUiReservations(board: VipFloorBoardV2): UiReservation[] {
@@ -51,8 +43,9 @@ export function toUiReservations(board: VipFloorBoardV2): UiReservation[] {
         lifecycleStatus: reservation.lifecycleStatus,
         startAt: reservation.scheduledStartAt,
         endAt: reservation.scheduledEndAt,
-        startLabel: formatTime(reservation.scheduledStartAt),
-        endLabel: formatTime(reservation.scheduledEndAt),
+        startLabel: vipBusinessTimeLabel(reservation.scheduledStartAt, board.businessDay.businessDate),
+        endLabel: vipBusinessTimeLabel(reservation.scheduledEndAt, board.businessDay.businessDate),
+        actualTimeLabel: vipScheduleLabels(board.businessDay.businessDate, reservation.scheduledStartAt, reservation.scheduledEndAt).actualLabel,
         guestCount: reservation.guestCount.total,
         tableIds: reservation.tableIds,
         tableCodes: reservation.tableIds.map((id) => tableCodeById.get(id) ?? "卓未定"),

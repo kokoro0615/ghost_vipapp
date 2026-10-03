@@ -1,5 +1,7 @@
 "use client";
 
+import { vipBusinessTimeLabel } from "@/lib/vipBusinessTime";
+
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
@@ -497,7 +499,7 @@ export function OperationCenter({
             <div className={styles.commandScroll}>
 	          <div className={styles.commandContext}>
 	            <strong>{displayedOperationContextLabel}</strong>
-	            <span className="tabular-nums">{formatBusinessDateWithWeekday(displayedBusinessDate)} / 22:00–翌05:00</span>
+	            <span className="tabular-nums">{formatBusinessDateWithWeekday(displayedBusinessDate)} / 22:00–29:00</span>
 	          </div>
 
           {!options ? (
@@ -914,7 +916,7 @@ export function OperationCenter({
             </header>
             {board.blocks.map((block) => (
               <div key={block.id}>
-                <span>{formatClock(block.startAt)}–{formatClock(block.endAt)}</span>
+                <span>{vipBusinessTimeLabel(block.startAt, displayedBusinessDate)}–{vipBusinessTimeLabel(block.endAt, displayedBusinessDate)}</span>
                 <strong>{block.targets.venueWide
                   ? "会場全体"
                   : block.targets.tableIds.map((tableId) =>
@@ -1014,13 +1016,4 @@ function toTokyoTimestamp(value: FormDataEntryValue | null) {
 function nullableText(value: FormDataEntryValue | null) {
   const text = String(value ?? "").trim();
   return text || null;
-}
-
-function formatClock(value: string) {
-  return new Intl.DateTimeFormat("ja-JP", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-    timeZone: "Asia/Tokyo",
-  }).format(new Date(value));
 }

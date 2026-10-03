@@ -1,5 +1,7 @@
 "use client";
 
+import { vipBusinessTimeLabel } from "@/lib/vipBusinessTime";
+
 import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 import { Clock3, Minus, Plus } from "lucide-react";
 
@@ -89,14 +91,9 @@ export default function ChartView({ board, reservations, selectedReservationId, 
    * which corresponded to nothing.
    */
   const tickCount = Math.max(1, Math.round(totalMinutes / 30));
-  const timeFormatter = new Intl.DateTimeFormat("ja-JP", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-    timeZone: "Asia/Tokyo",
-  });
+  const timeFormatter = new Intl.DateTimeFormat("ja-JP", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Tokyo" });
   const ticks = Array.from({ length: tickCount }, (_, index) =>
-    timeFormatter.format(new Date(operatingStart.getTime() + index * 30 * 60_000)));
+    vipBusinessTimeLabel(new Date(operatingStart.getTime() + index * 30 * 60_000).toISOString(), board.businessDay.businessDate));
   const showNowLine = renderedAt >= operatingStart.getTime()
     && renderedAt <= operatingEnd.getTime();
   const nowStyle = showNowLine
@@ -297,7 +294,7 @@ export default function ChartView({ board, reservations, selectedReservationId, 
                         data-acknowledged={phase.acknowledged || undefined}
                         data-selected={reservation.id === selectedReservationId || undefined}
                         onClick={() => onSelect(reservation.id)}
-                        aria-label={`${reservation.publicCode}、${reservation.guestLabel}、${reservation.guestCount}名、${reservation.startLabel}から${timeFormatter.format(new Date(endAt))}、${meta.label}。${phase.description}`}
+                        aria-label={`${reservation.publicCode}、${reservation.guestLabel}、${reservation.guestCount}名、${reservation.startLabel}から${vipBusinessTimeLabel(endAt, board.businessDay.businessDate)}、${meta.label}。${phase.description}`}
                       >
                         <i className={styles.timelineClosingWindow} aria-hidden />
                         <span className={styles.timelineBarTime}>{reservation.startLabel}</span>

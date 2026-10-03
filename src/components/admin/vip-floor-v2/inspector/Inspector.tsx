@@ -215,6 +215,7 @@ export function Inspector({
                   on every row would decorate rank differences away. */}
               <dl className={styles.detailList}>
                 <div data-rank="lead"><dt>時間</dt><dd className="tabular-nums">{reservation.startLabel}–{reservation.endLabel}</dd></div>
+                {reservation.actualTimeLabel ? <div><dt>暦日</dt><dd className="tabular-nums">{reservation.actualTimeLabel}</dd></div> : null}
                 <div data-rank="lead"><dt>人数</dt><dd className="tabular-nums">{reservation.guestCount}名</dd></div>
                 <div data-rank="lead"><dt>席</dt><dd className="tabular-nums">{reservation.tableCodes.join(" + ") || "卓未定"}</dd></div>
                 <div data-band><dt>ゲスト</dt><dd>{reservation.guestLabel}</dd></div>

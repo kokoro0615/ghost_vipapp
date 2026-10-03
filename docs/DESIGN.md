@@ -20,6 +20,10 @@ and is not repeated here.
 
 ---
 
+## 2026-10-03 Owner decision: VIP営業日時
+
+VIP予約の通知・お客様確認画面/メール・管理画面の主表示は、保存された営業日と24時超表記で統一する。例：`2026/10/03(土) 24:00〜26:00（営業日）`、併記：`実際：2026/10/04(日) 00:00〜02:00（日本時間）`。深夜は実際の暦日を詳細/選択内容/最終確認に常時表示する。営業時間は22:00〜翌05:00のまま、主表示だけ22:00〜29:00へ変更。L9・§5.5の`翌`主表示指定はこの判断で上書き。保存日時、入力/APIの値、期限・履歴・現在時計・通知判定は変更しない。Website側はこの判断を参照する。調査・不変条件・検証はworkspace `docs/research/vip-business-time-20261003/REPORT.md`。
+
 ## 0. Scope and precedence
 
 This document governs `src/app/**` and `src/components/admin/vip-floor-v2/**`

@@ -22,7 +22,8 @@
     "verify:backup-restore": "node scripts/verify-backup-restore-manifest.mjs",
     "verify:deployment-release": "node scripts/verify-deployment-release-manifest.mjs",
     "release:vip-manager": "node scripts/release-vip-manager.mjs",
-    "ci": "npm run lint && npm run typecheck && npm run test && npm run build && npm run test:maintenance && npm run test:a11y"
+    "ci": "npm run lint && npm run audit:dependencies && npm run typecheck && npm run test && npm run build && npm run test:maintenance && npm run test:a11y",
+    "audit:dependencies": "node scripts/dependency-audit-gate.mjs --report dependency-audit-report.json"
   },
   "engines": {
     "node": ">=24"

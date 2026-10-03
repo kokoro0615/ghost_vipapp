@@ -1,5 +1,7 @@
 "use client";
 
+import { vipScheduleLabels } from "@/lib/vipBusinessTime";
+
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { VipFloorBoardV2 } from "@/lib/vipFloorV2Contract";
@@ -132,13 +134,13 @@ export function ReservationAlerts({ board, healthy, demo }: Props) {
         <ul tabIndex={0} aria-label="時刻確認が必要な予約">
           {alerts.map((alert) => {
             const reservation = reservations.find((item) => item.id === alert.reservationId);
-            const time = new Intl.DateTimeFormat("ja-JP", { timeZone: "Asia/Tokyo", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(alert.targetAt));
-            const nextDay = new Date(alert.targetAt).toLocaleDateString("sv-SE", { timeZone: "Asia/Tokyo" }) !== alert.businessDate;
+            const schedule = vipScheduleLabels(alert.businessDate, alert.targetAt, null);
             return <li key={alert.key}>
               <strong className={styles.kind}>{alert.kind === "arrival" ? "来店前確認" : "延長確認"}</strong>
               <h3>{reservation?.guestLabel ?? "予約名未設定"}</h3>
               <p className="tabular-nums">{reservation?.tableCodes.join("・") || "卓未定"} / {reservation?.guestCount ?? "—"}名</p>
-              <p className="tabular-nums">{alert.kind === "arrival" ? "来店予定" : "終了予定"} {nextDay ? "翌" : ""}{time}</p>
+              <p className="tabular-nums">{alert.kind === "arrival" ? "来店予定" : "終了予定"} {schedule.timeLabel}</p>
+              {schedule.actualLabel ? <p className="tabular-nums">{schedule.actualLabel}</p> : null}
             </li>;
           })}
         </ul>

@@ -25,8 +25,8 @@ test("time selector exposes only 29 quarter-hour boundaries across midnight", ()
   const options = getGhostTimeOptions("2026-07-30");
   assert.equal(options.length, 29);
   assert.deepEqual(options[0], { value: "2026-07-30T22:00", label: "22:00" });
-  assert.deepEqual(options[8], { value: "2026-07-31T00:00", label: "翌 00:00" });
-  assert.deepEqual(options.at(-1), { value: "2026-07-31T05:00", label: "翌 05:00" });
+  assert.deepEqual(options[8], { value: "2026-07-31T00:00", label: "24:00" });
+  assert.deepEqual(options.at(-1), { value: "2026-07-31T05:00", label: "29:00" });
   assert.equal(options.some((option) => option.label.includes("12:00")), false);
 });
 
@@ -89,7 +89,7 @@ test("start changes preserve a valid end or clamp a two-hour stay to close", () 
       "2026-07-31T01:30",
       "2026-07-30",
     ),
-    "23:30–翌 01:30",
+    "23:30–25:30",
   );
 });
 

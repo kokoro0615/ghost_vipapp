@@ -79,6 +79,7 @@ export default function ReservationListView({
                       className={styles.rowOpen}
                       onClick={() => onSelect(reservation.id)}
                       aria-label={`${reservation.publicCode}の詳細を開く`}
+                      aria-description={reservation.actualTimeLabel ?? undefined}
                     >
                       <strong>{reservation.startLabel}</strong>
                       <small>{reservation.endLabel}まで</small>
