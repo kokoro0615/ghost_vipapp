@@ -195,6 +195,8 @@ export function TicketOperationsPanel({
           <div
             className={styles.operationsGrid}
             data-has-selection={Boolean(operations.selectedPublicCode)}
+            inert={confirmation !== null}
+            aria-hidden={confirmation !== null ? true : undefined}
           >
             <TicketOperationsQueue
               mode={mode}
