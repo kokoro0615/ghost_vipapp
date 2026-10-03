@@ -5,9 +5,14 @@ import type { QueueGroup, UiReservation } from "./uiTypes";
 
 function readGuestLabel(reservation: VipFloorReservationV2) {
   const customer = reservation.customer;
-  if (!customer) return "ゲスト情報なし";
+  if (!customer) return { label: "名前未登録", missing: true };
   const value = customer.displayLabel ?? customer.displayNameMasked ?? customer.guestLabel;
-  return typeof value === "string" && value.trim() ? value : "マスク済みゲスト";
+  if (customer.masked === true) {
+    return { label: typeof value === "string" && value.trim() ? value : "マスク済みゲスト", missing: false };
+  }
+  const missing = typeof value !== "string" || !value.trim()
+    || value === `Guest ${reservation.publicCode.slice(-4)}`;
+  return { label: missing ? "名前未登録" : value, missing };
 }
 
 function formatTime(value: string) {
@@ -25,6 +30,7 @@ export function toUiReservations(board: VipFloorBoardV2): UiReservation[] {
   return board.reservations
     .map((reservation) => {
       const status = getStatusMeta(reservation.serviceStatus);
+      const guestName = readGuestLabel(reservation);
       const exceptionLabel = reservation.flags.includes("no_contact")
         ? "連絡未達"
         : reservation.flags.includes("capacity_warning")
@@ -38,7 +44,8 @@ export function toUiReservations(board: VipFloorBoardV2): UiReservation[] {
       return {
         id: reservation.id,
         publicCode: reservation.publicCode,
-        guestLabel: readGuestLabel(reservation),
+        guestLabel: guestName.label,
+        guestLabelMissing: guestName.missing,
         serviceStatus: reservation.serviceStatus ?? "expected",
         serviceLabel: status.label,
         lifecycleStatus: reservation.lifecycleStatus,

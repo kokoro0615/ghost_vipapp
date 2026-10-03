@@ -6,11 +6,16 @@ export async function assertReservationNameFlow({
   page, board, reservationTemplate, origin, capture,
 }) {
   let savedBoard = structuredClone(board);
+  await page.clock.setFixedTime(new Date(board.generatedAt));
   const commands = [];
-  await page.route("**/api/admin/vip-floor?**", (route) => route.fulfill({
+  await page.route("**/api/admin/vip-floor?**", (route) => {
+    if (new URL(route.request().url()).searchParams.get("purpose") === "alerts") return route.fallback();
+    return route.fulfill({
     status: 200, contentType: "application/json", body: JSON.stringify(savedBoard),
-  }));
+    });
+  });
   await page.route("**/api/admin/vip-floor/operations", async (route) => {
+    if (route.request().method() !== "POST") return route.fallback();
     const command = route.request().postDataJSON();
     commands.push(command);
     assert.ok(["reservation_create", "reservation_update"].includes(command.kind));
@@ -126,4 +131,27 @@ export async function assertReservationNameFlow({
     assert.equal(await dialog.getByLabel("人数（必須）", { exact: true }).getAttribute("aria-invalid"), "true");
     assert.equal(commands.length, 2);
   }
+
+  await dialog.getByRole("button", { name: "新規作成を閉じる", exact: true }).click();
+  savedBoard.reservations[0].publicCode = "QA-UNNAMED-8734";
+  savedBoard.reservations[0].customer = {
+    customerId: null, displayLabel: "Guest 8734", masked: false,
+  };
+  for (const view of ["list", "floor", "chart"]) {
+    await page.goto(`${origin}/?view=${view}&date=${board.businessDay.businessDate}`, { waitUntil: "domcontentloaded" });
+    await page.getByText("名前未登録", { exact: true }).filter({ visible: true }).first().waitFor();
+    assert.equal(await page.getByText("Guest 8734", { exact: true }).count(), 0);
+    await capture(page, `reservation-name-missing-${view}`);
+  }
+  await page.goto(`${origin}/?view=list&date=${board.businessDay.businessDate}`, { waitUntil: "domcontentloaded" });
+  await page.locator('main[data-state="healthy"], main[data-state="empty"]').waitFor();
+  await page.getByRole("button", { name: "QA-UNNAMED-8734の詳細を開く", exact: true }).click();
+  await page.getByRole("button", { name: "予約編集", exact: true }).click();
+  dialog = page.getByRole("dialog", { name: "予約編集", exact: true });
+  await dialog.waitFor({ timeout: 10000 });
+  assert.equal(await dialog.getByLabel("予約名（必須）", { exact: true }).inputValue(), "");
+  await dialog.getByRole("button", { name: "内容を確認", exact: true }).click();
+  await dialog.getByText("予約名を入力してください（80文字以内）。", { exact: true }).waitFor();
+  assert.equal(commands.length, 2, "an old generated guest label must never satisfy the required field");
+  await capture(page, "reservation-name-missing-edit");
 }

@@ -1081,7 +1081,7 @@ async function auditReservationName(context, capture) {
     await assertReservationNameFlow({ page, board: emptyBoard, reservationTemplate: board.reservations[0], origin, capture });
   } catch (error) {
     await page.screenshot({ path: `${artifactDirectory}/reservation-failure.png` });
-    console.error(await page.getByRole("dialog").ariaSnapshot());
+    console.error(await page.locator("body").ariaSnapshot({ timeout: 1000 }));
     throw error;
   } finally {
     await closeQaPage(page);

@@ -49,6 +49,14 @@ return; failed reads visibly report unavailable monitoring and cannot create a
 new alert from stale data. This is device-local acknowledgement, not a shared
 floor status mutation.
 
+### Missing reservation names — Owner, 2026-10-03
+
+Show **名前未登録** consistently in List, Floor, Chart and the inspector when
+the canonical reservation name is absent. The legacy `Guest <code suffix>`
+fallback is not a saved name and must leave the edit input empty. Staff confirm
+and enter the actual name; never infer it from contact details, cardholder data
+or customer profiles. Preserve masked labels for roles without name access.
+
 ### 0.1 Precedence over the workspace-wide UI rule
 
 `/home/kokoro/projects/.claude/rules/ui-ux-excellence.md` is an always-on rule

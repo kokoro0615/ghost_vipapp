@@ -53,7 +53,24 @@ test("the ledger retains server masking and never uses a customer profile name",
   assert.equal(matchesReservation(reservation, "非表示顧客氏名"), false);
 });
 
-test("a reservation without a label or customer keeps the existing empty-name fallback", async () => {
+test("a reservation without a label or customer explicitly needs a name", async () => {
   const { toUiReservations } = await loadProjection();
-  assert.equal(toUiReservations(board(null))[0].guestLabel, "ゲスト情報なし");
+  const [reservation] = toUiReservations(board(null));
+  assert.equal(reservation.guestLabel, "名前未登録");
+  assert.equal(reservation.guestLabelMissing, true);
+});
+
+test("only a matching server placeholder is marked as missing; masking and real names survive", async () => {
+  const { toUiReservations } = await loadProjection();
+  const input = board({ displayLabel: "Guest 8734", masked: false });
+  input.reservations[0].publicCode = "VIP-20261003-8734";
+  const [missing] = toUiReservations(input);
+  assert.equal(missing.guestLabel, "名前未登録");
+  assert.equal(missing.guestLabelMissing, true);
+  input.reservations[0].customer = { displayLabel: "Guest 1234", masked: false };
+  assert.equal(toUiReservations(input)[0].guestLabelMissing, false);
+  input.reservations[0].customer = { displayLabel: "Guest 8734", masked: true };
+  assert.equal(toUiReservations(input)[0].guestLabel, "Guest 8734");
+  input.reservations[0].customer = { displayLabel: "名前未登録", masked: false };
+  assert.equal(toUiReservations(input)[0].guestLabelMissing, false);
 });

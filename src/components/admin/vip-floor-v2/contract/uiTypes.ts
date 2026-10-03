@@ -282,6 +282,7 @@ export type UiReservation = {
   id: string;
   publicCode: string;
   guestLabel: string;
+  guestLabelMissing?: boolean;
   serviceStatus: string;
   serviceLabel: string;
   lifecycleStatus: string;

@@ -119,7 +119,7 @@ export function OperationCenter({
   const reservationGuestLabelOwner = editReservation ? `edit:${editReservation.id}` : "create";
   const activeReservationGuestLabel = reservationGuestLabel?.owner === reservationGuestLabelOwner
     ? reservationGuestLabel.value
-    : editReservation?.guestLabel ?? "";
+    : editReservation?.guestLabelMissing ? "" : editReservation?.guestLabel ?? "";
   const activeKind: OperationKind = !editReservation
     && !operationKindTouched
     && !datePending
