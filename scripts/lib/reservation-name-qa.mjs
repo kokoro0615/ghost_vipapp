@@ -142,6 +142,11 @@ export async function assertReservationNameFlow({
   };
   for (const view of ["list", "floor", "chart"]) {
     await page.goto(`${origin}/?view=${view}&date=${board.businessDay.businessDate}`, { waitUntil: "domcontentloaded" });
+    // Chart bands display timing and the public code; the guest name is in
+    // their accessible name and the inspector opened by selecting the band.
+    if (view === "chart") {
+      await page.getByRole("button", { name: /^QA-UNNAMED-8734、名前未登録、/u }).click();
+    }
     await page.getByText("名前未登録", { exact: true }).filter({ visible: true }).first().waitFor();
     assert.equal(await page.getByText("Guest 8734", { exact: true }).count(), 0);
     await capture(page, `reservation-name-missing-${view}`);
