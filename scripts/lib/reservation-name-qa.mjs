@@ -6,7 +6,6 @@ export async function assertReservationNameFlow({
   page, board, reservationTemplate, origin, capture,
 }) {
   let savedBoard = structuredClone(board);
-  await page.clock.setFixedTime(new Date(board.generatedAt));
   const commands = [];
   await page.route("**/api/admin/vip-floor?**", (route) => {
     if (new URL(route.request().url()).searchParams.get("purpose") === "alerts") return route.fallback();
@@ -38,6 +37,10 @@ export async function assertReservationNameFlow({
           ? { customerId: null, displayLabel: payload.guestLabel, masked: false }
           : null,
       }],
+      tables: savedBoard.tables.map((table) => ({
+        ...table,
+        reservationIds: payload.tableIds.includes(table.id) ? [reservationTemplate.id] : [],
+      })),
     };
     await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({
       ok: true, message: "Synthetic reservation saved", boardRevision: savedBoard.boardRevision,
