@@ -72,6 +72,9 @@ const FLOOR_POSITIONS = [
   { x: 51.9, y: 53.3, w: 4.3, h: 4.3, r: 0 },
   { x: 51.8, y: 16.1, w: 4.15, h: 4.15, r: 0 },
   { x: 44.2, y: 16.1, w: 4.15, h: 4.15, r: 0 },
+  // WEST/EAST behind the DJ booth (Owner 2026-10-08), VIP Manager only.
+  { x: 73.0, y: 40.8, w: 3.6, h: 3.6, r: 0 },
+  { x: 72.8, y: 53.2, w: 3.6, h: 3.6, r: 0 },
 ] as const;
 
 const FLOOR_POSITION_INDEX_BY_CODE = new Map<string, number>([
@@ -91,6 +94,12 @@ const FLOOR_POSITION_INDEX_BY_CODE = new Map<string, number>([
   ["VIP-6", 5],
   ["VIP-7", 6],
   ["VIP-8", 7],
+  ["dj-booth-west", 8],
+  ["dj-booth-east", 9],
+  ["WEST", 8],
+  ["EAST", 9],
+  ["DJ BOOTH WEST", 8],
+  ["DJ BOOTH EAST", 9],
 ]);
 
 function resolveFloorPositions(seats: LegacyVipSeat[]) {

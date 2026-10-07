@@ -492,8 +492,8 @@ async function auditViewport(context, viewport) {
     if (view === "chart") {
       assert.equal(
         await emptyViewsPage.locator('[class*="timelineRow"]').count(),
-        8,
-        "an empty business day must still render all eight chart rows",
+        10,
+        "an empty business day must still render all ten chart rows",
       );
     }
   }
@@ -501,8 +501,8 @@ async function auditViewport(context, viewport) {
   await emptyViewsPage.getByRole("heading", { name: "VIPフロア" }).waitFor();
   assert.equal(
     await emptyViewsPage.locator('button[class*="tableNode"]').count(),
-    8,
-    "an empty business day must still render all eight floor tables",
+    10,
+    "an empty business day must still render all ten floor tables",
   );
   await closeQaPage(emptyViewsPage);
 
@@ -1966,8 +1966,10 @@ const ticketOperationsLegacyIncompleteOrderFixture = {
   },
 };
 
+// Ten production tables: VIP-1..VIP-8 plus WEST/EAST behind the DJ booth
+// (Owner 2026-10-08, VIP Manager only, never sold on the website).
 const tableIds = Array.from(
-  { length: 8 },
+  { length: 10 },
   (_, index) => `00000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
 );
 
@@ -1982,7 +1984,14 @@ const qaTableGeometry = [
   { x: 51.9, y: 53.3, size: 4.3, rotation: 0 },
   { x: 51.8, y: 16.1, size: 4.15, rotation: 0 },
   { x: 44.2, y: 16.1, size: 4.15, rotation: 0 },
+  { x: 73.0, y: 40.8, size: 3.6, rotation: 0 },
+  { x: 72.8, y: 53.2, size: 3.6, rotation: 0 },
 ];
+const qaTableIdentity = (index) => index < 8
+  ? { code: `VIP-${index + 1}`, name: `VIP TABLE ${index + 1}`, onlineEligible: true }
+  : index === 8
+    ? { code: "WEST", name: "DJ BOOTH WEST", onlineEligible: false }
+    : { code: "EAST", name: "DJ BOOTH EAST", onlineEligible: false };
 
 const board = {
   schemaVersion: "vip-floor.v2",
@@ -2006,16 +2015,17 @@ const board = {
   sections: [],
   tables: tableIds.map((id, index) => {
     const geometry = qaTableGeometry[index];
+    const identity = qaTableIdentity(index);
     return {
       id,
       version: 3,
-      publicResourceCode: `VIP-${index + 1}`,
-      displayCode: `VIP-${index + 1}`,
-      name: `VIP TABLE ${index + 1}`,
+      publicResourceCode: identity.code,
+      displayCode: identity.code,
+      name: identity.name,
       sectionId: "",
       capacityMin: 1,
       capacityMax: index === 0 ? 7 : 6,
-      onlineEligible: true,
+      onlineEligible: identity.onlineEligible,
       geometry: {
         shape: "rect",
         xPercent: geometry.x,
@@ -2067,7 +2077,7 @@ const board = {
   blocks: [],
   notes: [],
   totals: {
-    tableCount: 8,
+    tableCount: 10,
     reservationCount: 1,
     activeReservationCount: 1,
     assignmentCount: 1,
@@ -2358,6 +2368,13 @@ const operationOptions = {
     maxGuests: 20,
     minSpendYen: 0,
     compatibleTableIds: tableIds.slice(0, 4),
+  }, {
+    id: "30000000-0000-4000-8000-000000000002",
+    name: "DJ BOOTH",
+    minGuests: 1,
+    maxGuests: 12,
+    minSpendYen: 0,
+    compatibleTableIds: tableIds.slice(8, 10),
   }],
 };
 

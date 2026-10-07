@@ -17,6 +17,11 @@ import {
   readBoundedJsonObject,
 } from "@/lib/server/httpBoundary";
 
+// The block form lists every table (ten since WEST/EAST behind the DJ booth,
+// 2026-10-08). Mirror the canonical v2 block parser's bound instead of the
+// eight-table reservation bound.
+const BLOCK_SEAT_LIMIT = 100;
+
 export const runtime = "nodejs";
 
 // Operation bodies are a small {kind, payload} shape; 8 KiB is generous.
@@ -530,7 +535,7 @@ function parseBlock(payload: Record<string, unknown>) {
   const startAt = readIso(payload.startAt);
   const endAt = readIso(payload.endAt);
   const memo = readNullableString(payload.memo, 1000);
-  const seatResourceIds = readUuidArray(payload.seatResourceIds, 0, 8);
+  const seatResourceIds = readUuidArray(payload.seatResourceIds, 0, BLOCK_SEAT_LIMIT);
   const venueWide = payload.venueWide === true;
   const repeatDays = readInteger(payload.repeatDays, 1, 14);
 
@@ -583,7 +588,7 @@ function parseBlockMutation(payload: Record<string, unknown>, requireIdentity: b
   const startAt = readIso(payload.startAt);
   const endAt = readIso(payload.endAt);
   const memo = readNullableString(payload.memo, 1000);
-  const seatResourceIds = readUuidArray(payload.seatResourceIds, 0, 8);
+  const seatResourceIds = readUuidArray(payload.seatResourceIds, 0, BLOCK_SEAT_LIMIT);
   const venueWide = payload.venueWide === true;
 
   if (

@@ -80,3 +80,26 @@ test("legacy fallback does not infer VIP-1 from an unrelated VIP-101 code", () =
     [72.8, 17.9],
   );
 });
+
+test("legacy fallback places WEST and EAST behind the DJ booth, apart from every official seat", () => {
+  const board = adaptLegacyVipBoard({
+    businessDate: "2026-10-09",
+    reservations: [],
+    seats: [
+      seat("dj-booth-east", "DJ BOOTH EAST"),
+      ...[...expectedGeometry.keys()].map((code) => seat(code)),
+      seat("dj-booth-west", "DJ BOOTH WEST"),
+    ],
+    totals: {},
+  }, "2026-10-09");
+
+  const position = (id) => {
+    const table = board.tables.find((candidate) => candidate.id === id);
+    return [table?.geometry.xPercent, table?.geometry.yPercent];
+  };
+  assert.deepEqual(position("dj-booth-west"), [73.0, 40.8]);
+  assert.deepEqual(position("dj-booth-east"), [72.8, 53.2]);
+  for (const [code, [x, y]] of expectedGeometry) {
+    assert.deepEqual(position(code), [x, y], code);
+  }
+});

@@ -191,9 +191,12 @@ These look like mistakes and are not:
   is the fast path on the venue's iPads; preloading the webfont would cost the
   first paint it is supposed to protect.
 - **`unoptimized` on the floor-plan images** (`FloorView.tsx`,
-  `ReservationWizard.tsx`, asset `/media/images/vipmapv3.9239fd2174.webp`).
+  `ReservationWizard.tsx`, asset `/media/images/vipmapv3-west-east.43e30e785e.webp`).
   A second encode destroys the plan's authentic black-violet and champagne. The
-  contract test asserts both `unoptimized` and `filter: none`.
+  contract test asserts both `unoptimized` and `filter: none`. The WEST/EAST
+  revision (2026-10-08) adds only the two seats behind the DJ booth: generated
+  patches composited over the decoded `vipmapv3.9239fd2174` pixels, every other
+  pixel kept, then encoded once at WebP q92 (mean channel shift < 0.2/255).
 - **`middleware.ts` matcher excludes `_next/static`, `_next/image`, `media/`,
   `icon.svg`.** Widening it puts the Basic challenge in front of the floor plan.
 - **`body { overflow: hidden }`** in `globals.css`. The workspace owns its own

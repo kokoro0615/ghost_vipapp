@@ -32,6 +32,9 @@ const OFFICIAL_DISPLAY_CODES = new Set([
   "VIP-7",
   "VIP-8",
 ]);
+// WEST/EAST behind the DJ booth (Owner 2026-10-08) are VIP Manager-only seats.
+// A board carries both of them or neither; the regression never books them.
+const MANAGER_ONLY_DISPLAY_CODES = new Set(["WEST", "EAST"]);
 
 async function main() {
   const config = await loadConfiguration();
@@ -731,12 +734,22 @@ async function readBoard(client, businessDate) {
 
 function officialTables(board) {
   const tables = Array.isArray(board?.tables) ? board.tables : [];
-  assert(tables.length === 8, "board_table_count_not_eight");
+  const managerOnly = tables.filter((table) => MANAGER_ONLY_DISPLAY_CODES.has(table?.displayCode));
   assert(
-    tables.every((table) => OFFICIAL_DISPLAY_CODES.has(table?.displayCode)),
+    tables.length === OFFICIAL_DISPLAY_CODES.size + managerOnly.length
+      && (managerOnly.length === 0 || managerOnly.length === MANAGER_ONLY_DISPLAY_CODES.size),
+    "board_table_count_unexpected",
+  );
+  assert(
+    managerOnly.every((table) => table?.onlineEligible === false),
+    "board_manager_only_table_online",
+  );
+  const official = tables.filter((table) => !MANAGER_ONLY_DISPLAY_CODES.has(table?.displayCode));
+  assert(
+    official.every((table) => OFFICIAL_DISPLAY_CODES.has(table?.displayCode)),
     "board_contains_non_official_table",
   );
-  return tables;
+  return official;
 }
 
 function findTable(board, displayCode) {

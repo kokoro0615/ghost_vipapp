@@ -358,7 +358,7 @@ test("Basic access stays browser-native until terminal logout requires explicit 
   assert.match(workspace, /lockedOwnerAccess[\s\S]*?<form[\s\S]*?autoComplete="username"[\s\S]*?type="password"[\s\S]*?ロックを解除/u);
   assert.match(workspace, /ブラウザに残るBasic認証だけでは解除できません/u);
   assert.match(workspaceStyles, /\.loginFrame \{[\s\S]*?grid-template-columns:/u);
-  assert.match(workspaceStyles, /vipmapv3\.9239fd2174\.webp/u);
+  assert.match(workspaceStyles, /vipmapv3-west-east\.43e30e785e\.webp/u);
   assert.match(
     workspaceStyles,
     /@media \(max-width: 1023px\) \{[\s\S]*?\.loginFrame \{[\s\S]*?border: 0;[\s\S]*?\.loginIdentityBody, \.loginPlan \{ display: none;/u,

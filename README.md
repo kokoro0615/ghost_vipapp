@@ -27,7 +27,7 @@ Productionのcommitとこのcheckoutを照合します。
 ## Current scope
 
 - Customer Trial終了後の正式Production data planeをrelease targetとし、Trial mode、staging origin、bypass、Trial banner、Trial資格情報は各Gateで撤去
-- active/UI卓は正式な`VIP-1`〜`VIP-8`だけ。`T1`〜`T8`はrun-scoped Trial fixtureとしてcleanupし、rename／移行しない
+- active/UI卓は正式な`VIP-1`〜`VIP-8`と、VIP Manager専用の`WEST`/`EAST`（DJ BOOTH裏、2026-10-08追加、公開Websiteでは非販売）だけ。`T1`〜`T8`はrun-scoped Trial fixtureとしてcleanupし、rename／移行しない
 - VIP Managerだけをwarm-white、graphite、限定champagneのlight operations UIとし、公開GHOST websiteのblack-violet paletteは維持
 - List / Floor / Chart の3つを直接到達可能な主要運用ビューとし、TableCheckは情報階層とworkflowだけを参照
 - 例外キュー、予約Inspector、command center

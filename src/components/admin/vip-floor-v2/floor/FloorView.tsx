@@ -97,7 +97,7 @@ export default function FloorView({
         {/* The plan keeps its true aspect ratio so table geometry lands on the room. */}
         <div className={styles.floorPlan}>
           <Image
-            src="/media/images/vipmapv3.9239fd2174.webp"
+            src="/media/images/vipmapv3-west-east.43e30e785e.webp"
             alt="GHOST Osaka VIPフロアのカラー座席図"
             width={1672}
             height={940}

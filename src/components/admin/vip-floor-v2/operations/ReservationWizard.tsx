@@ -501,7 +501,7 @@ export function ReservationWizard({
               <summary>フロア図を確認</summary>
             <figure className={styles.wizardMap}>
               <Image
-                src="/media/images/vipmapv3.9239fd2174.webp"
+                src="/media/images/vipmapv3-west-east.43e30e785e.webp"
                 alt="GHOST Osaka VIPフロアのカラー座席図"
                 width={1672}
                 height={940}

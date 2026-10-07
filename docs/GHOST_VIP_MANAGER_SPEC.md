@@ -107,9 +107,12 @@ TableCheckはUI/操作研究の基準であり、TableCheck API、名称、ロ�
 | 6 | FLOOR VIP | 1 | 6 |
 | 7 | FLOOR VIP | 1 | 6 |
 | 8 | FLOOR VIP | 1 | 6 |
+| WEST | DJ BOOTH WEST | 1 | 6 |
+| EAST | DJ BOOTH EAST | 1 | 6 |
 
-- 8卓MAPを唯一の正本フロアとする。
-- active masterとManager UIは正式な`VIP-1`〜`VIP-8`だけとする。Trial `T1`〜`T8`はrun-scoped fixtureであり、正式卓へのrename、予約・block・assignment・staff assignmentの移行、CSS/read filterだけの隠蔽を禁止する。
+- 2026-10-08 Owner決定: DJ BOOTH裏に`WEST`（フロア図の上側）と`EAST`（下側）を追加した。常連の特別受入れ用で、VIP Managerからの事前予約・店頭受付・blockだけで運用し、公開Websiteでは販売しない（`online_eligible=false`、Website公開許可リスト、v88保留ガード）。プランは専用「DJ BOOTH」（最低金額なし、1卓1〜6名、2卓同時は最大12名）で、既存プランとは混在できない。
+- 10卓MAP（`/media/images/vipmapv3-west-east.43e30e785e.webp`、DJ BOOTH裏にW/Eを描画）を唯一の正本フロアとする。
+- active masterとManager UIは正式な`VIP-1`〜`VIP-8`と`WEST`/`EAST`だけとする。Trial `T1`〜`T8`はrun-scoped fixtureであり、正式卓へのrename、予約・block・assignment・staff assignmentの移行、CSS/read filterだけの隠蔽を禁止する。
 - Trial終了時はexact runを依存順に破棄しseed前baselineを復元する。Productionに履歴参照付きinactive検証卓がある場合は物理削除せず、inactive/archiveとして保持しactive read/UIから除外する。
 - セクション分けはしない。
 - 接続可能な卓組合せはない。
