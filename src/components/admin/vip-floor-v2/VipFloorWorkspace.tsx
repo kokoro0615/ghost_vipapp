@@ -299,21 +299,24 @@ export default function VipFloorWorkspace({
   }, [pathname]);
 
   useEffect(() => {
-    const nextView = parseWorkspaceView(searchParams.get("view"));
+    // searchParams only triggers this sync; the values come from the committed
+    // URL. Observed with Next.js 16.4.1: useSearchParams() can still return the
+    // previous query right after updateRoute()'s native history.replaceState(),
+    // which made this effect restore the old view/filter/date the workspace had
+    // just replaced (e.g. a phone-reservation date switch reloading the old day).
+    const routeParams = new URLSearchParams(window.location.search);
+
+    const nextView = parseWorkspaceView(routeParams.get("view"));
     if (state.view !== nextView) dispatch({ type: "view", view: nextView });
 
-    const nextQuery = searchParams.get("q") ?? "";
+    const nextQuery = routeParams.get("q") ?? "";
     if (state.query !== nextQuery) dispatch({ type: "query", query: nextQuery });
 
-    const status = searchParams.get("filter");
+    const status = routeParams.get("filter");
     const nextStatus = status && STATUS_FILTERS.has(status) ? status : "all";
     if (state.statusFilter !== nextStatus) dispatch({ type: "statusFilter", status: nextStatus });
 
-    // Read the committed URL rather than useSearchParams(): since Next.js 16.4
-    // the hook can lag one render behind a native history.replaceState(), so a
-    // date this workspace just wrote would look like a navigation back to the
-    // previous day and reload it.
-    const date = new URLSearchParams(window.location.search).get("date");
+    const date = routeParams.get("date");
     // A phone-reservation date switch verifies options and then loads the
     // canonical board before replacing the URL. Do not let the still-old URL
     // race that in-flight load and abort it by restoring the previous date.
