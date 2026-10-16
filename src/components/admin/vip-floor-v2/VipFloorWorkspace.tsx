@@ -309,7 +309,11 @@ export default function VipFloorWorkspace({
     const nextStatus = status && STATUS_FILTERS.has(status) ? status : "all";
     if (state.statusFilter !== nextStatus) dispatch({ type: "statusFilter", status: nextStatus });
 
-    const date = searchParams.get("date");
+    // Read the committed URL rather than useSearchParams(): since Next.js 16.4
+    // the hook can lag one render behind a native history.replaceState(), so a
+    // date this workspace just wrote would look like a navigation back to the
+    // previous day and reload it.
+    const date = new URLSearchParams(window.location.search).get("date");
     // A phone-reservation date switch verifies options and then loads the
     // canonical board before replacing the URL. Do not let the still-old URL
     // race that in-flight load and abort it by restoring the previous date.
